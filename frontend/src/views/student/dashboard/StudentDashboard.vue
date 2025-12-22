@@ -2,7 +2,7 @@
   <!-- Welcome Section -->
   <div class="mb-5">
     <h1 class="h2 fw-bold text-dark mb-2">Student Dashboard</h1>
-    <p class="text-muted">Welcome back! Continue your learning journey.</p>
+    <p class="text-muted">Welcome back! Now Continue your learning journey.</p>
   </div>
 
   <!-- Stats Grid -->
