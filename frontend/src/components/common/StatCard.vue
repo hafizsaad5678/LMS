@@ -47,16 +47,3 @@ const iconBgColor = computed(() => props.bgColor);
 const iconColorClass = computed(() => props.iconColor);
 </script>
 
-<style scoped>
-.stat-card {
-  transition: all 0.3s ease;
-}
-
-.stat-card:hover {
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1) !important;
-}
-
-.bg-primary-light {
-  background-color: rgba(13, 110, 253, 0.1);
-}
-</style>

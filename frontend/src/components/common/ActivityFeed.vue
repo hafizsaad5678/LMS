@@ -26,27 +26,4 @@ defineProps({
 });
 </script>
 
-<style scoped>
-.activity-feed {
-  max-height: 400px;
-  overflow-y: auto;
-}
 
-.activity-feed::-webkit-scrollbar {
-  width: 6px;
-}
-
-.activity-feed::-webkit-scrollbar-track {
-  background: #f1f1f1;
-  border-radius: 10px;
-}
-
-.activity-feed::-webkit-scrollbar-thumb {
-  background: #888;
-  border-radius: 10px;
-}
-
-.activity-feed::-webkit-scrollbar-thumb:hover {
-  background: #555;
-}
-</style>

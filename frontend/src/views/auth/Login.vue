@@ -51,6 +51,12 @@ export default {
       
       console.log('Login successful - User role:', userRole)
       
+      // Store tokens and user info
+      localStorage.setItem('access_token', data.access)
+      localStorage.setItem('refresh_token', data.refresh)
+      localStorage.setItem('user_role', userRole)
+      localStorage.setItem('username', data.username)
+      
       // Redirect based on actual database role
       switch (userRole) {
         case 'student':
@@ -65,7 +71,12 @@ export default {
           break
         default:
           console.warn('Unknown role:', userRole)
-          this.$router.push('/login')
+          // For unknown roles, show error but still allow access to a default dashboard
+          alert('Your account does not have a specific role assigned. Please contact administrator.')
+          // Redirect to admin dashboard if user is staff/superuser, otherwise show error
+          if (data.is_staff || data.is_superuser) {
+            this.$router.push('/admin-dashboard')
+          }
       }
     },
     handleLoginError(error) {

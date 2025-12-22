@@ -23,17 +23,19 @@ export const useAuth = defineStore('auth', {
       this.error = null
       try {
         const response = await authAPI.login(credentials)
-        
+
         // Store tokens
         this.access_token = response.data.access
         this.refresh_token = response.data.refresh
-        
+        this.userName = response.data.username || response.data.full_name || 'Admin'
+
         localStorage.setItem('access_token', response.data.access)
         localStorage.setItem('refresh_token', response.data.refresh)
-        
+        localStorage.setItem('username', this.userName)
+
         // Redirect to dashboard
         router.push('/admin-dashboard')
-        
+
         return response.data
       } catch (error) {
         this.error = error.response?.data?.error || 'Login failed'

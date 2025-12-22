@@ -97,6 +97,7 @@ export default {
       try {
         const response = await authAPI.login(this.form)
         
+        console.log(response)
         localStorage.setItem('access_token', response.data.access)
         localStorage.setItem('refresh_token', response.data.refresh)
         localStorage.setItem('userRole', response.data.role)

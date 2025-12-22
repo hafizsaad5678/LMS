@@ -1,16 +1,26 @@
 <template>
   <!-- Sidebar -->
-  <aside :class="['sidebar', sidebarTheme]">
+  <aside :class="['sidebar', sidebarTheme, { 'show': isOpen }]">
     <!-- Sidebar Header -->
     <div class="sidebar-header border-bottom">
-      <div class="d-flex align-items-center gap-3">
-        <div :class="['logo-icon', `${sidebarTheme}-icon`]">
-          <i :class="dashboardIcon"></i>
+      <div class="d-flex align-items-center justify-content-between">
+        <div class="d-flex align-items-center gap-3">
+          <div :class="['logo-icon', `${sidebarTheme}-icon`]">
+            <i :class="dashboardIcon"></i>
+          </div>
+          <div>
+            <h6 class="mb-0 fw-bold">{{ dashboardTitle }}</h6>
+            <small class="text-muted">{{ dashboardSubtitle }}</small>
+          </div>
         </div>
-        <div>
-          <h6 class="mb-0 fw-bold">{{ dashboardTitle }}</h6>
-          <small class="text-muted">{{ dashboardSubtitle }}</small>
-        </div>
+        <!-- Close button for mobile -->
+        <button 
+          class="btn btn-link text-muted d-lg-none p-0"
+          @click="emit('close')"
+          aria-label="Close sidebar"
+        >
+          <i class="bi bi-x-lg fs-5"></i>
+        </button>
       </div>
     </div>
 
@@ -114,8 +124,14 @@ const props = defineProps({
   dashboardHighlightText: {
     type: String,
     default: ''
+  },
+  isOpen: {
+    type: Boolean,
+    default: false
   }
 })
+
+const emit = defineEmits(['close'])
 
 const route = useRoute()
 const expandedItems = reactive({})
@@ -153,147 +169,3 @@ const toggleSupportCard = () => {
 }
 </script>
 
-<style scoped>
-.sidebar {
-  width: 280px;
-  position: fixed;
-  left: 0;
-  top: 56px;
-  bottom: 0;
-  overflow-y: auto;
-  z-index: 1020;
-}
-
-.sidebar.admin { background: linear-gradient(180deg, #ffe5e8 0%, #ffd6db 100%); }
-.sidebar.teacher { background: linear-gradient(180deg, #e7f1ff 0%, #d4e7ff 100%); }
-.sidebar.student { background: linear-gradient(180deg, #e8f5e9 0%, #d4edda 100%); }
-
-.sidebar-header { padding: 1.5rem 1.25rem; }
-
-.logo-icon {
-  width: 48px;
-  height: 48px;
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 24px;
-  color: white;
-}
-
-.admin-icon { background: linear-gradient(135deg, #dc3545 0%, #c82333 100%); box-shadow: 0 4px 12px rgba(220, 53, 69, 0.3); }
-.teacher-icon { background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%); box-shadow: 0 4px 12px rgba(13, 110, 253, 0.3); }
-.student-icon { background: linear-gradient(135deg, #198754 0%, #146c43 100%); box-shadow: 0 4px 12px rgba(25, 135, 84, 0.3); }
-
-.nav-item {
-  padding: 0.75rem 1rem;
-  border-radius: 12px;
-  color: #495057;
-  text-decoration: none;
-  background: transparent;
-  border: none;
-  transition: all 0.2s;
-  display: block;
-}
-
-.nav-item:hover {
-  background: rgba(255, 255, 255, 0.6);
-  color: #1a1a1a;
-  transform: translateX(4px);
-}
-
-.sidebar.admin .nav-item.active {
-  background: rgba(220, 53, 69, 0.15);
-  color: #dc3545;
-  font-weight: 600;
-  border-left: 4px solid #dc3545;
-}
-
-.sidebar.teacher .nav-item.active {
-  background: rgba(13, 110, 253, 0.15);
-  color: #0d6efd;
-  font-weight: 600;
-  border-left: 4px solid #0d6efd;
-}
-
-.sidebar.student .nav-item.active {
-  background: rgba(25, 135, 84, 0.15);
-  color: #198754;
-  font-weight: 600;
-  border-left: 4px solid #198754;
-}
-
-.rotate-180 { transform: rotate(180deg); transition: transform 0.3s; }
-
-.submenu {
-  padding-left: 1.5rem;
-  border-left: 2px solid rgba(0, 0, 0, 0.1);
-}
-
-.submenu-item {
-  padding: 0.625rem 1rem;
-  border-radius: 8px;
-  color: #6c757d;
-  text-decoration: none;
-  font-size: 0.875rem;
-  transition: all 0.2s;
-  display: block;
-}
-
-.submenu-item:hover {
-  background: rgba(255, 255, 255, 0.5);
-  color: #1a1a1a;
-}
-
-.sidebar.admin .submenu-item.active { background: rgba(220, 53, 69, 0.12); color: #dc3545; font-weight: 600; }
-.sidebar.teacher .submenu-item.active { background: rgba(13, 110, 253, 0.12); color: #0d6efd; font-weight: 600; }
-.sidebar.student .submenu-item.active { background: rgba(25, 135, 84, 0.12); color: #198754; font-weight: 600; }
-
-.submenu-enter-active, .submenu-leave-active { transition: all 0.3s; overflow: hidden; }
-.submenu-enter-from, .submenu-leave-to { opacity: 0; max-height: 0; }
-.submenu-enter-to, .submenu-leave-from { opacity: 1; max-height: 500px; }
-
-.support-float-btn {
-  position: fixed;
-  bottom: 24px;
-  right: 24px;
-  width: 60px;
-  height: 60px;
-  border: none;
-  color: white;
-  z-index: 9998;
-  transition: all 0.3s;
-}
-
-.admin-float { background: linear-gradient(135deg, #dc3545 0%, #c82333 100%); }
-.teacher-float { background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%); }
-.student-float { background: linear-gradient(135deg, #198754 0%, #146c43 100%); }
-
-.support-float-btn:hover {
-  transform: scale(1.1) rotate(15deg);
-}
-
-.support-card-container {
-  position: fixed;
-  bottom: 100px;
-  right: 24px;
-  z-index: 9999;
-  min-width: 280px;
-}
-
-.admin-support { border-color: #dc3545 !important; }
-.teacher-support { border-color: #0d6efd !important; }
-.student-support { border-color: #198754 !important; }
-
-.admin-btn { background: linear-gradient(135deg, #dc3545 0%, #c82333 100%); }
-.teacher-btn { background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%); }
-.student-btn { background: linear-gradient(135deg, #198754 0%, #146c43 100%); }
-
-.support-card-enter-active, .support-card-leave-active { transition: all 0.3s; }
-.support-card-enter-from, .support-card-leave-to { opacity: 0; transform: translateY(20px) scale(0.9); }
-
-@media (max-width: 992px) {
-  .sidebar { transform: translateX(-100%); }
-  .sidebar.show { transform: translateX(0); }
-}
-</style>

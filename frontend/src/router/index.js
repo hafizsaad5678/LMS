@@ -3,6 +3,7 @@ import Login from '../views/auth/Login.vue'
 import Signup from '../views/auth/Signup.vue'
 import ForgotPassword from '../views/auth/ForgotPassword.vue'
 import ResetPassword from '../views/auth/ResetPassword.vue'
+import HomeScreen from '../views/HomeScreen.vue'
 import AdminLayout from '../layouts/AdminLayout.vue'
 import StudentLayout from '../layouts/StudentLayout.vue'
 import TeacherLayout from '../layouts/TeacherLayout.vue'
@@ -17,30 +18,42 @@ import ListStudent from '../views/admin/student/ListStudent.vue'
 import AddStudent from '../views/admin/student/AddStudent.vue'
 import EditStudent from '../views/admin/student/EditStudent.vue'
 import DeleteStudent from '../views/admin/student/DeleteStudent.vue'
+import StudentProfile from '../views/admin/student/StudentProfile.vue'
 
 // Admin Teacher views
 import ListTeacher from '../views/admin/teacher/ListTeacher.vue'
 import AddTeacher from '../views/admin/teacher/AddTeacher.vue'
 import EditTeacher from '../views/admin/teacher/EditTeacher.vue'
 import DeleteTeacher from '../views/admin/teacher/DeleteTeacher.vue'
+import TeacherProfile from '../views/admin/teacher/TeacherProfile.vue'
 
 // Admin Department views
 import ListDepartment from '../views/admin/department/ListDepartment.vue'
 import AddDepartment from '../views/admin/department/AddDepartment.vue'
 import EditDepartment from '../views/admin/department/EditDepartment.vue'
 import DeleteDepartment from '../views/admin/department/DeleteDepartment.vue'
+import DepartmentProfile from '../views/admin/department/DepartmentProfile.vue'
 
 // Admin Subject views
 import ListSubject from '../views/admin/subject/ListSubject.vue'
 import AddSubject from '../views/admin/subject/AddSubject.vue'
 import EditSubject from '../views/admin/subject/EditSubject.vue'
 import DeleteSubject from '../views/admin/subject/DeleteSubject.vue'
+import SubjectProfile from '../views/admin/subject/SubjectProfile.vue'
 
 // Admin Course views
 import ListCourse from '../views/admin/course/ListCourse.vue'
 import AddCourse from '../views/admin/course/AddCourse.vue'
 import EditCourse from '../views/admin/course/EditCourse.vue'
 import DeleteCourse from '../views/admin/course/DeleteCourse.vue'
+import CourseProfile from '../views/admin/course/CourseProfile.vue'
+
+// Admin Institution views
+import ListInstitution from '../views/admin/institution/ListInstitution.vue'
+import AddInstitution from '../views/admin/institution/AddInstitution.vue'
+import EditInstitution from '../views/admin/institution/EditInstitution.vue'
+import DeleteInstitution from '../views/admin/institution/DeleteInstitution.vue'
+import InstitutionProfile from '../views/admin/institution/InstitutionProfile.vue'
 
 // Admin Assignment views
 import AddAssignment from '../views/admin/assignment/AddAssignment.vue'
@@ -52,8 +65,21 @@ import ListAssignment from '../views/admin/assignment/ListAssignment.vue'
 import Accounts from '../views/admin/management/Accounts.vue'
 import FeesCollection from '../views/admin/management/FeesCollection.vue'
 import Expenses from '../views/admin/management/Expenses.vue'
-import Salary from '../views/admin/management/Salary.vue'
-import Library from '../views/admin/management/Library.vue'
+import LibraryDashboard from '../views/admin/library/Library.vue'
+import LibraryBooks from '../views/admin/library/LibraryBooks.vue'
+import BookBorrowing from '../views/admin/library/BookBorrowing.vue'
+
+// Admin Semester views
+import ListSemester from '../views/admin/semester/ListSemester.vue'
+import AddSemester from '../views/admin/semester/AddSemester.vue'
+import EditSemester from '../views/admin/semester/EditSemester.vue'
+import SemesterProfile from '../views/admin/semester/SemesterProfile.vue'
+
+// Admin Session views
+import ListSessions from '../views/admin/session/ListSessions.vue'
+import AddSession from '../views/admin/session/AddSession.vue'
+import EditSession from '../views/admin/session/EditSession.vue'
+import SessionProfile from '../views/admin/session/SessionProfile.vue'
 
 // Admin Academic views
 import Holidays from '../views/admin/academic/Holidays.vue'
@@ -109,7 +135,7 @@ import CourseMaterial from '../views/student/resources/CourseMaterial.vue'
 import StudentMaterialDownload from '../views/student/resources/MaterialDownload.vue'
 
 const routes = [
-  { path: '/', redirect: '/login' },
+  { path: '/', name: 'Home', component: HomeScreen },
   { path: '/login', name: 'Login', component: Login, meta: { requiresGuest: true } },
   { path: '/signup', name: 'Signup', component: Signup, meta: { requiresGuest: true } },
   { path: '/forgot-password', name: 'ForgotPassword', component: ForgotPassword, meta: { requiresGuest: true } },
@@ -126,32 +152,57 @@ const routes = [
       // Student routes
       { path: 'students', name: 'ListStudent', component: ListStudent },
       { path: 'students/add', name: 'AddStudent', component: AddStudent },
-      { path: 'students/edit', name: 'EditStudent', component: EditStudent },
-      { path: 'students/delete', name: 'DeleteStudent', component: DeleteStudent },
+      { path: 'students/edit/:id?', name: 'EditStudent', component: EditStudent },
+      { path: 'students/delete/:id?', name: 'DeleteStudent', component: DeleteStudent },
+      { path: 'students/:id', name: 'StudentProfile', component: StudentProfile },
 
       // Teacher routes
       { path: 'teachers', name: 'ListTeacher', component: ListTeacher },
       { path: 'teachers/add', name: 'AddTeacher', component: AddTeacher },
-      { path: 'teachers/edit', name: 'EditTeacher', component: EditTeacher },
-      { path: 'teachers/delete', name: 'DeleteTeacher', component: DeleteTeacher },
+      { path: 'teachers/edit/:id?', name: 'EditTeacher', component: EditTeacher },
+      { path: 'teachers/delete/:id?', name: 'DeleteTeacher', component: DeleteTeacher },
+      { path: 'teachers/:id', name: 'TeacherProfile', component: TeacherProfile },
+
+      // Institution routes
+      { path: 'institution', name: 'ListInstitution', component: ListInstitution },
+      { path: 'institution/add', name: 'AddInstitution', component: AddInstitution },
+      { path: 'institution/edit/:id?', name: 'EditInstitution', component: EditInstitution },
+      { path: 'institution/delete/:id?', name: 'DeleteInstitution', component: DeleteInstitution },
+      { path: 'institution/:id', name: 'InstitutionProfile', component: InstitutionProfile },
 
       // Department routes
       { path: 'departments', name: 'ListDepartment', component: ListDepartment },
       { path: 'departments/add', name: 'AddDepartment', component: AddDepartment },
-      { path: 'departments/edit', name: 'EditDepartment', component: EditDepartment },
-      { path: 'departments/delete', name: 'DeleteDepartment', component: DeleteDepartment },
-
+      { path: 'departments/edit/:id?', name: 'EditDepartment', component: EditDepartment },
+      { path: 'departments/delete/:id?', name: 'DeleteDepartment', component: DeleteDepartment },
+      { path: 'departments/:id', name: 'DepartmentProfile', component: DepartmentProfile },
       // Subject routes
       { path: 'subjects', name: 'ListSubject', component: ListSubject },
       { path: 'subjects/add', name: 'AddSubject', component: AddSubject },
-      { path: 'subjects/edit', name: 'EditSubject', component: EditSubject },
-      { path: 'subjects/delete', name: 'DeleteSubject', component: DeleteSubject },
+      { path: 'subjects/edit/:id?', name: 'EditSubject', component: EditSubject },
+      { path: 'subjects/delete/:id?', name: 'DeleteSubject', component: DeleteSubject },
+      { path: 'subjects/:id', name: 'SubjectProfile', component: SubjectProfile },
 
       // Course routes
       { path: 'courses', name: 'ListCourse', component: ListCourse },
       { path: 'courses/add', name: 'AddCourse', component: AddCourse },
-      { path: 'courses/edit', name: 'EditCourse', component: EditCourse },
-      { path: 'courses/delete', name: 'DeleteCourse', component: DeleteCourse },
+      { path: 'courses/edit/:id?', name: 'EditCourse', component: EditCourse },
+      { path: 'courses/delete/:id?', name: 'DeleteCourse', component: DeleteCourse },
+      { path: 'courses/:id', name: 'CourseProfile', component: CourseProfile },
+
+      // Semester routes
+      { path: 'semesters', name: 'ListSemester', component: ListSemester },
+      { path: 'semesters/add', name: 'AddSemester', component: AddSemester },
+      { path: 'semesters/edit/:id?', name: 'EditSemester', component: EditSemester, props: true },
+      { path: 'semesters/:id', name: 'SemesterProfile', component: SemesterProfile, props: true },
+
+      // Academic Session routes (NEW - Batch Management)
+      { path: 'sessions', name: 'ListSessions', component: ListSessions },
+      { path: 'sessions/add', name: 'AddSession', component: AddSession },
+      { path: 'sessions/edit', name: 'EditSessionSelect', component: EditSession },
+      { path: 'sessions/edit/:id', name: 'EditSession', component: EditSession, props: true },
+      { path: 'sessions/profile', name: 'SessionProfileSelect', component: SessionProfile },
+      { path: 'sessions/profile/:id', name: 'SessionProfile', component: SessionProfile, props: true },
 
       // Assignment routes
       { path: 'assignments', name: 'ListAssignment', component: ListAssignment },
@@ -163,8 +214,10 @@ const routes = [
       { path: 'accounts', name: 'Accounts', component: Accounts },
       { path: 'fees-collection', name: 'FeesCollection', component: FeesCollection },
       { path: 'expenses', name: 'Expenses', component: Expenses },
-      { path: 'salary', name: 'Salary', component: Salary },
-      { path: 'library', name: 'Library', component: Library },
+
+      { path: 'library', name: 'LibraryDashboard', component: LibraryDashboard },
+      { path: 'library/books', name: 'LibraryBooks', component: LibraryBooks },
+      { path: 'library/borrowings', name: 'BookBorrowing', component: BookBorrowing },
 
       // Academic routes
       { path: 'holidays', name: 'Holidays', component: Holidays },

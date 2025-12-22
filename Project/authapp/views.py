@@ -58,22 +58,60 @@ def verify_email(request, uidb64, token):
 def login(request):
     serializer = LoginSerializer(data=request.data)
     if serializer.is_valid():
-        username = serializer.validated_data['username']
+        username_input = serializer.validated_data['username']
         password = serializer.validated_data['password']
-        user = authenticate(username=username, password=password)
+        
+        # Determine if input is email or username
+        user_obj = None
+        if '@' in username_input:
+            user_obj = User.objects.filter(email=username_input).first()
+        
+        if user_obj:
+            username_to_auth = user_obj.username
+        else:
+            username_to_auth = username_input
+            
+        user = authenticate(username=username_to_auth, password=password)
+        
         if user:
             refresh = RefreshToken.for_user(user)
-            # Get user role from profile
-            user_role = 'student'  # default
-            if hasattr(user, 'profile'):
-                user_role = user.profile.role
+            
+            # Determine User Role - check profiles exist and are not None
+            user_role = 'unknown'
+            
+            # Check for superuser/staff first (highest priority)
+            if user.is_superuser or user.is_staff:
+                user_role = 'admin'
+            # Check for linked profiles
+            elif hasattr(user, 'student_profile') and user.student_profile is not None:
+                try:
+                    _ = user.student_profile.id  # Access to verify it exists
+                    user_role = 'student'
+                except:
+                    pass
+            elif hasattr(user, 'teacher_profile') and user.teacher_profile is not None:
+                try:
+                    _ = user.teacher_profile.id
+                    user_role = 'teacher'
+                except:
+                    pass
+            elif hasattr(user, 'admin_profile') and user.admin_profile is not None:
+                try:
+                    _ = user.admin_profile.id
+                    user_role = 'admin'
+                except:
+                    pass
             
             return Response({
                 "message": "Login successful",
                 "access": str(refresh.access_token),
                 "refresh": str(refresh),
                 "role": user_role,
-                "username": user.username
+                "username": user.username,
+                "email": user.email,
+                "full_name": user.get_full_name(),
+                "is_staff": user.is_staff,
+                "is_superuser": user.is_superuser
             })
         return Response({"error": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

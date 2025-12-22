@@ -1,4 +1,5 @@
 import axios from 'axios'
+import router from '@/router'
 
 const API_BASE_URL = 'http://127.0.0.1:8000/api'
 
@@ -41,13 +42,13 @@ api.interceptors.response.use(
         } catch (err) {
           // Refresh token expired or invalid → logout
           localStorage.clear()
-          window.location.href = '/login'
+          router.push('/login')
           return Promise.reject(err)
         }
       } else {
         // No refresh token → logout
         localStorage.clear()
-        window.location.href = '/login'
+        router.push('/login')
       }
     }
 

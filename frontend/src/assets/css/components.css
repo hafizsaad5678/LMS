@@ -1,0 +1,1193 @@
+/**
+ * LMS Component Styles
+ * All component-specific styling including cards, tables, forms, modals, etc.
+ */
+
+/* ==================== CARD STYLES ==================== */
+.card {
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.card-header {
+    padding: 1.25rem 1.5rem;
+}
+
+.card-body {
+    padding: 1.5rem;
+}
+
+.card-header-gradient {
+    background: linear-gradient(135deg, rgba(220, 53, 69, 0.05) 0%, rgba(220, 53, 69, 0.02) 100%);
+}
+
+/* ==================== STAT CARDS ==================== */
+.stat-card {
+    display: flex;
+    align-items: center;
+    padding: 1.5rem;
+    border-radius: 12px;
+    gap: 1rem;
+    transition: all 0.3s ease;
+    cursor: pointer;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+}
+
+.stat-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 25px rgba(255, 50, 50, 0.15);
+    border-color: rgba(255, 50, 50, 0.3);
+}
+
+.stat-card:hover .stat-icon {
+    transform: scale(1.1);
+}
+
+.stat-icon {
+    width: 56px;
+    height: 56px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    transition: transform 0.3s ease;
+}
+
+.stat-content h3 {
+    margin: 0;
+    font-size: 1.75rem;
+    font-weight: 700;
+}
+
+.stat-content p {
+    margin: 0;
+    color: #6c757d;
+    font-size: 0.85rem;
+}
+
+/* ==================== AVATAR STYLES ==================== */
+.avatar-circle {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--admin-primary) 0%, var(--admin-primary-dark) 100%);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 1rem;
+}
+
+.avatar-circle-sm {
+    width: 36px;
+    height: 36px;
+}
+
+.avatar-circle-lg {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background: rgba(220, 53, 69, 0.1);
+    color: #dc3545;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2.5rem;
+}
+
+.avatar-xl {
+    width: 80px;
+    height: 80px;
+    font-size: 2rem;
+}
+
+.avatar-circle.teacher {
+    background: linear-gradient(135deg, var(--teacher-primary) 0%, var(--teacher-primary-dark) 100%);
+}
+
+.avatar-circle.student {
+    background: linear-gradient(135deg, var(--student-primary) 0%, var(--student-primary-dark) 100%);
+}
+
+/* Avatar Variants */
+.avatar-dept,
+.avatar-department {
+    background: linear-gradient(135deg, #6f42c1 0%, #5a32a3 100%);
+    color: white;
+}
+
+.avatar-course {
+    background: linear-gradient(135deg, #198754 0%, #157347 100%);
+    color: white;
+}
+
+.avatar-subject {
+    background: linear-gradient(135deg, #0d6efd 0%, #0b5ed7 100%);
+    color: white;
+}
+
+.avatar-teacher {
+    background: linear-gradient(135deg, #6f42c1 0%, #5a32a3 100%);
+    color: white;
+}
+
+.avatar-student {
+    background: linear-gradient(135deg, #198754 0%, #157347 100%);
+    color: white;
+}
+
+.avatar-exam {
+    background: linear-gradient(135deg, #6f42c1 0%, #5a32a3 100%);
+    color: white;
+}
+
+.avatar-event,
+.avatar-holiday,
+.avatar-expense,
+.avatar-account {
+    background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+    color: white;
+}
+
+.avatar-fee {
+    background: linear-gradient(135deg, #198754 0%, #157347 100%);
+    color: white;
+}
+
+.avatar-book {
+    background: linear-gradient(135deg, #6f42c1 0%, #5a32a3 100%);
+    color: white;
+}
+
+.avatar-semester {
+    background: linear-gradient(135deg, #0d6efd 0%, #0b5ed7 100%);
+    color: white;
+}
+
+.avatar-session,
+.session-avatar {
+    background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+    color: white;
+}
+
+.avatar-assignment {
+    background: linear-gradient(135deg, #fd7e14 0%, #e55a00 100%);
+    color: white;
+}
+
+.avatar-institution {
+    background: linear-gradient(135deg, #0d6efd 0%, #0b5ed7 100%);
+    color: white;
+}
+
+/* ==================== PROFILE AVATAR ==================== */
+.profile-avatar {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2.5rem;
+    font-weight: bold;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+.profile-avatar.rounded {
+    border-radius: 16px;
+}
+
+.profile-avatar.bg-admin,
+.profile-avatar-admin {
+    background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+    box-shadow: 0 4px 15px rgba(220, 53, 69, 0.3);
+}
+
+.profile-avatar.bg-teacher,
+.profile-avatar-teacher {
+    background: linear-gradient(135deg, #6f42c1 0%, #5a32a3 100%);
+    box-shadow: 0 4px 15px rgba(111, 66, 193, 0.3);
+}
+
+.profile-avatar.bg-course,
+.profile-avatar-course {
+    background: linear-gradient(135deg, #198754 0%, #157347 100%);
+    box-shadow: 0 4px 15px rgba(25, 135, 84, 0.3);
+}
+
+.profile-avatar.bg-subject,
+.profile-avatar-subject {
+    background: linear-gradient(135deg, #0d6efd 0%, #0b5ed7 100%);
+    box-shadow: 0 4px 15px rgba(13, 110, 253, 0.3);
+}
+
+.profile-avatar.bg-department,
+.profile-avatar-department {
+    background: linear-gradient(135deg, #6f42c1 0%, #5a32a3 100%);
+    box-shadow: 0 4px 15px rgba(111, 66, 193, 0.3);
+}
+
+.profile-avatar.bg-session,
+.profile-avatar-session {
+    background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+    box-shadow: 0 4px 15px rgba(56, 239, 125, 0.3);
+}
+
+.session-avatar {
+    width: 80px;
+    height: 80px;
+    border-radius: 16px;
+    font-size: 2rem;
+    box-shadow: 0 4px 15px rgba(56, 239, 125, 0.3);
+}
+
+/* ==================== TABLE STYLES ==================== */
+.table-hover tbody tr {
+    transition: all 0.2s ease;
+}
+
+.table-hover tbody tr:hover {
+    background-color: rgba(220, 53, 69, 0.05);
+}
+
+.table th {
+    font-weight: 600;
+    color: #495057;
+    border-bottom: 2px solid #dee2e6;
+}
+
+/* ==================== FORM STYLES ==================== */
+.form-control:focus,
+.form-select:focus {
+    border-color: var(--admin-primary);
+    box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.15);
+}
+
+/* ==================== INFO ROW STYLES ==================== */
+.info-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.info-row:last-child {
+    border-bottom: none;
+}
+
+.info-label {
+    color: #6c757d;
+    font-size: 0.9rem;
+}
+
+.info-value {
+    font-weight: 500;
+    color: #212529;
+}
+
+/* ==================== INFO CARDS ==================== */
+.info-card,
+.department-info-card,
+.course-info-card,
+.subject-info-card,
+.student-info-card,
+.teacher-info-card,
+.info-card-bordered {
+    border: 1px solid #dee2e6;
+}
+
+/* ==================== BADGE STYLES ==================== */
+.badge {
+    padding: 0.375rem 0.75rem;
+    font-weight: 500;
+    font-size: 0.75rem;
+}
+
+.badge-sm {
+    font-size: 0.7rem;
+    padding: 0.25rem 0.5rem;
+}
+
+/* ==================== MODAL STYLES ==================== */
+.modal.show {
+    display: block;
+}
+
+.modal-content {
+    border-radius: 12px;
+    border: none;
+}
+
+.modal-header {
+    border-bottom: 1px solid #dee2e6;
+}
+
+.modal-footer {
+    border-top: 1px solid #dee2e6;
+}
+
+/* ==================== WIZARD STYLES ==================== */
+.wizard-progress {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px 0;
+    flex-wrap: wrap;
+    gap: 5px;
+}
+
+.wizard-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    opacity: 0.5;
+    transition: all 0.3s;
+}
+
+.wizard-step.active,
+.wizard-step.completed {
+    opacity: 1;
+}
+
+.step-number {
+    width: 45px;
+    height: 45px;
+    border-radius: 50%;
+    background: #e0e0e0;
+    color: #666;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 1.1rem;
+    transition: all 0.3s;
+}
+
+.wizard-step.active .step-number {
+    background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+    color: white;
+    box-shadow: 0 4px 8px rgba(220, 53, 69, 0.3);
+}
+
+.wizard-step.completed .step-number {
+    background: #198754;
+    color: white;
+}
+
+.step-label {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: #666;
+}
+
+.wizard-step.active .step-label {
+    color: #dc3545;
+    font-weight: 600;
+}
+
+.step-line {
+    width: 60px;
+    height: 3px;
+    background: #e0e0e0;
+    transition: all 0.3s;
+}
+
+.step-line.completed {
+    background: #198754;
+}
+
+.wizard-content {
+    min-height: 300px;
+}
+
+/* ==================== HOLIDAY CALENDAR STYLES ==================== */
+.calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 1rem;
+}
+
+.month-card {
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 1rem;
+    background: #fff;
+    transition: box-shadow 0.2s;
+}
+
+.month-card:hover {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.month-header {
+    font-weight: 600;
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid #dc3545;
+    color: #dc3545;
+}
+
+.month-holidays {
+    font-size: 0.875rem;
+}
+
+.holiday-item {
+    padding: 0.75rem;
+    border-bottom: 1px solid #f0f0f0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.holiday-item:last-child {
+    border-bottom: none;
+}
+
+/* ==================== TIMETABLE STYLES ==================== */
+.timetable th,
+.timetable td {
+    padding: 1rem;
+    vertical-align: middle;
+}
+
+.schedule-cell {
+    cursor: pointer;
+    min-height: 80px;
+    transition: 0.2s;
+}
+
+.schedule-cell:hover {
+    background: rgba(220, 53, 69, 0.05);
+}
+
+.schedule-item {
+    background: linear-gradient(135deg, rgba(220, 53, 69, 0.1), rgba(220, 53, 69, 0.05));
+    padding: 0.5rem;
+    border-radius: 4px;
+    border-left: 3px solid #dc3545;
+}
+
+/* ==================== LIBRARY STYLES ==================== */
+.hover-card {
+    transition: transform 0.3s ease;
+    cursor: pointer;
+}
+
+.hover-card:hover {
+    transform: translateY(-5px);
+}
+
+.capacity-indicator {
+    min-width: 100px;
+}
+
+/* ==================== HOME PAGE STYLES ==================== */
+.home-container {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.feature-card:hover,
+.user-card:hover {
+    transform: translateY(-5px);
+    transition: transform 0.3s ease;
+}
+
+.feature-icon {
+    transition: transform 0.3s ease;
+}
+
+.feature-card:hover .feature-icon {
+    transform: scale(1.1);
+}
+
+.navbar-brand {
+    transition: transform 0.3s ease;
+}
+
+.navbar-brand:hover {
+    transform: scale(1.05);
+}
+
+#stats .col-md-3 {
+    transition: transform 0.3s ease;
+}
+
+#stats .col-md-3:hover {
+    transform: scale(1.05);
+}
+
+/* ==================== EMPTY STATE ==================== */
+.empty-state {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: #6c757d;
+}
+
+.empty-state i {
+    font-size: 4rem;
+    color: #dee2e6;
+    margin-bottom: 1rem;
+}
+
+/* ==================== LOADING STATE ==================== */
+.content-section.loading {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+/* ==================== SPINNER ==================== */
+.spinner-border.text-admin {
+    color: var(--admin-primary) !important;
+}
+
+/* ==================== DELETE PAGE STYLES ==================== */
+.border-top-danger {
+    border-top: 4px solid #dc3545 !important;
+}
+
+/* ==================== MOBILE MENU TOGGLE ==================== */
+.mobile-menu-toggle {
+    display: none;
+    background: transparent;
+    border: none;
+    color: white;
+    font-size: 1.5rem;
+    padding: 0.5rem;
+    cursor: pointer;
+}
+
+@media (max-width: 992px) {
+    .mobile-menu-toggle {
+        display: block;
+    }
+}
+
+/* ==================== RESPONSIVE ADJUSTMENTS ==================== */
+@media (max-width: 768px) {
+    .display-3 {
+        font-size: 2.5rem;
+    }
+
+    .display-5 {
+        font-size: 2rem;
+    }
+
+    .stat-card {
+        padding: 1rem;
+    }
+
+    .stat-icon {
+        width: 48px;
+        height: 48px;
+        font-size: 1.25rem;
+    }
+
+    .stat-content h3 {
+        font-size: 1.5rem;
+    }
+
+    .card-body {
+        padding: 1rem;
+    }
+}
+
+@media (max-width: 576px) {
+    .step-line {
+        width: 30px;
+    }
+
+    .step-number {
+        width: 36px;
+        height: 36px;
+        font-size: 0.9rem;
+    }
+
+    .step-label {
+        font-size: 0.75rem;
+    }
+
+    .table-responsive {
+        font-size: 0.875rem;
+    }
+
+    .table .d-none-mobile {
+        display: none !important;
+    }
+}
+
+
+/* ==================== SIDEBAR STYLES ==================== */
+.sidebar {
+    width: 280px;
+    position: fixed;
+    left: 0;
+    top: 56px;
+    bottom: 0;
+    overflow-y: auto;
+    z-index: 1020;
+}
+
+.sidebar.admin {
+    background: linear-gradient(180deg, #ffe5e8 0%, #ffd6db 100%);
+}
+
+.sidebar.teacher {
+    background: linear-gradient(180deg, #e7f1ff 0%, #d4e7ff 100%);
+}
+
+.sidebar.student {
+    background: linear-gradient(180deg, #e8f5e9 0%, #d4edda 100%);
+}
+
+.sidebar-header {
+    padding: 1.5rem 1.25rem;
+}
+
+.logo-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    color: white;
+}
+
+.admin-icon {
+    background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+    box-shadow: 0 4px 12px rgba(220, 53, 69, 0.3);
+}
+
+.teacher-icon {
+    background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);
+    box-shadow: 0 4px 12px rgba(13, 110, 253, 0.3);
+}
+
+.student-icon {
+    background: linear-gradient(135deg, #198754 0%, #146c43 100%);
+    box-shadow: 0 4px 12px rgba(25, 135, 84, 0.3);
+}
+
+.nav-item {
+    padding: 0.75rem 1rem;
+    border-radius: 12px;
+    color: #495057;
+    text-decoration: none;
+    background: transparent;
+    border: none;
+    transition: all 0.2s;
+    display: block;
+}
+
+.nav-item:hover {
+    background: rgba(255, 255, 255, 0.6);
+    color: #1a1a1a;
+    transform: translateX(4px);
+}
+
+.sidebar.admin .nav-item.active {
+    background: rgba(220, 53, 69, 0.15);
+    color: #dc3545;
+    font-weight: 600;
+    border-left: 4px solid #dc3545;
+}
+
+.sidebar.teacher .nav-item.active {
+    background: rgba(13, 110, 253, 0.15);
+    color: #0d6efd;
+    font-weight: 600;
+    border-left: 4px solid #0d6efd;
+}
+
+.sidebar.student .nav-item.active {
+    background: rgba(25, 135, 84, 0.15);
+    color: #198754;
+    font-weight: 600;
+    border-left: 4px solid #198754;
+}
+
+.rotate-180 {
+    transform: rotate(180deg);
+    transition: transform 0.3s;
+}
+
+.submenu {
+    padding-left: 1.5rem;
+    border-left: 2px solid rgba(0, 0, 0, 0.1);
+}
+
+.submenu-item {
+    padding: 0.625rem 1rem;
+    border-radius: 8px;
+    color: #6c757d;
+    text-decoration: none;
+    font-size: 0.875rem;
+    transition: all 0.2s;
+    display: block;
+}
+
+.submenu-item:hover {
+    background: rgba(255, 255, 255, 0.5);
+    color: #1a1a1a;
+}
+
+.sidebar.admin .submenu-item.active {
+    background: rgba(220, 53, 69, 0.12);
+    color: #dc3545;
+    font-weight: 600;
+}
+
+.sidebar.teacher .submenu-item.active {
+    background: rgba(13, 110, 253, 0.12);
+    color: #0d6efd;
+    font-weight: 600;
+}
+
+.sidebar.student .submenu-item.active {
+    background: rgba(25, 135, 84, 0.12);
+    color: #198754;
+    font-weight: 600;
+}
+
+.submenu-enter-active,
+.submenu-leave-active {
+    transition: all 0.3s;
+    overflow: hidden;
+}
+
+.submenu-enter-from,
+.submenu-leave-to {
+    opacity: 0;
+    max-height: 0;
+}
+
+.submenu-enter-to,
+.submenu-leave-from {
+    opacity: 1;
+    max-height: 500px;
+}
+
+.support-float-btn {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    width: 60px;
+    height: 60px;
+    border: none;
+    color: white;
+    z-index: 9998;
+    transition: all 0.3s;
+}
+
+.admin-float {
+    background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+}
+
+.teacher-float {
+    background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);
+}
+
+.student-float {
+    background: linear-gradient(135deg, #198754 0%, #146c43 100%);
+}
+
+.support-float-btn:hover {
+    transform: scale(1.1) rotate(15deg);
+}
+
+.support-card-container {
+    position: fixed;
+    bottom: 100px;
+    right: 24px;
+    z-index: 9999;
+    min-width: 280px;
+}
+
+.admin-support {
+    border-color: #dc3545 !important;
+}
+
+.teacher-support {
+    border-color: #0d6efd !important;
+}
+
+.student-support {
+    border-color: #198754 !important;
+}
+
+.admin-btn {
+    background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+}
+
+.teacher-btn {
+    background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);
+}
+
+.student-btn {
+    background: linear-gradient(135deg, #198754 0%, #146c43 100%);
+}
+
+.support-card-enter-active,
+.support-card-leave-active {
+    transition: all 0.3s;
+}
+
+.support-card-enter-from,
+.support-card-leave-to {
+    opacity: 0;
+    transform: translateY(20px) scale(0.9);
+}
+
+@media (max-width: 992px) {
+    .sidebar {
+        transform: translateX(-100%);
+    }
+
+    .sidebar.show {
+        transform: translateX(0);
+    }
+}
+
+/* ==================== NAVBAR STYLES ==================== */
+.navbar {
+    transition: all 0.3s ease;
+}
+
+.navbar-brand {
+    font-size: 1.25rem;
+    letter-spacing: 0.5px;
+    transition: transform 0.3s ease;
+}
+
+.navbar-brand:hover {
+    transform: scale(1.05);
+}
+
+.nav-link {
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.nav-link:hover {
+    opacity: 0.8;
+}
+
+.btn-outline-light:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+}
+
+/* ==================== ALERT MESSAGE STYLES ==================== */
+.alert-custom {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    min-width: 400px;
+    max-width: 500px;
+    background: white;
+    border-radius: 16px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(0, 0, 0, 0.05);
+    z-index: 9999;
+    overflow: hidden;
+}
+
+.alert-content {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    padding: 20px;
+}
+
+.alert-icon-wrapper {
+    flex-shrink: 0;
+}
+
+.alert-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+}
+
+.icon-success {
+    background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+    color: #155724;
+}
+
+.icon-error {
+    background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%);
+    color: #721c24;
+}
+
+.icon-warning {
+    background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+    color: #856404;
+}
+
+.icon-info {
+    background: linear-gradient(135deg, #d1ecf1 0%, #bee5eb 100%);
+    color: #0c5460;
+}
+
+.alert-body {
+    flex: 1;
+    min-width: 0;
+}
+
+.alert-title {
+    margin: 0 0 8px 0;
+    font-size: 18px;
+    font-weight: 700;
+    color: #1a1a1a;
+    line-height: 1.3;
+}
+
+.alert-message {
+    margin: 0;
+    font-size: 14px;
+    color: #666;
+    line-height: 1.5;
+}
+
+.alert-actions {
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.btn-confirm,
+.btn-close-custom {
+    border: none;
+    border-radius: 8px;
+    padding: 8px 16px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-confirm {
+    min-width: 80px;
+}
+
+.btn-confirm.btn-success {
+    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+    color: white;
+}
+
+.btn-confirm.btn-error {
+    background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+    color: white;
+}
+
+.btn-confirm.btn-warning {
+    background: linear-gradient(135deg, #ffc107 0%, #ff9800 100%);
+    color: #1a1a1a;
+}
+
+.btn-confirm.btn-info {
+    background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);
+    color: white;
+}
+
+.btn-confirm:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.btn-close-custom {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    background: transparent;
+    color: #999;
+}
+
+.btn-close-custom.btn-secondary {
+    background: #e9ecef;
+    color: #495057;
+}
+
+.btn-close-custom:hover {
+    background: #f8f9fa;
+    color: #1a1a1a;
+}
+
+.btn-close-custom.btn-secondary:hover {
+    background: #dee2e6;
+}
+
+.alert-progress {
+    height: 4px;
+    background: rgba(0, 0, 0, 0.05);
+    overflow: hidden;
+}
+
+.alert-progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+    animation: progress linear forwards;
+    transform-origin: left;
+}
+
+@keyframes progress {
+    from {
+        transform: scaleX(1);
+    }
+
+    to {
+        transform: scaleX(0);
+    }
+}
+
+.alert-success {
+    border-left: 4px solid #28a745;
+}
+
+.alert-error {
+    border-left: 4px solid #dc3545;
+}
+
+.alert-warning {
+    border-left: 4px solid #ffc107;
+}
+
+.alert-info {
+    border-left: 4px solid #17a2b8;
+}
+
+.slide-fade-enter-active {
+    animation: slideIn 0.3s ease-out;
+}
+
+.slide-fade-leave-active {
+    animation: slideOut 0.3s ease-in;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateX(100%) translateY(-20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateX(0) translateY(0);
+    }
+}
+
+@keyframes slideOut {
+    from {
+        opacity: 1;
+        transform: translateX(0) translateY(0);
+    }
+
+    to {
+        opacity: 0;
+        transform: translateX(100%) translateY(-20px);
+    }
+}
+
+/* ==================== ACTIVITY FEED STYLES ==================== */
+.activity-feed {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.activity-feed::-webkit-scrollbar {
+    width: 6px;
+}
+
+.activity-feed::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 10px;
+}
+
+.activity-feed::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 10px;
+}
+
+.activity-feed::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+/* ==================== BASE CARD HOVER ==================== */
+.shadow-hover:hover {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15) !important;
+}
+
+/* ==================== QUICK ACTION CARD ==================== */
+.quick-action-card {
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+.quick-action-card:hover {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1) !important;
+    transform: translateY(-2px);
+}
+
+/* ==================== DATA TABLE RESPONSIVE ==================== */
+@media (max-width: 768px) {
+    .table {
+        font-size: 0.875rem;
+    }
+
+    .avatar-circle {
+        width: 32px;
+        height: 32px;
+        font-size: 0.875rem;
+    }
+}
+
+/* ==================== ALERT RESPONSIVE ==================== */
+@media (max-width: 576px) {
+    .alert-custom {
+        min-width: calc(100vw - 40px);
+        max-width: calc(100vw - 40px);
+        right: 20px;
+        left: 20px;
+        top: 10px;
+    }
+
+    .alert-content {
+        padding: 16px;
+        gap: 12px;
+    }
+
+    .alert-icon {
+        width: 40px;
+        height: 40px;
+        font-size: 20px;
+    }
+
+    .alert-title {
+        font-size: 16px;
+    }
+
+    .alert-message {
+        font-size: 13px;
+    }
+}
+
+/* ==================== ACTION BUTTONS RESPONSIVE ==================== */
+@media (max-width: 576px) {
+    .btn-sm {
+        padding: 0.2rem 0.4rem;
+        font-size: 0.75rem;
+    }
+}

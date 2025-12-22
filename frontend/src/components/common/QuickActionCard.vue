@@ -32,18 +32,3 @@ const props = defineProps({
 });
 </script>
 
-<style scoped>
-.quick-action-card {
-  transition: all 0.3s ease;
-  cursor: pointer;
-}
-
-.quick-action-card:hover {
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1) !important;
-  transform: translateY(-2px);
-}
-
-.bg-primary-light {
-  background-color: rgba(13, 110, 253, 0.1);
-}
-</style>

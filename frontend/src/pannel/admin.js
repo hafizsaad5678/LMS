@@ -1,38 +1,10 @@
 
 export const mainNav = [
-  { name: 'Students', href: '/admin-dashboard/students' },
-  { name: 'Teachers', href: '/admin-dashboard/teachers' },
   { name: 'Departments', href: '/admin-dashboard/departments' },
-  { name: 'Subjects', href: '/admin-dashboard/subjects' },
-  { name: 'Courses', href: '/admin-dashboard/courses' }
-];
-
-export const recentActivities = [
-  {
-    id: 1,
-    message: 'New student enrolled',
-    time: 'John Smith • 2 hours ago'
-  },
-  {
-    id: 2,
-    message: 'Teacher added new assignment',
-    time: 'Dr. Sarah Wilson • 4 hours ago'
-  },
-  {
-    id: 3,
-    message: 'Fee payment received',
-    time: 'Michael Brown • 6 hours ago'
-  },
-  {
-    id: 4,
-    message: 'New department created',
-    time: 'Admin • 1 day ago'
-  },
-  {
-    id: 5,
-    message: 'Exam schedule updated',
-    time: 'Dr. James Lee • 2 days ago'
-  }
+  { name: 'Courses', href: '/admin-dashboard/courses' },
+  { name: 'Expenses', href: '/admin-dashboard/expenses' },
+  { name: 'Holidays', href: '/admin-dashboard/holidays' },
+  { name: 'Timetable', href: '/admin-dashboard/timetable' }
 ];
 
 export const sidebarSections = [
@@ -53,7 +25,8 @@ export const sidebarSections = [
           { name: 'Student List', href: '/admin-dashboard/students', icon: '📋' },
           { name: 'Add Student', href: '/admin-dashboard/students/add', icon: '➕' },
           { name: 'Edit Student', href: '/admin-dashboard/students/edit', icon: '✏️' },
-          { name: 'Delete Student', href: '/admin-dashboard/students/delete', icon: '🗑️' }
+          { name: 'Delete Student', href: '/admin-dashboard/students/delete', icon: '🗑️' },
+          { name: 'StudentProfile ', href: '/admin-dashboard/students/profile', icon: '📋' }
         ]
       }
     ]
@@ -69,7 +42,25 @@ export const sidebarSections = [
           { name: 'Teacher List', href: '/admin-dashboard/teachers', icon: '📋' },
           { name: 'Add Teacher', href: '/admin-dashboard/teachers/add', icon: '➕' },
           { name: 'Edit Teacher', href: '/admin-dashboard/teachers/edit', icon: '✏️' },
-          { name: 'Delete Teacher', href: '/admin-dashboard/teachers/delete', icon: '🗑️' }
+          { name: 'Delete Teacher', href: '/admin-dashboard/teachers/delete', icon: '🗑️' },
+          { name: 'TeacherProfile ', href: '/admin-dashboard/teachers/profile', icon: '📋' }
+        ]
+      }
+    ]
+  },
+  {
+    title: 'Institution',
+    items: [
+      {
+        name: 'Institution',
+        href: '/admin-dashboard/institution',
+        icon: '🏢',
+        submenu: [
+          { name: 'Institution List', href: '/admin-dashboard/institution', icon: '📋' },
+          { name: 'Add Institution', href: '/admin-dashboard/institution/add', icon: '➕' },
+          { name: 'Edit Institution', href: '/admin-dashboard/institution/edit', icon: '✏️' },
+          { name: 'Delete Institution', href: '/admin-dashboard/institution/delete', icon: '🗑️' },
+          { name: 'InstitutionProfile ', href: '/admin-dashboard/institution/profile', icon: '📋' }
         ]
       }
     ]
@@ -85,7 +76,8 @@ export const sidebarSections = [
           { name: 'Department List', href: '/admin-dashboard/departments', icon: '📋' },
           { name: 'Add Department', href: '/admin-dashboard/departments/add', icon: '➕' },
           { name: 'Edit Department', href: '/admin-dashboard/departments/edit', icon: '✏️' },
-          { name: 'Delete Department', href: '/admin-dashboard/departments/delete', icon: '🗑️' }
+          { name: 'Delete Department', href: '/admin-dashboard/departments/delete', icon: '🗑️' },
+          { name: 'DepartmentProfile ', href: '/admin-dashboard/departments/profile', icon: '📋' }
         ]
       }
     ]
@@ -101,7 +93,8 @@ export const sidebarSections = [
           { name: 'Subject List', href: '/admin-dashboard/subjects', icon: '📋' },
           { name: 'Add Subject', href: '/admin-dashboard/subjects/add', icon: '➕' },
           { name: 'Edit Subject', href: '/admin-dashboard/subjects/edit', icon: '✏️' },
-          { name: 'Delete Subject', href: '/admin-dashboard/subjects/delete', icon: '🗑️' }
+          { name: 'Delete Subject', href: '/admin-dashboard/subjects/delete', icon: '🗑️' },
+          { name: 'SubjectProfile ', href: '/admin-dashboard/subjects/profile', icon: '📋' }
         ]
       }
     ]
@@ -117,7 +110,40 @@ export const sidebarSections = [
           { name: 'Course List', href: '/admin-dashboard/courses', icon: '📋' },
           { name: 'Add Course', href: '/admin-dashboard/courses/add', icon: '➕' },
           { name: 'Edit Course', href: '/admin-dashboard/courses/edit', icon: '✏️' },
-          { name: 'Delete Course', href: '/admin-dashboard/courses/delete', icon: '🗑️' }
+          { name: 'Delete Course', href: '/admin-dashboard/courses/delete', icon: '🗑️' },
+          { name: 'CourseProfile ', href: '/admin-dashboard/courses/profile', icon: '📋' }
+        ]
+      }
+    ]
+  },
+  {
+    title: 'Semesters',
+    items: [
+      {
+        name: 'Semesters',
+        href: '/admin-dashboard/semesters',
+        icon: '📅',
+        submenu: [
+          { name: 'Semester List', href: '/admin-dashboard/semesters', icon: '📋' },
+          { name: 'Add Semester', href: '/admin-dashboard/semesters/add', icon: '➕' },
+          { name: 'Edit Semester', href: '/admin-dashboard/semesters/edit', icon: '✏️' },
+          { name: 'Semester Profile', href: '/admin-dashboard/semesters/profile', icon: '👤' }
+        ]
+      }
+    ]
+  },
+  {
+    title: 'Academic Sessions',
+    items: [
+      {
+        name: 'Sessions',
+        href: '/admin-dashboard/sessions',
+        icon: '🎓',
+        submenu: [
+          { name: 'All Sessions', href: '/admin-dashboard/sessions', icon: '📋' },
+          { name: 'Create Session', href: '/admin-dashboard/sessions/add', icon: '➕' },
+          { name: 'Edit Session', href: '/admin-dashboard/sessions/edit', icon: '✏️' },
+          { name: 'Session Profile', href: '/admin-dashboard/sessions/profile', icon: '👤' }
         ]
       }
     ]
@@ -149,7 +175,7 @@ export const sidebarSections = [
           { name: 'Accounts', href: '/admin-dashboard/accounts', icon: '🏦' },
           { name: 'Fees Collection', href: '/admin-dashboard/fees-collection', icon: '💰' },
           { name: 'Expenses', href: '/admin-dashboard/expenses', icon: '💸' },
-          { name: 'Salary', href: '/admin-dashboard/salary', icon: '💵' }
+
         ]
       },
       {
@@ -163,7 +189,16 @@ export const sidebarSections = [
           { name: 'Time Table', href: '/admin-dashboard/timetable', icon: '⏰' }
         ]
       },
-      { name: 'Library', href: '/admin-dashboard/library', icon: '📖' }
+      {
+        name: 'Library',
+        href: '#',
+        icon: '📖',
+        submenu: [
+          { name: 'Overview', href: '/admin-dashboard/library', icon: '📊' },
+          { name: 'Books', href: '/admin-dashboard/library/books', icon: '📚' },
+          { name: 'Borrowings', href: '/admin-dashboard/library/borrowings', icon: '🔁' }
+        ]
+      }
     ]
   }
 ];

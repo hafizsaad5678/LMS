@@ -10,11 +10,21 @@
     />
     <nav :class="['navbar navbar-expand-lg navbar-dark shadow-sm fixed-top', headerColor]">
       <div class="container-fluid">
+        <!-- Mobile Sidebar Toggle -->
+        <button 
+          class="btn btn-link text-white d-lg-none me-2 p-0"
+          @click="$emit('toggle-sidebar')"
+          aria-label="Toggle sidebar"
+        >
+          <i class="bi bi-list fs-4"></i>
+        </button>
+        
         <router-link to="/" class="navbar-brand fw-bold d-flex align-items-center gap-2 text-decoration-none text-white">
-          <div class="bg-white rounded p-2" style="width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;">
+          <div class="bg-white rounded p-2 d-none d-sm-flex" style="width: 40px; height: 40px; align-items: center; justify-content: center;">
             <span class="fs-5">📚</span>
           </div>
-          <span>College LMS</span>
+          <span class="d-none d-sm-inline">College LMS</span>
+          <span class="d-sm-none">LMS</span>
         </router-link>
         
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
@@ -22,7 +32,7 @@
         </button>
         
         <div class="collapse navbar-collapse" id="navbarNav">
-          <ul class="navbar-nav ms-auto d-flex align-items-center gap-3">
+          <ul class="navbar-nav ms-auto d-flex align-items-center gap-2 gap-lg-3">
             <li v-for="link in mainNav" :key="link.name" class="nav-item">
               <router-link :to="link.href" class="nav-link text-white">{{ link.name }}</router-link>
             </li>
@@ -66,6 +76,8 @@ defineProps({
   }
 })
 
+defineEmits(['toggle-sidebar'])
+
 const router = useRouter()
 const showAlert = ref(false)
 
@@ -89,26 +101,4 @@ const logout = async () => {
 }
 </script>
 
-<style scoped>
-.navbar {
-  transition: all 0.3s ease;
-}
 
-.navbar-brand {
-  font-size: 1.25rem;
-  letter-spacing: 0.5px;
-}
-
-.nav-link {
-  transition: all 0.3s ease;
-  position: relative;
-}
-
-.nav-link:hover {
-  opacity: 0.8;
-}
-
-.btn-outline-light:hover {
-  background-color: rgba(255, 255, 255, 0.2);
-}
-</style>
