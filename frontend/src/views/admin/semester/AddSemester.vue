@@ -5,6 +5,16 @@
     icon="bi bi-calendar-plus"
     :breadcrumbs="breadcrumbs"
   >
+    <ConfirmDialog
+      v-model="showConfirmDialog"
+      title="Discard Changes"
+      message="Are you sure? All unsaved changes will be lost."
+      type="warning"
+      theme="admin"
+      confirm-text="Discard"
+      @confirm="confirmCancel"
+    />
+
     <div class="row justify-content-center">
       <div class="col-lg-6">
         <div class="card border-0 shadow-sm">
@@ -64,13 +74,12 @@
                 </div>
 
                 <div class="mb-3">
-                  <label for="semester-status" class="form-label">Status</label>
-                  <select id="semester-status" v-model="form.status" class="form-select">
-                    <option value="draft">Draft</option>
-                    <option value="active">Active</option>
-                    <option value="completed">Completed</option>
-                    <option value="archived">Archived</option>
-                  </select>
+                  <SelectInput
+                    v-model="form.status"
+                    :options="SEMESTER_STATUS_OPTIONS"
+                    label="Status"
+                    placeholder="Select status"
+                  />
                 </div>
               </div>
 
@@ -85,11 +94,11 @@
                   No semesters to create. This program may already have all required semesters.
                 </div>
                 
-                <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                <div class="table-responsive position-relative max-h-400-scroll">
                   <table class="table table-bordered table-sm">
                     <thead class="table-light sticky-top">
                       <tr>
-                        <th style="width: 60px">#</th>
+                        <th class="col-w-60">#</th>
                         <th>Name</th>
                         <th>Start Date</th>
                         <th>End Date</th>
@@ -109,6 +118,7 @@
                             format="yyyy-MM-dd"
                             auto-apply
                             :state="null"
+                            :teleport="false"
                             input-class-name="form-control form-control-sm"
                           />
                         </td>
@@ -120,6 +130,7 @@
                             format="yyyy-MM-dd"
                             auto-apply
                             :state="null"
+                            :teleport="false"
                             input-class-name="form-control form-control-sm"
                           />
                         </td>
@@ -147,28 +158,31 @@
 
 <script setup>
 import { ref, onMounted, computed, watch } from 'vue'
+import { useAlert } from '@/composables/shared'
 import { useRouter, useRoute } from 'vue-router'
-import AdminPageTemplate from '@/components/navbar/AdminPageTemplate.vue'
-import BaseInput from '@/components/common/BaseInput.vue'
+import { AdminPageTemplate } from '@/components/shared/panels'
+import { BaseInput, AlertMessage, ConfirmDialog, SelectInput } from '@/components/shared/common'
 import { VueDatePicker } from '@vuepic/vue-datepicker'
 import '@vuepic/vue-datepicker/dist/main.css'
-import AlertMessage from '@/components/common/AlertMessage.vue'
-import { semesterService } from '@/services/semesterService'
-import api from '@/services/api'
-import cacheService from '@/services/cacheService'
+import { semesterService } from '@/services/shared'
+import { api } from '@/services/shared'
+import { cacheService } from '@/services/shared'
+import { ADMIN_ROUTES } from '@/utils/constants/routes'
+import { SEMESTER_STATUS_OPTIONS } from '@/utils/constants/options'
 
 const router = useRouter()
 const route = useRoute()
 const breadcrumbs = [
-  { name: 'Dashboard', href: '/admin-dashboard' },
-  { name: 'Semesters', href: '/admin-dashboard/semesters' },
+  { name: 'Dashboard', href: ADMIN_ROUTES.DASHBOARD.path },
+  { name: 'Semesters', href: ADMIN_ROUTES.SEMESTER_LIST.path },
   { name: 'Add' }
 ]
 
 const submitting = ref(false)
 const programs = ref([])
-const alert = ref({ show: false, type: 'success', title: '', message: '' })
+const { alert, showAlert } = useAlert()
 const mode = ref('single') // single or bulk
+const showConfirmDialog = ref(false)
 
 const form = ref({
   program: '',
@@ -181,9 +195,6 @@ const form = ref({
 
 const bulkSemesters = ref([])
 
-const showAlert = (type, message, title = null) => {
-  alert.value = { show: true, type, title, message }
-}
 
 onMounted(async () => {
   if (route.query.program) {
@@ -210,6 +221,36 @@ onMounted(async () => {
   }
 })
 
+// Helper function to generate semester dates (6 months apart)
+const generateSemesterDates = (semesterIndex, startFromDate = null) => {
+  const baseDate = startFromDate ? new Date(startFromDate) : new Date()
+  
+  // Each semester is 6 months
+  const semesterMonths = 6
+  
+  // Calculate start date for this semester
+  const startDate = new Date(baseDate)
+  startDate.setMonth(startDate.getMonth() + (semesterIndex * semesterMonths))
+  
+  // Calculate end date (6 months after start)
+  const endDate = new Date(startDate)
+  endDate.setMonth(endDate.getMonth() + semesterMonths)
+  endDate.setDate(endDate.getDate() - 1) // End day before next semester starts
+  
+  // Format as yyyy-MM-dd
+  const formatDate = (date) => {
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+  }
+  
+  return {
+    start_date: formatDate(startDate),
+    end_date: formatDate(endDate)
+  }
+}
+
 // Watch for program change in bulk mode to auto-generate semester rows
 watch(() => form.value.program, async (newProgramId) => {
   if (mode.value === 'bulk' && newProgramId) {
@@ -234,29 +275,35 @@ watch(() => form.value.program, async (newProgramId) => {
           showAlert('info', `This program already has ${existingSemesters.length} semester(s). You can create ${expectedCount - existingSemesters.length} more.`, 'Partial Semesters')
         }
         
-        // Generate remaining semesters
+        // Generate remaining semesters with default dates (6 months each)
         const startNumber = existingSemesters.length + 1
         const remainingCount = expectedCount - existingSemesters.length
         
-        bulkSemesters.value = Array.from({ length: remainingCount }, (_, i) => ({
-          number: startNumber + i,
-          name: `Semester ${startNumber + i}`,
-          start_date: '',
-          end_date: '',
-          status: 'draft'
-        }))
+        bulkSemesters.value = Array.from({ length: remainingCount }, (_, i) => {
+          const dates = generateSemesterDates(i)
+          return {
+            number: startNumber + i,
+            name: `Semester ${startNumber + i}`,
+            start_date: dates.start_date,
+            end_date: dates.end_date,
+            status: 'draft'
+          }
+        })
       } catch (e) {
         console.error('Error checking existing semesters:', e)
-        // If error, proceed with normal generation
+        // If error, proceed with normal generation with default dates
         const semesterCount = program.duration_years ? program.duration_years * 2 : (program.default_semesters || 8)
         
-        bulkSemesters.value = Array.from({ length: semesterCount }, (_, i) => ({
-          number: i + 1,
-          name: `Semester ${i + 1}`,
-          start_date: '',
-          end_date: '',
-          status: 'draft'
-        }))
+        bulkSemesters.value = Array.from({ length: semesterCount }, (_, i) => {
+          const dates = generateSemesterDates(i)
+          return {
+            number: i + 1,
+            name: `Semester ${i + 1}`,
+            start_date: dates.start_date,
+            end_date: dates.end_date,
+            status: 'draft'
+          }
+        })
       }
     }
   }
@@ -264,12 +311,15 @@ watch(() => form.value.program, async (newProgramId) => {
 
 const handleCancel = () => {
   if (form.value.name || form.value.number > 1 || form.value.program) {
-    if (confirm('Are you sure? All unsaved changes will be lost.')) {
-      router.back()
-    }
+    showConfirmDialog.value = true
   } else {
     router.back()
   }
+}
+
+const confirmCancel = () => {
+  showConfirmDialog.value = false
+  router.back()
 }
 
 const submitForm = async () => {
@@ -319,7 +369,7 @@ const submitForm = async () => {
     }
 
     showAlert('success', 'Semester(s) created successfully!', 'Success!')
-    setTimeout(() => router.push('/admin-dashboard/semesters'), 1500)
+    setTimeout(() => router.push({ name: ADMIN_ROUTES.SEMESTER_LIST.name }), 1500)
   } catch (e) {
     console.error('Error creating semester:', e.response?.data || e.message)
     const msg = e.response?.data?.detail || e.response?.data?.non_field_errors?.[0] || 'Failed to create semester'
@@ -329,3 +379,12 @@ const submitForm = async () => {
   }
 }
 </script>
+
+<style scoped>
+/* Datepicker z-index fix - must be scoped for :deep() selector */
+:deep(.dp__menu) {
+  z-index: 9999 !important;
+}
+</style>
+
+

@@ -1,0 +1,287 @@
+/* Rich Text Editor Styles */
+.rte-container {
+    border: 1px solid #dee2e6;
+    border-radius: 0.5rem;
+    overflow: hidden;
+    background: #fff;
+    transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+}
+
+.rte-container:focus-within {
+    border-color: #86b7fe;
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+}
+
+/* Toolbar */
+.rte-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    padding: 0.5rem;
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+    user-select: none;
+}
+
+.rte-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    background: transparent;
+    color: #495057;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.rte-btn:hover {
+    background-color: #e9ecef;
+    color: #000;
+}
+
+.rte-btn.active {
+    background-color: #e2e6ea;
+    border-color: #adb5bd;
+    color: #000;
+}
+
+/* Editable Area */
+.rte-content {
+    min-height: 200px;
+    padding: 1rem;
+    outline: none;
+    overflow-y: auto;
+    font-size: 1rem;
+    line-height: 1.5;
+}
+
+.rte-content[contenteditable=true]:empty:before {
+    content: attr(placeholder);
+    color: #6c757d;
+    font-style: italic;
+    pointer-events: none;
+    display: block;
+}
+
+/* Content Styles */
+.rte-content pre {
+    background-color: #f8f9fa;
+    padding: 0.5rem;
+    border-radius: 4px;
+    border: 1px solid #dee2e6;
+    font-family: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+.rte-content ul,
+.rte-content ol {
+    padding-left: 2rem;
+    margin-bottom: 1rem;
+}
+
+.rte-content p {
+    margin-bottom: 1rem;
+}
+
+/* Link Modal - Using basic prompt for now as per "simple" instruction, 
+   but providing style if user wants to build UI modal later */
+.rte-link-input {
+    font-size: 0.875rem;
+}
+
+/* ==================== QUIZ BUILDER STYLES ==================== */
+.question-card {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    border: 1px solid #edf2f7;
+    background: #fff;
+}
+
+.question-card:hover {
+    border-color: #cbd5e0;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05);
+}
+
+.question-number {
+    width: 32px;
+    height: 32px;
+    background: #f0f7ff;
+    color: #0d6efd;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+}
+
+.option-input-group {
+    background: #f8fafc;
+    border-radius: 12px;
+    padding: 10px;
+    margin-bottom: 10px;
+}
+
+.option-radio {
+    width: 20px;
+    height: 20px;
+    cursor: pointer;
+}
+
+.btn-add-option {
+    color: #0d6efd;
+    font-size: 0.9rem;
+    font-weight: 600;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 10px;
+    border-radius: 8px;
+    transition: background 0.2s;
+}
+
+.btn-add-option:hover {
+    background: #e7f1ff;
+}
+
+.quiz-preview-container {
+    position: sticky;
+    top: 20px;
+}
+
+.type-badge {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 4px 8px;
+    border-radius: 6px;
+}
+
+.type-mcq {
+    background: #e0f2fe;
+    color: #0369a1;
+}
+
+.type-answer {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+/* ==================== Student Quiz Styles ==================== */
+.quiz-card {
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.quiz-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.1);
+}
+
+.quiz-card-header {
+    position: relative;
+}
+
+.quiz-card-header .quiz-icon {
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 12px;
+    font-size: 1.25rem;
+    color: white;
+}
+
+.quiz-card-header.bg-student {
+    background: linear-gradient(135deg, #198754 0%, #157347 100%);
+}
+
+.quiz-card-header.bg-success {
+    background: linear-gradient(135deg, #20c997 0%, #198754 100%);
+}
+
+/* Quiz Timer */
+.quiz-timer {
+    font-size: 1.25rem;
+    transition: all 0.3s;
+}
+
+.quiz-timer.bg-student-light {
+    background: rgba(25, 135, 84, 0.1);
+}
+
+/* Quiz Options */
+.option-item {
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.option-item:hover .border {
+    border-color: #198754 !important;
+    background: rgba(25, 135, 84, 0.05);
+}
+
+.option-item.selected .border {
+    border-color: #198754 !important;
+    background: rgba(25, 135, 84, 0.1);
+}
+
+.radio-circle {
+    width: 24px;
+    height: 24px;
+    border: 2px solid #dee2e6;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.radio-circle.active {
+    background: #198754;
+    border-color: #198754;
+    color: white;
+}
+
+.option-letter {
+    font-weight: bold;
+    color: #6c757d;
+}
+
+/* Question Card */
+.question-card .question-text {
+    font-size: 1.1rem;
+    line-height: 1.6;
+}
+
+.question-card .question-text p {
+    margin-bottom: 0.5rem;
+}
+
+/* Result Modal */
+.result-icon {
+    animation: bounceIn 0.5s ease-out;
+}
+
+@keyframes bounceIn {
+    0% {
+        transform: scale(0);
+        opacity: 0;
+    }
+
+    50% {
+        transform: scale(1.2);
+    }
+
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+.score-display {
+    border: 2px dashed #198754;
+}

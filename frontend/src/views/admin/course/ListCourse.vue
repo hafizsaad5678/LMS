@@ -55,23 +55,21 @@
     <!-- Main Content -->
     <DataTable
       :columns="tableColumns"
-      :data="courses"
+      :data="filteredData"
       :loading="loading"
       loading-text="Loading courses..."
       empty-icon="bi bi-mortarboard"
       empty-title="No courses found"
       empty-subtitle="Try adjusting your filters or add a new course"
     >
-      <template #cell-code="{ value }">
-        <span class="badge bg-dark fw-semibold">{{ value }}</span>
-      </template>
+
 
       <template #cell-name="{ row }">
         <div class="d-flex align-items-center">
           <div class="avatar-circle avatar-course me-2"><i class="bi bi-mortarboard"></i></div>
           <div>
             <div class="fw-semibold text-dark">{{ row.name }}</div>
-            <small class="text-muted d-none d-md-block">{{ truncate(row.description, 30) }}</small>
+            <small class="text-muted d-none d-md-block">{{ row.code }}</small>
           </div>
         </div>
       </template>
@@ -96,16 +94,16 @@
         <ActionButtons
           :item="row"
           :show-toggle="false"
-          @view="router.push(`/admin-dashboard/courses/${row.id}`)"
-          @edit="router.push(`/admin-dashboard/courses/edit/${row.id}`)"
-          @delete="router.push(`/admin-dashboard/courses/delete/${row.id}`)"
+          @view="router.push({ name: ADMIN_ROUTES.COURSE_PROFILE.name, params: { id: row.id } })"
+          @edit="router.push({ name: ADMIN_ROUTES.COURSE_EDIT.name, params: { id: row.id } })"
+          @delete="router.push({ name: ADMIN_ROUTES.COURSE_DELETE.name, params: { id: row.id } })"
         />
       </template>
     </DataTable>
 
     <template #footer>
       <div class="d-flex justify-content-between flex-wrap gap-2">
-        <p class="text-muted small mb-0">Total: {{ courses.length }} courses</p>
+        <p class="text-muted small mb-0">Total: {{ filteredData.length }} courses</p>
         <p class="text-muted small mb-0">Students: {{ stats.totalStudents }}</p>
       </div>
     </template>
@@ -113,118 +111,77 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed, watch } from 'vue'
+import { onMounted, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import AdminPageTemplate from '@/components/navbar/AdminPageTemplate.vue'
-import { StatCard, DataTable, SearchFilter, ActionButtons } from '@/components/common'
-import { programService } from '@/services/programService'
-import cacheService from '@/services/cacheService'
+import { AdminPageTemplate } from '@/components/shared/panels'
+import { StatCard, DataTable, SearchFilter, ActionButtons } from '@/components/shared/common'
+import { useEntityList } from '@/composables/shared'
+import { programService } from '@/services/shared'
+import { ADMIN_ROUTES } from '@/utils/constants/routes'
 
 const router = useRouter()
 
 const breadcrumbs = [
-  { name: 'Dashboard', href: '/admin-dashboard' },
+  { name: 'Dashboard', href: ADMIN_ROUTES.DASHBOARD.path },
   { name: 'Courses' }
 ]
 
 const actions = [
-  { label: 'Add Course', icon: 'bi bi-plus-circle', variant: 'btn-admin-primary', onClick: () => router.push('/admin-dashboard/courses/add') }
+  { label: 'Add Course', icon: 'bi bi-plus-circle', variant: 'btn-admin-primary', onClick: () => router.push({ name: ADMIN_ROUTES.COURSE_ADD.name }) }
 ]
 
 const tableColumns = [
-  { key: 'code', label: 'Code' },
   { key: 'name', label: 'Course' },
   { key: 'department_name', label: 'Department', hideOnMobile: true },
   { key: 'duration_years', label: 'Duration', hideOnMobile: true },
-  { key: 'semester_count', label: 'Semesters' },
-  { key: 'student_count', label: 'Students', hideOnMobile: true },
+  { key: 'semester_count', label: 'Semesters', center: true },
+  { key: 'student_count', label: 'Students', hideOnMobile: true, center: true },
   { key: 'actions', label: 'Actions', center: true }
 ]
 
-const loading = ref(true)
-const courses = ref([])
-const filters = ref({ search: '', duration: '' })
+// Use composable for list logic
+const {
+  loading,
+  filteredData,
+  filters,
+  loadData,
+  applyFilters,
+  resetFilters: baseResetFilters
+} = useEntityList({
+  cacheKey: 'courses_list',
+  searchFields: ['name', 'code'],
+  defaultFilters: { duration: '' },
+  customFilter: (data, filterValues) => {
+    if (filterValues.duration) {
+      const duration = parseInt(filterValues.duration)
+      return data.filter(c => c.duration_years === duration)
+    }
+    return data
+  }
+})
 
+// Custom stats for courses
 const stats = computed(() => {
-  const total = courses.value.length
-  const totalStudents = courses.value.reduce((sum, c) => sum + (c.student_count || 0), 0)
-  const totalDuration = courses.value.reduce((sum, c) => sum + (c.duration_years || 0), 0)
+  const total = filteredData.value.length
+  const totalStudents = filteredData.value.reduce((sum, c) => sum + (c.student_count || 0), 0)
+  const totalDuration = filteredData.value.reduce((sum, c) => sum + (c.duration_years || 0), 0)
   const avgDuration = total > 0 ? (totalDuration / total).toFixed(1) : 0
-  const totalSemesters = courses.value.reduce((sum, c) => sum + (c.semester_count || 0), 0)
+  const totalSemesters = filteredData.value.reduce((sum, c) => sum + (c.semester_count || 0), 0)
   return { total, totalStudents, avgDuration, totalSemesters }
 })
 
-// Cache key
-const CACHE_KEY = 'courses_list'
+const fetchCourses = () => programService.getAllPrograms()
 
-const loadCourses = async (useCache = true) => {
-  // Check cache first
-  if (useCache) {
-    const cached = cacheService.get(CACHE_KEY)
-    if (cached) {
-      applyFilters(cached)
-      return
-    }
-  }
-
-  loading.value = true
-  try {
-    const response = await programService.getAllPrograms()
-    const data = Array.isArray(response) ? response : (response.results || response.data || [])
-    
-    // Store in cache
-    cacheService.set(CACHE_KEY, data)
-    applyFilters(data)
-  } catch (error) {
-    console.error('Error loading courses:', error)
-  } finally {
-    loading.value = false
-  }
-}
-
-const applyFilters = (sourceData = null) => {
-  // Use provided data or get from cache
-  const cachedData = sourceData || cacheService.get(CACHE_KEY) || []
-  let data = [...cachedData]
-  
-  if (filters.value.search) {
-    const q = filters.value.search.toLowerCase()
-    data = data.filter(c => c.name?.toLowerCase().includes(q) || c.code?.toLowerCase().includes(q))
-  }
-  
-  if (filters.value.duration) {
-    const duration = parseInt(filters.value.duration)
-    data = data.filter(c => c.duration_years === duration)
-  }
-  
-  courses.value = data
-}
+const loadCourses = () => loadData(fetchCourses)
 
 const resetFilters = () => {
-  filters.value = { search: '', duration: '' }
-  applyFilters()
+  filters.value.duration = ''
+  baseResetFilters()
 }
 
-const truncate = (text, length) => {
-  if (!text) return ''
-  return text.length > length ? text.substring(0, length) + '...' : text
-}
-
-// Debounce search filter
-let searchTimeout = null
-watch(() => filters.value.search, () => {
-  clearTimeout(searchTimeout)
-  searchTimeout = setTimeout(() => {
-    applyFilters()
-  }, 300)
-})
-
-// Watch duration filter without debounce
-watch(() => filters.value.duration, () => {
-  applyFilters()
-})
+// Watch duration filter
+watch(() => filters.value.duration, () => applyFilters())
 
 onMounted(loadCourses)
 </script>
-
 

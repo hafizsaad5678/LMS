@@ -12,22 +12,13 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { computed } from 'vue'
 import DashboardLayout from '@/layouts/DashboardLayout.vue'
-import { sidebarSections, mainNav } from '@/pannel/admin.js'
+import { sidebarSections, mainNav } from '@/panels/admin.js'
 import { useAuth } from '@/store/auth'
 
 const authStore = useAuth()
 
-// Get username from store or localStorage, fallback to 'Admin'
-const userName = computed(() => {
-  return authStore.userName || localStorage.getItem('username') || 'Admin'
-})
-
-// Update store username from localStorage on mount if not already set
-onMounted(() => {
-  if (!authStore.userName && localStorage.getItem('username')) {
-    authStore.userName = localStorage.getItem('username')
-  }
-})
+// Get username from auth store with fallback
+const userName = computed(() => authStore.userName || authStore.user?.username || 'Admin')
 </script>

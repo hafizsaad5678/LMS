@@ -38,8 +38,7 @@
 <script setup>
 import { ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import Navbar from '@/components/navbar/Navbar.vue'
-import Sidebar from '@/components/navbar/Sidebar.vue'
+import { Navbar, Sidebar } from '@/components/shared/panels'
 
 defineProps({
   mainNav: {
@@ -94,22 +93,4 @@ watch(() => route.path, () => {
 })
 </script>
 
-<style scoped>
-.sidebar-overlay {
-  display: none;
-  position: fixed;
-  top: 56px;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  z-index: 1019;
-  transition: opacity 0.3s ease;
-}
-
-@media (max-width: 992px) {
-  .sidebar-overlay.show {
-    display: block;
-  }
-}
-</style>
+<!-- Sidebar overlay styles moved to assets/css/components.css -->

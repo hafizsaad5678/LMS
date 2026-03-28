@@ -1,12 +1,19 @@
 import { defineStore } from 'pinia'
-import { authAPI } from '@/services/api'
+import { authAPI } from '@/services/shared'
 import router from '@/router'
+import { validateUserId, safeStorage } from '@/utils/security'
+import { USER_ROLES } from '@/utils/constants/config'
+import { ADMIN_ROUTES, TEACHER_ROUTES, STUDENT_ROUTES } from '@/utils/constants/routes'
+import { STORAGE_KEYS } from '@/utils/constants/storage'
 
 export const useAuth = defineStore('auth', {
   state: () => ({
-    access_token: localStorage.getItem('access_token') || null,
-    refresh_token: localStorage.getItem('refresh_token') || null,
-    userName: localStorage.getItem('username') || null,
+    access_token: safeStorage.get('access_token'),
+    refresh_token: safeStorage.get('refresh_token'),
+    userName: safeStorage.get('username'),
+    userId: safeStorage.get('userId'),
+    userRole: safeStorage.get('userRole'),
+    userEmail: safeStorage.get('userEmail'),
     user: null,
     isLoading: false,
     error: null
@@ -24,36 +31,57 @@ export const useAuth = defineStore('auth', {
       try {
         const response = await authAPI.login(credentials)
 
-        // Store tokens
+        // Store tokens and user info
         this.access_token = response.data.access
         this.refresh_token = response.data.refresh
-        this.userName = response.data.username || response.data.full_name || 'Admin'
+        this.userName = response.data.username || response.data.full_name || 'User'
+        this.user = response.data.user || response.data
 
-        localStorage.setItem('access_token', response.data.access)
-        localStorage.setItem('refresh_token', response.data.refresh)
-        localStorage.setItem('username', this.userName)
+        const userRole = response.data.role || 'unknown'
+        // Try multiple possible fields for user ID
+        const userId = response.data.user_id || response.data.id || response.data.student_id || response.data.teacher_id || response.data.admin_id
 
-        // Redirect to dashboard
-        router.push('/admin-dashboard')
+        safeStorage.set('access_token', response.data.access)
+        safeStorage.set('refresh_token', response.data.refresh)
+        safeStorage.set('username', this.userName)
+        safeStorage.set('userRole', userRole)
+        safeStorage.set('userEmail', response.data.email)
+
+        // Validate and store user ID
+        if (userId && validateUserId(String(userId))) {
+          safeStorage.set('userId', userId)
+          this.userId = userId
+        }
+
+        // Update state
+        this.userRole = userRole
+        this.userEmail = response.data.email
+
+        // Update axios default headers with new token
+        const api = (await import('@/services/shared')).default
+        api.defaults.headers.common['Authorization'] = `Bearer ${response.data.access}`
+
+        // Determine redirect path using route constants
+        const dashboardPaths = {
+          [USER_ROLES.ADMIN]: ADMIN_ROUTES.DASHBOARD.path,
+          [USER_ROLES.TEACHER]: TEACHER_ROUTES.DASHBOARD.path,
+          [USER_ROLES.STUDENT]: STUDENT_ROUTES.DASHBOARD.path,
+        }
+        const redirectPath = dashboardPaths[userRole] || '/'
+
+        // Preload dashboard stats in background (don't wait for it)
+        this.preloadDashboardStats(userRole, userId).catch(err => {
+          console.warn('Failed to preload dashboard stats:', err)
+        })
+
+        // Use router.push instead of window.location.href
+        // Add a small delay to ensure token is set before navigation
+        await new Promise(resolve => setTimeout(resolve, 50))
+        router.push(redirectPath)
 
         return response.data
       } catch (error) {
         this.error = error.response?.data?.error || 'Login failed'
-        throw error
-      } finally {
-        this.isLoading = false
-      }
-    },
-
-    async signup(userData) {
-      this.isLoading = true
-      this.error = null
-      try {
-        const response = await authAPI.signup(userData)
-        router.push({ name: 'Login', query: { msg: 'Check your email to verify account' } })
-        return response.data
-      } catch (error) {
-        this.error = error.response?.data?.error || 'Signup failed'
         throw error
       } finally {
         this.isLoading = false
@@ -93,12 +121,42 @@ export const useAuth = defineStore('auth', {
       this.access_token = null
       this.refresh_token = null
       this.userName = null
+      this.userId = null
+      this.userRole = null
+      this.userEmail = null
       this.user = null
-      localStorage.removeItem('access_token')
-      localStorage.removeItem('refresh_token')
-      localStorage.removeItem('username')
-      localStorage.removeItem('userRole')
-      router.push('/login')
+      safeStorage.clear()
+      router.push({ name: 'Login' })
+    },
+
+    /**
+     * Preload dashboard stats after login for instant dashboard load
+     */
+    async preloadDashboardStats(userRole, userId) {
+      try {
+        if (userRole === USER_ROLES.ADMIN) {
+          const { default: adminPanelService } = await import('@/services/admin/adminPanelService')
+          await Promise.all([
+            adminPanelService.getDashboardStats(),
+            adminPanelService.getRecentActivities()
+          ])
+        } else if (userRole === USER_ROLES.TEACHER) {
+          const { default: teacherPanelService } = await import('@/services/teacher/teacherPanelService')
+          await Promise.all([
+            teacherPanelService.getDashboardStats(),
+            teacherPanelService.getRecentActivities()
+          ])
+        } else if (userRole === USER_ROLES.STUDENT && userId) {
+          const { default: studentPanelService } = await import('@/services/student/studentPanelService')
+          await Promise.all([
+            studentPanelService.getDashboardStats(userId),
+            studentPanelService.getActivities(userId)
+          ])
+        }
+      } catch {
+        // Silently fail - dashboard will load normally if preload fails
+      }
     }
   }
 })
+

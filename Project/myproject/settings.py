@@ -1,21 +1,25 @@
 
 import os
 from pathlib import Path
+from dotenv import load_dotenv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Load environment variables from .env file
+load_dotenv(BASE_DIR / '.env')
 
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-@jn^^i(s_jq+1&izy%p5m5rhnd(19v!3vc5f+d#_tn*!71xsoh'
+SECRET_KEY = os.environ.get('SECRET_KEY', 'fallback-insecure-key-change-me')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.environ.get('DEBUG', 'False').lower() in ('true', '1', 'yes')
 
-ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
 
 
 # Application definition
@@ -32,11 +36,13 @@ INSTALLED_APPS = [
     'rest_framework',
     'authapp',
     'lms_cors',
+    'ai_core',
 ]
 
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -68,12 +74,26 @@ WSGI_APPLICATION = 'myproject.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+DB_ENGINE = os.environ.get('DB_ENGINE', 'sqlite3')
+
+if DB_ENGINE == 'postgresql':
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': os.environ.get('DB_NAME', 'lms_database'),
+            'USER': os.environ.get('DB_USER', 'lms_user'),
+            'PASSWORD': os.environ.get('DB_PASSWORD', ''),
+            'HOST': os.environ.get('DB_HOST', 'localhost'),
+            'PORT': os.environ.get('DB_PORT', '5432'),
+        }
     }
-}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
 
 
 # Password validation
@@ -111,6 +131,8 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 STATIC_URL = 'static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
@@ -120,7 +142,12 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 from datetime import timedelta
 REST_FRAMEWORK = {
-   
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
     'DEFAULT_FILTER_BACKENDS': [
         'django_filters.rest_framework.DjangoFilterBackend',
         'rest_framework.filters.SearchFilter',
@@ -128,15 +155,34 @@ REST_FRAMEWORK = {
     ],
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 20,
+    # Rate Limiting (Issue #11)
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle'
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': os.environ.get('ANON_THROTTLE_RATE', '20/min'),
+        'user': os.environ.get('USER_THROTTLE_RATE', '100/min'),
+        'login': os.environ.get('LOGIN_THROTTLE_RATE', '5/min'),
+    }
 }
+
+# Disable Browsable API in production
+if not DEBUG:
+    REST_FRAMEWORK['DEFAULT_RENDERER_CLASSES'] = (
+        'rest_framework.renderers.JSONRenderer',
+    )
 
 # Media files configuration
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
+# JWT Configuration (Issue #10)
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=30),
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=int(os.environ.get('ACCESS_TOKEN_LIFETIME_MINUTES', 30))),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=int(os.environ.get('REFRESH_TOKEN_LIFETIME_DAYS', 30))),
+    'ROTATE_REFRESH_TOKENS': True,
+    'BLACKLIST_AFTER_ROTATION': True,
 }
 
 
@@ -144,20 +190,90 @@ SIMPLE_JWT = {
 
 # settings.py
 
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'  # Django ka built-in SMTP backend
-EMAIL_HOST = 'smtp.gmail.com'  # Gmail ka SMTP server
-EMAIL_PORT = 587  # TLS ke liye correct port
-EMAIL_USE_TLS = True  # Secure connection (encrypted)
-EMAIL_HOST_USER = 'hamzahmza622@gmail.com'
-EMAIL_HOST_PASSWORD = 'tuanqqufcujarcou' # App password (not your login password)
-DEFAULT_FROM_EMAIL = EMAIL_HOST_USER  # Default sender email
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
+DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 
 # CORS Configuration
-CORS_ALLOWED_ORIGINS = [
-    'http://localhost:5173',
-    'http://127.0.0.1:5173',
-    'http://localhost:3000',
-    'http://127.0.0.1:3000',
-]
+# CORS Configuration (Issue #12)
+CORS_ALLOWED_ORIGINS = os.environ.get(
+    'CORS_ALLOWED_ORIGINS', 
+    'http://localhost:5173,http://127.0.0.1:5173'
+).split(',')
 
 CORS_ALLOW_CREDENTIALS = True
+
+
+# Logging Configuration (Issue #13)
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
+            'style': '{',
+        },
+        'simple': {
+            'format': '{levelname} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+        'file': {
+            'level': 'ERROR',
+            'class': 'logging.FileHandler',
+            'filename': os.path.join(BASE_DIR, 'django_errors.log'),
+            'formatter': 'verbose',
+        },
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console', 'file'],
+            'level': 'INFO',
+            'propagate': True,
+        },
+    },
+}
+
+
+# =============================================================================
+# Production Security Settings (only active when DEBUG=False)
+# =============================================================================
+if not DEBUG:
+    # HTTPS enforcement
+    SECURE_SSL_REDIRECT = True
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    
+    # Secure cookies
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    
+    # HTTP Strict Transport Security (1 year)
+    SECURE_HSTS_SECONDS = 31536000
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+    
+    # Prevent content sniffing
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    
+    # XSS filter
+    SECURE_BROWSER_XSS_FILTER = True
+
+
+# =============================================================================
+# AI Configuration
+# =============================================================================
+# These settings are read directly from environment variables in ai_core/services/llm_provider.py
+# ensuring that changes in .env take effect immediately without managing duplicate defaults here.
+
+# Vector Database Path (generated data; keep out of app package)
+FAISS_INDEX_DIR = os.path.join(BASE_DIR, 'data', 'faiss_indexes')
+

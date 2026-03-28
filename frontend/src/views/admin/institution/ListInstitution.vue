@@ -17,6 +17,16 @@
       @close="alert.show = false"
     />
 
+    <ConfirmDialog
+      v-model="showConfirmDialog"
+      title="Delete Institution"
+      :message="institutionToDelete ? `Are you sure you want to delete '${institutionToDelete.name}'? This action cannot be undone.` : 'Delete this institution?'"
+      type="danger"
+      theme="admin"
+      confirm-text="Delete"
+      @confirm="confirmDeleteInstitution"
+    />
+
     <!-- Stats Section -->
     <template #stats>
       <div class="row g-3 g-lg-4">
@@ -53,7 +63,7 @@
     <!-- Main Content -->
     <DataTable
       :columns="tableColumns"
-      :data="filteredInstitutions"
+      :data="filteredData"
       :loading="loading"
       loading-text="Loading institutions..."
       empty-icon="bi bi-bank2"
@@ -65,14 +75,12 @@
           <div class="avatar-circle avatar-institution me-2"><i class="bi bi-bank2"></i></div>
           <div>
             <div class="fw-semibold text-dark">{{ row.name }}</div>
-            <small class="text-muted">{{ row.short_name || '-' }}</small>
+            <small class="text-muted d-none d-md-block">{{ row.code }}</small>
           </div>
         </div>
       </template>
 
-      <template #cell-code="{ value }">
-        <span class="badge bg-dark">{{ value }}</span>
-      </template>
+
 
       <template #cell-contact="{ row }">
         <div v-if="row.email || row.phone">
@@ -83,8 +91,8 @@
       </template>
 
       <template #cell-is_active="{ row }">
-        <span :class="['badge', row.is_active ? 'bg-success' : 'bg-secondary']">
-          {{ row.is_active ? 'Active' : 'Inactive' }}
+        <span :class="['badge', getActiveBadgeClass(row.is_active)]">
+          {{ getActiveStatusText(row.is_active) }}
         </span>
       </template>
 
@@ -92,52 +100,69 @@
         <ActionButtons
           :item="row"
           :show-toggle="false"
-          @view="router.push(`/admin-dashboard/institution/${row.id}`)"
-          @edit="router.push(`/admin-dashboard/institution/edit/${row.id}`)"
+          @view="router.push({ name: ADMIN_ROUTES.INSTITUTION_PROFILE.name, params: { id: row.id } })"
+          @edit="router.push({ name: ADMIN_ROUTES.INSTITUTION_EDIT.name, params: { id: row.id } })"
           @delete="confirmDelete(row)"
         />
       </template>
     </DataTable>
 
     <template #footer>
-      <p class="text-muted small mb-0">Total: {{ filteredInstitutions.length }} institutions</p>
+      <p class="text-muted small mb-0">Total: {{ filteredData.length }} institutions</p>
     </template>
   </AdminPageTemplate>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import AdminPageTemplate from '@/components/navbar/AdminPageTemplate.vue'
-import { StatCard, DataTable, SearchFilter, ActionButtons, AlertMessage } from '@/components/common'
-import { institutionService } from '@/services/institutionService'
-import cacheService from '@/services/cacheService'
+import { AdminPageTemplate } from '@/components/shared/panels'
+import { StatCard, DataTable, SearchFilter, ActionButtons, AlertMessage, ConfirmDialog } from '@/components/shared/common'
+import { useEntityList, useAlert } from '@/composables/shared'
+import { institutionService } from '@/services/shared'
+import { ADMIN_ROUTES } from '@/utils/constants/routes'
+import { getActiveBadgeClass, getActiveStatusText } from '@/utils/badgeHelpers'
 
 const router = useRouter()
 
 const breadcrumbs = [
-  { name: 'Dashboard', href: '/admin-dashboard' },
+  { name: 'Dashboard', href: ADMIN_ROUTES.DASHBOARD.path },
   { name: 'Institutions' }
 ]
 
 const actions = [
-  { label: 'Add Institution', icon: 'bi bi-plus-circle', variant: 'btn-admin-primary', onClick: () => router.push('/admin-dashboard/institution/add') }
+  { label: 'Add Institution', icon: 'bi bi-plus-circle', variant: 'btn-admin-primary', onClick: () => router.push({ name: ADMIN_ROUTES.INSTITUTION_ADD.name }) }
 ]
 
 const tableColumns = [
   { key: 'name', label: 'Institution' },
-  { key: 'code', label: 'Code' },
   { key: 'city', label: 'City', hideOnMobile: true, default: '-' },
   { key: 'contact', label: 'Contact', hideOnMobile: true },
   { key: 'is_active', label: 'Status' },
   { key: 'actions', label: 'Actions', center: true }
 ]
 
-const alert = ref({ show: false, type: 'success', title: '', message: '' })
-const loading = ref(true)
-const institutions = ref([])
-const filters = ref({ search: '', status: '' })
+// Use shared alert composable
+const { alert, showAlert } = useAlert()
+const showConfirmDialog = ref(false)
+const institutionToDelete = ref(null)
 
+// Use composable for list logic
+const {
+  loading,
+  data: institutions,
+  filteredData,
+  filters,
+  loadData,
+  resetFilters,
+  refresh
+} = useEntityList({
+  cacheKey: 'institutions_list',
+  searchFields: ['name', 'code', 'city'],
+  statusField: 'is_active'
+})
+
+// Custom stats
 const stats = computed(() => ({
   total: institutions.value.length,
   active: institutions.value.filter(i => i.is_active).length,
@@ -145,93 +170,31 @@ const stats = computed(() => ({
   uniqueCities: new Set(institutions.value.map(i => i.city).filter(Boolean)).size
 }))
 
-const filteredInstitutions = computed(() => {
-  let list = institutions.value
-  
-  if (filters.value.search) {
-    const q = filters.value.search.toLowerCase()
-    list = list.filter(i => 
-      i.name?.toLowerCase().includes(q) || 
-      i.code?.toLowerCase().includes(q) ||
-      i.city?.toLowerCase().includes(q)
-    )
-  }
-  
-  if (filters.value.status === 'active') {
-    list = list.filter(i => i.is_active)
-  } else if (filters.value.status === 'inactive') {
-    list = list.filter(i => !i.is_active)
-  }
-  
-  return list
-})
+const fetchInstitutions = () => institutionService.getAllInstitutions()
 
-// Cache key
-const CACHE_KEY = 'institutions_list'
-
-const showAlert = (type, message, title = null) => {
-  alert.value = { show: true, type, title, message }
-}
-
-const loadInstitutions = async (useCache = true) => {
-  // Check cache first
-  if (useCache) {
-    const cached = cacheService.get(CACHE_KEY)
-    if (cached) {
-      institutions.value = cached
-      return
-    }
-  }
-
-  loading.value = true
-  try {
-    const data = await institutionService.getAllInstitutions()
-    const result = Array.isArray(data) ? data : (data.results || [])
-    
-    // Store in cache
-    cacheService.set(CACHE_KEY, result)
-    institutions.value = result
-  } catch (error) {
-    console.error('Error loading institutions:', error)
-    showAlert('danger', 'Failed to load institutions', 'Error')
-  } finally {
-    loading.value = false
-  }
-}
-
-const resetFilters = () => {
-  filters.value = { search: '', status: '' }
-}
+const loadInstitutions = () => loadData(fetchInstitutions)
 
 const confirmDelete = (inst) => {
-  if (confirm(`Are you sure you want to delete "${inst.name}"? This action cannot be undone.`)) {
-    deleteInstitution(inst.id)
-  }
+  institutionToDelete.value = inst
+  showConfirmDialog.value = true
 }
 
-const deleteInstitution = async (id) => {
+const confirmDeleteInstitution = async () => {
   try {
-    await institutionService.deleteInstitution(id)
+    await institutionService.deleteInstitution(institutionToDelete.value.id)
     showAlert('success', 'Institution deleted successfully', 'Success')
-    cacheService.clear(CACHE_KEY) // Invalidate cache
-    loadInstitutions(false)
+    refresh(fetchInstitutions)
   } catch (error) {
     console.error('Error deleting institution:', error)
     showAlert('danger', 'Failed to delete institution', 'Error')
+  } finally {
+    showConfirmDialog.value = false
+    institutionToDelete.value = null
   }
 }
 
-// Debounce search filter
-let searchTimeout = null
-watch(() => filters.value.search, () => {
-  clearTimeout(searchTimeout)
-  searchTimeout = setTimeout(() => {
-    // Trigger computed property recalculation
-    filters.value = { ...filters.value }
-  }, 300)
-})
-
 onMounted(loadInstitutions)
 </script>
+
 
 

@@ -9,12 +9,16 @@
     dashboard-highlight-text="text-success"
     sidebar-theme="student"
   />
+
+  <!-- Floating Academic Assistant -->
+  <StudentAIChatbot />
 </template>
 
 <script setup>
 import { useAuth } from '@/store/auth.js'
 import DashboardLayout from '@/layouts/DashboardLayout.vue'
-import { sidebarSections, mainNav } from '@/pannel/student.js'
+import { sidebarSections, mainNav } from '@/panels/student.js'
+import { StudentAIChatbot } from '@/components/shared/panels'
 
 const authStore = useAuth()
 </script>

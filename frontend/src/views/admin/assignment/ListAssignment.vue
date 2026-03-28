@@ -31,26 +31,23 @@
         v-model="filters.search"
         search-placeholder="Search by title or subject..."
         :show-status-filter="false"
-        search-col-size="col-md-4 col-12"
-        actions-col-size="col-md-2 col-6"
         :loading="loading"
         @refresh="loadAssignments"
         @reset="resetFilters"
       >
         <template #filters>
-          <div class="col-md-4 col-6">
-            <label class="form-label small fw-semibold text-dark">Subject</label>
+          <div class="col-md-3 col-6">
             <select v-model="filters.subject" class="form-select" @change="loadAssignments">
               <option value="">All Subjects</option>
               <option v-for="subj in subjects" :key="subj.id" :value="subj.id">{{ subj.code }} - {{ subj.name }}</option>
             </select>
           </div>
-          <div class="col-md-2 col-6">
-            <label class="form-label small fw-semibold text-dark">Status</label>
+          <div class="col-md-3 col-6">
             <select v-model="filters.status" class="form-select" @change="loadAssignments">
-              <option value="">All</option>
-              <option value="upcoming">Upcoming</option>
-              <option value="overdue">Overdue</option>
+              <option value="">All Status</option>
+              <option v-for="opt in ASSIGNMENT_TIME_STATUS_OPTIONS" :key="opt.value" :value="opt.value">
+                {{ opt.label }}
+              </option>
             </select>
           </div>
         </template>
@@ -115,20 +112,24 @@
 <script setup>
 import { ref, onMounted, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import AdminPageTemplate from '@/components/navbar/AdminPageTemplate.vue'
-import { StatCard, DataTable, SearchFilter } from '@/components/common'
-import { assignmentService } from '@/services/assignmentService'
-import { subjectService } from '@/services/subjectService'
+import { AdminPageTemplate } from '@/components/shared/panels'
+import { StatCard, DataTable, SearchFilter, SelectInput } from '@/components/shared/common'
+import { useEntityList } from '@/composables/shared'
+import { assignmentService } from '@/services/shared'
+import { subjectService } from '@/services/shared'
+import { formatDate as formatDateUtil, truncateText } from '@/utils/formatters'
+import { ADMIN_ROUTES } from '@/utils/constants/routes'
+import { ASSIGNMENT_TIME_STATUS_OPTIONS } from '@/utils/constants/options'
 
 const router = useRouter()
 
 const breadcrumbs = [
-  { name: 'Dashboard', href: '/admin-dashboard' },
+  { name: 'Dashboard', href: ADMIN_ROUTES.DASHBOARD.path },
   { name: 'Assignments' }
 ]
 
 const actions = [
-  { label: 'Add Assignment', icon: 'bi bi-plus-circle', variant: 'btn-admin-primary', onClick: () => router.push('/admin-dashboard/assignments/add') }
+  { label: 'Add Assignment', icon: 'bi bi-plus-circle', variant: 'btn-admin-primary', onClick: () => router.push(`${ADMIN_ROUTES.ASSIGNMENTS.path}/add`) }
 ]
 
 const tableColumns = [
@@ -141,11 +142,35 @@ const tableColumns = [
   { key: 'actions', label: 'Actions', center: true }
 ]
 
-const loading = ref(true)
-const assignments = ref([])
 const subjects = ref([])
-const filters = ref({ search: '', subject: '', status: '' })
 
+// Use composable for list logic
+const {
+  loading,
+  filteredData: assignments,
+  filters,
+  loadData,
+  applyFilters,
+  resetFilters: baseResetFilters
+} = useEntityList({
+  cacheKey: 'assignments_list',
+  searchFields: ['title', 'subject_name'],
+  defaultFilters: { subject: '', status: '' },
+  customFilter: (data, filterValues) => {
+    let result = data
+    if (filterValues.subject) {
+      result = result.filter(a => String(a.subject) === String(filterValues.subject))
+    }
+    if (filterValues.status === 'upcoming') {
+      result = result.filter(a => new Date(a.due_date) >= new Date())
+    } else if (filterValues.status === 'overdue') {
+      result = result.filter(a => new Date(a.due_date) < new Date())
+    }
+    return result
+  }
+})
+
+// Custom stats
 const stats = computed(() => {
   const total = assignments.value.length
   const now = new Date()
@@ -162,33 +187,9 @@ const stats = computed(() => {
   return { total, dueThisWeek, overdue, totalSubmissions }
 })
 
-const loadAssignments = async () => {
-  loading.value = true
-  try {
-    const params = {}
-    if (filters.value.subject) params.subject = filters.value.subject
-    
-    const response = await assignmentService.getAllAssignments(params)
-    let data = Array.isArray(response) ? response : (response.results || [])
-    
-    if (filters.value.search) {
-      const q = filters.value.search.toLowerCase()
-      data = data.filter(a => a.title?.toLowerCase().includes(q) || a.subject_name?.toLowerCase().includes(q))
-    }
-    
-    if (filters.value.status === 'upcoming') {
-      data = data.filter(a => new Date(a.due_date) >= new Date())
-    } else if (filters.value.status === 'overdue') {
-      data = data.filter(a => new Date(a.due_date) < new Date())
-    }
-    
-    assignments.value = data
-  } catch (error) {
-    console.error('Error loading assignments:', error)
-  } finally {
-    loading.value = false
-  }
-}
+const fetchAssignments = () => assignmentService.getAllAssignments()
+
+const loadAssignments = () => loadData(fetchAssignments)
 
 const loadSubjects = async () => {
   try {
@@ -200,23 +201,20 @@ const loadSubjects = async () => {
 }
 
 const resetFilters = () => {
-  filters.value = { search: '', subject: '', status: '' }
-  loadAssignments()
+  filters.value.subject = ''
+  filters.value.status = ''
+  baseResetFilters()
 }
 
 const viewSubmissions = (assignment) => {
-  router.push(`/admin-dashboard/assignments/${assignment.id}/submissions`)
+  router.push(`${ADMIN_ROUTES.ASSIGNMENTS.path}/${assignment.id}/submissions`)
 }
 
-const formatDate = (dateString) => {
-  if (!dateString) return 'N/A'
-  return new Date(dateString).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
-}
+// Use shared formatDate utility
+const formatDate = (dateString) => formatDateUtil(dateString)
 
-const truncate = (text, length) => {
-  if (!text) return ''
-  return text.length > length ? text.substring(0, length) + '...' : text
-}
+// Use shared truncateText utility
+const truncate = (text, length) => truncateText(text, length)
 
 const getDueDateClass = (dueDate) => {
   const due = new Date(dueDate)
@@ -230,16 +228,14 @@ const getDueDateClass = (dueDate) => {
 const getStatus = (dueDate) => new Date(dueDate) < new Date() ? 'Overdue' : 'Active'
 const getStatusBadge = (dueDate) => new Date(dueDate) < new Date() ? 'badge bg-danger' : 'badge bg-success'
 
-let searchTimeout
-watch(() => filters.value.search, () => {
-  clearTimeout(searchTimeout)
-  searchTimeout = setTimeout(loadAssignments, 300)
-})
+// Watch custom filters
+watch(() => [filters.value.subject, filters.value.status], () => applyFilters())
 
 onMounted(() => {
   loadSubjects()
   loadAssignments()
 })
 </script>
+
 
 

@@ -1,4 +1,4 @@
-<template>
+p<template>
   <AdminPageTemplate
     title="Academic Sessions"
     subtitle="Manage batches and intakes for all programs"
@@ -7,6 +7,27 @@
     :actions="actions"
     content-title="Session List"
   >
+    <!-- Alert Message -->
+    <AlertMessage
+      v-if="alert.show"
+      :type="alert.type"
+      :message="alert.message"
+      :title="alert.title"
+      :auto-close="true"
+      :auto-close-duration="3000"
+      @close="alert.show = false"
+    />
+
+    <ConfirmDialog
+      v-model="showConfirmDialog"
+      :title="confirmTitle"
+      :message="confirmMessage"
+      :type="confirmAction === 'deleteSession' ? 'danger' : 'info'"
+      theme="admin"
+      :confirm-text="confirmAction === 'deleteSession' ? 'Delete' : 'Confirm'"
+      @confirm="handleConfirm"
+    />
+
     <!-- Stats Section -->
     <template #stats>
       <div class="row g-3 g-lg-4">
@@ -29,17 +50,14 @@
     <template #filters>
       <SearchFilter
         v-model="filters.search"
+        v-model:status-value="filters.status"
         search-placeholder="Search sessions..."
-        :show-status-filter="false"
-        search-col-size="col-md-3 col-12"
-        actions-col-size="col-md-3 col-6"
         :loading="loading"
         @refresh="loadSessions"
         @reset="resetFilters"
       >
         <template #filters>
           <div class="col-md-3 col-6">
-            <label class="form-label small fw-semibold text-dark">Program Level</label>
             <select v-model="filters.program_level" class="form-select" @change="loadSessions">
               <option value="">All Levels</option>
               <option value="bachelor">Bachelor</option>
@@ -47,16 +65,6 @@
               <option value="intermediate">Intermediate</option>
               <option value="phd">PhD</option>
               <option value="diploma">Diploma</option>
-            </select>
-          </div>
-          <div class="col-md-3 col-6">
-            <label class="form-label small fw-semibold text-dark">Status</label>
-            <select v-model="filters.status" class="form-select" @change="loadSessions">
-              <option value="">All Statuses</option>
-              <option value="upcoming">Upcoming</option>
-              <option value="active">Active</option>
-              <option value="completed">Completed</option>
-              <option value="archived">Archived</option>
             </select>
           </div>
         </template>
@@ -75,7 +83,7 @@
     >
       <template #cell-session_name="{ row }">
         <div class="d-flex align-items-center">
-          <div class="avatar-circle avatar-session me-2"><i class="bi bi-calendar-check"></i></div>
+          <div class="avatar-circle avatar-session me-2">{{ row.session_code?.substring(0, 2) || 'AS' }}</div>
           <div>
             <div class="fw-semibold text-dark">{{ row.session_name }}</div>
             <small class="text-muted">{{ row.session_code }}</small>
@@ -100,7 +108,7 @@
             <small>{{ row.current_enrollment }}/{{ row.total_capacity }}</small>
             <small>{{ Math.round(row.capacity_percentage) }}%</small>
           </div>
-          <div class="progress" style="height: 6px;">
+          <div class="progress progress-h-6">
             <div class="progress-bar" :class="getCapacityClass(row.capacity_percentage)" :style="{ width: row.capacity_percentage + '%' }"></div>
           </div>
         </div>
@@ -115,12 +123,15 @@
       </template>
 
       <template #cell-actions="{ row }">
-        <div class="d-flex gap-1 justify-content-center flex-wrap">
-          <router-link :to="`/admin-dashboard/sessions/profile/${row.id}`" class="btn btn-sm btn-outline-info" title="View"><i class="bi bi-eye"></i></router-link>
-          <router-link :to="`/admin-dashboard/sessions/edit/${row.id}`" class="btn btn-sm btn-outline-primary" title="Edit"><i class="bi bi-pencil"></i></router-link>
+        <ActionButtons
+          :item="row"
+          :show-toggle="false"
+          @view="router.push({ name: ADMIN_ROUTES.SESSION_PROFILE.name, params: { id: row.id } })"
+          @edit="router.push({ name: ADMIN_ROUTES.SESSION_EDIT.name, params: { id: row.id } })"
+          @delete="confirmDelete(row)"
+        >
           <button v-if="row.semester_count === 0" @click="setupSemesters(row)" class="btn btn-sm btn-success" title="Setup Semesters"><i class="bi bi-gear"></i></button>
-          <button @click="confirmDelete(row)" class="btn btn-sm btn-outline-danger" title="Delete"><i class="bi bi-trash"></i></button>
-        </div>
+        </ActionButtons>
       </template>
     </DataTable>
 
@@ -131,22 +142,23 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed, watch } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import AdminPageTemplate from '@/components/navbar/AdminPageTemplate.vue'
-import { StatCard, DataTable, SearchFilter } from '@/components/common'
-import sessionService from '@/services/sessionService'
-import cacheService from '@/services/cacheService'
+import { AdminPageTemplate } from '@/components/shared/panels'
+import { StatCard, DataTable, SearchFilter, ActionButtons, ConfirmDialog, AlertMessage } from '@/components/shared/common'
+import { useEntityList, useAlert } from '@/composables/shared'
+import { sessionService } from '@/services/shared'
+import { ADMIN_ROUTES } from '@/utils/constants/routes'
 
 const router = useRouter()
 
 const breadcrumbs = [
-  { name: 'Dashboard', href: '/admin-dashboard' },
+  { name: 'Dashboard', href: ADMIN_ROUTES.DASHBOARD.path },
   { name: 'Sessions' }
 ]
 
 const actions = [
-  { label: 'Create Session', icon: 'bi bi-plus-circle', variant: 'btn-admin-primary', onClick: () => router.push('/admin-dashboard/sessions/add') }
+  { label: 'Create Session', icon: 'bi bi-plus-circle', variant: 'btn-admin-primary', onClick: () => router.push({ name: ADMIN_ROUTES.SESSION_ADD.name }) }
 ]
 
 const tableColumns = [
@@ -159,48 +171,48 @@ const tableColumns = [
   { key: 'actions', label: 'Actions', center: true }
 ]
 
-const loading = ref(false)
-const sessions = ref([])
 const stats = ref({ total: 0, active: 0, upcoming: 0, completed: 0 })
-const filters = ref({ program_level: '', status: '', search: '' })
+const showConfirmDialog = ref(false)
+const confirmAction = ref(null)
+const confirmMessage = ref('')
+const confirmTitle = ref('')
+const sessionToDelete = ref(null)
+const sessionToSetup = ref(null)
+const { alert, showAlert } = useAlert()
 
-// Cache key
-const CACHE_KEY = 'sessions_list'
-
-const loadSessions = async (useCache = true) => {
-  // Check cache first (only if no filters applied)
-  const hasFilters = filters.value.program_level || filters.value.status || filters.value.search
-  
-  if (useCache && !hasFilters) {
-    const cached = cacheService.get(CACHE_KEY)
-    if (cached) {
-      sessions.value = cached
-      return
+// Use composable for list logic
+const {
+  loading,
+  filteredData: sessions,
+  filters,
+  loadData,
+  applyFilters,
+  resetFilters: baseResetFilters
+} = useEntityList({
+  cacheKey: 'sessions_list',
+  searchFields: ['session_name', 'session_code'],
+  statusField: 'status',
+  defaultFilters: { program_level: '' },
+  customFilter: (data, filterValues) => {
+    let result = data
+    if (filterValues.program_level) {
+      result = result.filter(s => s.program_level === filterValues.program_level)
     }
-  }
-
-  loading.value = true
-  try {
-    const params = {}
-    if (filters.value.program_level) params.program__program_level = filters.value.program_level
-    if (filters.value.status) params.status = filters.value.status
-    if (filters.value.search) params.search = filters.value.search
-    
-    const response = await sessionService.getSessions(params)
-    const data = Array.isArray(response.data) ? response.data : (response.data.results || [])
-    
-    // Only cache if no filters applied
-    if (!hasFilters) {
-      cacheService.set(CACHE_KEY, data)
+    if (filterValues.status) {
+      result = result.filter(s => s.status === filterValues.status)
     }
-    
-    sessions.value = data
-  } catch (error) {
-    console.error('Error loading sessions:', error)
-    alert('Failed to load sessions')
-  } finally {
-    loading.value = false
+    return result
   }
+})
+
+const fetchSessions = async () => {
+  const data = await sessionService.getSessions()
+  return Array.isArray(data) ? data : (data.results || [])
+}
+
+const loadSessions = async () => {
+  await loadData(fetchSessions)
+  loadStats()
 }
 
 const loadStats = async () => {
@@ -210,58 +222,82 @@ const loadStats = async () => {
       sessionService.getActiveSessions(),
       sessionService.getUpcomingSessions()
     ])
-    
-    const all = Array.isArray(allSessions.data) ? allSessions.data : (allSessions.data.results || [])
-    const active = Array.isArray(activeSessions.data) ? activeSessions.data : (activeSessions.data.results || [])
-    const upcoming = Array.isArray(upcomingSessions.data) ? upcomingSessions.data : (upcomingSessions.data.results || [])
-    
+
+    const extractData = (data) => {
+      if (!data) return []
+      return Array.isArray(data) ? data : (data.results || [])
+    }
+
+    const all = extractData(allSessions)
+    const active = extractData(activeSessions)
+    const upcoming = extractData(upcomingSessions)
+
     stats.value = {
       total: all.length,
       active: active.length,
       upcoming: upcoming.length,
-      completed: all.filter(s => s.status === 'completed').length
+      completed: all.filter((s) => s.status === 'completed').length
     }
   } catch (error) {
     console.error('Error loading stats:', error)
   }
 }
 
-const setupSemesters = async (session) => {
-  if (!confirm(`Auto-create ${session.total_semesters} semesters for ${session.session_name}?`)) return
-  
+const setupSemesters = (session) => {
+  sessionToSetup.value = session
+  confirmTitle.value = 'Setup Semesters'
+  confirmMessage.value = `Auto-create ${session.total_semesters} semesters for ${session.session_name}?`
+  confirmAction.value = 'setupSemesters'
+  showConfirmDialog.value = true
+}
+
+const confirmSetupSemesters = async () => {
   try {
-    await sessionService.setupSemesters(session.id)
-    alert(`Successfully created semesters for ${session.session_name}`)
-    cacheService.clear(CACHE_KEY) // Invalidate cache
-    loadSessions(false)
+    await sessionService.setupSemesters(sessionToSetup.value.id)
+    showAlert('success', `Successfully created semesters for ${sessionToSetup.value.session_name}`)
+    loadSessions()
   } catch (error) {
     console.error('Error setting up semesters:', error)
-    alert(error.response?.data?.error || 'Failed to setup semesters')
+    showAlert('error', error.response?.data?.error || 'Failed to setup semesters')
+  } finally {
+    showConfirmDialog.value = false
+    sessionToSetup.value = null
   }
 }
 
 const confirmDelete = (session) => {
-  if (confirm(`Are you sure you want to delete ${session.session_name}?`)) {
-    deleteSession(session.id)
+  sessionToDelete.value = session
+  confirmTitle.value = 'Delete Session'
+  confirmMessage.value = `Are you sure you want to delete ${session.session_name}?`
+  confirmAction.value = 'deleteSession'
+  showConfirmDialog.value = true
+}
+
+const confirmDeleteSession = async () => {
+  try {
+    await sessionService.deleteSession(sessionToDelete.value.id)
+    showAlert('success', 'Session deleted successfully')
+    loadSessions()
+  } catch (error) {
+    console.error('Error deleting session:', error)
+    showAlert('error', 'Failed to delete session')
+  } finally {
+    showConfirmDialog.value = false
+    sessionToDelete.value = null
   }
 }
 
-const deleteSession = async (id) => {
-  try {
-    await sessionService.deleteSession(id)
-    alert('Session deleted successfully')
-    cacheService.clear(CACHE_KEY) // Invalidate cache
-    loadSessions(false)
-    loadStats()
-  } catch (error) {
-    console.error('Error deleting session:', error)
-    alert('Failed to delete session')
+const handleConfirm = () => {
+  if (confirmAction.value === 'setupSemesters') {
+    confirmSetupSemesters()
+  } else if (confirmAction.value === 'deleteSession') {
+    confirmDeleteSession()
   }
 }
 
 const resetFilters = () => {
-  filters.value = { program_level: '', status: '', search: '' }
-  loadSessions()
+  filters.value.program_level = ''
+  baseResetFilters()
 }
 
 const getProgramLevelBadgeClass = (level) => {
@@ -280,24 +316,9 @@ const getCapacityClass = (percentage) => {
   return 'bg-success'
 }
 
-// Debounce search filter
-let searchTimeout = null
-watch(() => filters.value.search, () => {
-  clearTimeout(searchTimeout)
-  searchTimeout = setTimeout(() => {
-    loadSessions()
-  }, 300)
-})
+// Watch custom filters
+watch(() => filters.value.program_level, () => applyFilters())
 
-// Watch other filters without debounce
-watch(() => [filters.value.program_level, filters.value.status], () => {
-  loadSessions()
-})
-
-onMounted(() => {
-  loadSessions()
-  loadStats()
-})
+onMounted(loadSessions)
 </script>
-
 

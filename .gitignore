@@ -1,37 +1,93 @@
-# Python cache
+# ------------------------------
+# Python / Django cache artifacts
+# ------------------------------
 __pycache__/
-*.pyc
+*.py[cod]
 *.pyo
 *.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
 
-# Django
+# ------------------------------
+# Local database and logs
+# ------------------------------
 *.sqlite3
-*.log
-*.pot
-*.py[cod]
 db.sqlite3
+db.sqlite3-journal
+db.sqlite3-shm
+db.sqlite3-wal
+*.log
+Project/django_errors.log
 
-# Virtual environment
+# ------------------------------
+# Django generated runtime folders
+# ------------------------------
+Project/staticfiles/
+Project/media/
+
+# Django migrations (keep only package initializers)
+Project/*/migrations/*.py
+!Project/*/migrations/__init__.py
+
+# ------------------------------
+# Generated AI vector/index data
+# ------------------------------
+Project/ai_core/faiss_index/
+Project/faiss_indexes/
+Project/data/faiss_indexes/
+Project/data/
+
+# ------------------------------
+# Virtual environments
+# ------------------------------
 venv/
 env/
 ENV/
-.env
 
-# Node / Frontend
+# ------------------------------
+# Environment / secrets
+# ------------------------------
+.env
+.env.*
+!.env.example
+Project/.env
+Project/.env.*
+!Project/.env.example
+frontend/.env
+frontend/.env.*
+!frontend/.env.example
+
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+
+# ------------------------------
+# Node / frontend generated files
+# ------------------------------
 node_modules/
 dist/
 build/
+frontend/dist/
+frontend/dist-ssr/
+frontend/coverage/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
 
-# IDE/editor
+# ------------------------------
+# Editor / OS junk
+# ------------------------------
 .vscode/
 .idea/
 *.sublime-project
 *.sublime-workspace
 *.swp
-
-# OS files
+*.swo
 .DS_Store
 Thumbs.db

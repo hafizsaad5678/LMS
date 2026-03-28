@@ -2,6 +2,16 @@
   <AdminPageTemplate title="Exam Schedule" subtitle="Manage examination timetable and schedules" icon="bi bi-clipboard-check" :breadcrumbs="breadcrumbs" :actions="actions" content-title="Exam List">
     <AlertMessage v-if="alert.show" :type="alert.type" :message="alert.message" :title="alert.title" :auto-close="true" :auto-close-duration="3000" @close="alert.show = false" />
 
+    <ConfirmDialog
+      v-model="showConfirmDialog"
+      title="Delete Exam"
+      :message="examToDelete ? `Delete exam '${examToDelete.subject_name || examToDelete.subject_code}'?` : 'Delete this exam?'"
+      type="danger"
+      theme="admin"
+      confirm-text="Delete"
+      @confirm="confirmDeleteExam"
+    />
+
     <!-- Stats Section -->
     <template #stats>
       <div class="row g-3 g-lg-4">
@@ -26,29 +36,25 @@
         v-model="searchQuery"
         search-placeholder="Search exams..."
         :show-status-filter="false"
-        search-col-size="col-md-4 col-12"
-        actions-col-size="col-md-2 col-6"
         :loading="loading"
         @refresh="loadExams"
         @reset="resetFilters"
       >
         <template #filters>
           <div class="col-md-3 col-6">
-            <label class="form-label small fw-semibold text-dark">Type</label>
             <select v-model="typeFilter" class="form-select" @change="loadExams">
               <option value="">All Types</option>
-              <option value="midterm">Midterm</option>
-              <option value="final">Final</option>
-              <option value="quiz">Quiz</option>
+              <option v-for="opt in EXAM_TYPE_OPTIONS" :key="opt.value" :value="opt.value">
+                {{ opt.label }}
+              </option>
             </select>
           </div>
           <div class="col-md-3 col-6">
-            <label class="form-label small fw-semibold text-dark">Status</label>
             <select v-model="statusFilter" class="form-select" @change="loadExams">
               <option value="">All Status</option>
-              <option value="upcoming">Upcoming</option>
-              <option value="ongoing">Ongoing</option>
-              <option value="completed">Completed</option>
+              <option v-for="opt in SCHEDULE_STATUS_OPTIONS" :key="opt.value" :value="opt.value">
+                {{ opt.label }}
+              </option>
             </select>
           </div>
         </template>
@@ -89,42 +95,61 @@
       </template>
     </DataTable>
 
-    <!-- Modal -->
-    <div v-if="showModal" class="modal show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5);">
-      <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-          <div class="modal-header"><h5 class="modal-title">{{ editingExam ? 'Edit Exam' : 'Add Exam' }}</h5><button type="button" class="btn-close" @click="closeModal"></button></div>
-          <div class="modal-body">
-            <form @submit.prevent="saveExam">
-              <div class="mb-3"><label class="form-label">Subject <span class="text-danger">*</span></label><input v-model="examForm.subject" type="text" class="form-control" required></div>
-              <div class="row">
-                <div class="col-md-6 mb-3"><BaseInput v-model="examForm.exam_date" label="Date" type="date" :required="true" /></div>
-                <div class="col-md-6 mb-3"><label class="form-label">Time <span class="text-danger">*</span></label><input v-model="examForm.exam_time" type="time" class="form-control" required></div>
-              </div>
-              <div class="row">
-                <div class="col-md-6 mb-3"><label class="form-label">Type</label><select v-model="examForm.exam_type" class="form-select"><option value="midterm">Midterm</option><option value="final">Final</option><option value="quiz">Quiz</option></select></div>
-                <div class="col-md-6 mb-3"><label class="form-label">Duration (mins)</label><input v-model.number="examForm.duration_minutes" type="number" class="form-control"></div>
-              </div>
-              <div class="mb-3"><label class="form-label">Room</label><input v-model="examForm.room" type="text" class="form-control"></div>
-              <div class="d-flex gap-2 justify-content-end">
-                <button type="button" @click="closeModal" class="btn btn-secondary">Cancel</button>
-                <button type="submit" class="btn btn-admin-primary">{{ editingExam ? 'Update' : 'Add' }}</button>
-              </div>
-            </form>
-          </div>
+    <!-- Modal using reusable component -->
+    <EntityFormModal
+      v-model="showModal"
+      :title="editingExam ? 'Edit Exam' : 'Add Exam'"
+      icon="bi bi-clipboard-check"
+      :loading="saving"
+      :confirm-text="editingExam ? 'Update' : 'Add'"
+      @confirm="saveExam"
+      @close="closeModal"
+    >
+      <form @submit.prevent="saveExam">
+        <div class="mb-3">
+          <label class="form-label">Subject <span class="text-danger">*</span></label>
+          <select v-model="examForm.subject" class="form-select" required>
+            <option value="" disabled>Select Subject</option>
+            <option v-for="subject in subjects" :key="subject.id" :value="subject.id">
+              {{ subject.name }} ({{ subject.code }})
+            </option>
+          </select>
         </div>
-      </div>
-    </div>
+        <div class="row">
+          <div class="col-md-6 mb-3"><BaseInput v-model="examForm.exam_date" label="Date" type="date" :required="true" /></div>
+          <div class="col-md-6 mb-3"><label class="form-label">Time <span class="text-danger">*</span></label><input v-model="examForm.exam_time" type="time" class="form-control" required></div>
+        </div>
+        <div class="row">
+          <div class="col-md-6 mb-3">
+            <SelectInput
+              v-model="examForm.exam_type"
+              :options="EXAM_TYPE_OPTIONS"
+              label="Type"
+              placeholder="Select exam type"
+            />
+          </div>
+          <div class="col-md-6 mb-3"><label class="form-label">Duration (mins)</label><input v-model.number="examForm.duration_minutes" type="number" class="form-control"></div>
+        </div>
+        <div class="mb-3"><label class="form-label">Room</label><input v-model="examForm.room" type="text" class="form-control"></div>
+      </form>
+    </EntityFormModal>
   </AdminPageTemplate>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
-import AdminPageTemplate from '@/components/navbar/AdminPageTemplate.vue'
-import { StatCard, DataTable, SearchFilter, ActionButtons, AlertMessage, BaseInput } from '@/components/common'
-import { examService } from '@/services/managementService'
+import { smartSearch } from '@/utils'
+import { AdminPageTemplate } from '@/components/shared/panels'
+import { StatCard, DataTable, SearchFilter, ActionButtons, AlertMessage, BaseInput, ConfirmDialog, EntityFormModal, SelectInput } from '@/components/shared/common'
+import { useAlert } from '@/composables/shared'
+import { examService } from '@/services/admin/managementService'
+import { subjectService } from '@/services/shared'
+import { normalizeToArray } from '@/services/shared'
+import { formatDate as formatDateUtil } from '@/utils/formatters'
+import { ADMIN_ROUTES } from '@/utils/constants/routes'
+import { EXAM_TYPE_OPTIONS, SCHEDULE_STATUS_OPTIONS } from '@/utils/constants/options'
 
-const breadcrumbs = [{ name: 'Dashboard', href: '/admin-dashboard' }, { name: 'Exams' }]
+const breadcrumbs = [{ name: 'Dashboard', href: ADMIN_ROUTES.DASHBOARD.path }, { name: 'Exams' }]
 const actions = [{ label: 'Add Exam', icon: 'bi bi-plus-circle', variant: 'btn-admin-primary', onClick: () => showModal.value = true }]
 
 const tableColumns = [
@@ -137,14 +162,19 @@ const tableColumns = [
   { key: 'actions', label: 'Actions', center: true }
 ]
 
-const alert = ref({ show: false, type: 'success', title: '', message: '' })
+// Use shared alert composable
+const { alert, showAlert } = useAlert()
 const loading = ref(false)
+const saving = ref(false)
 const exams = ref([])
+const subjects = ref([])
 const searchQuery = ref('')
 const typeFilter = ref('')
 const statusFilter = ref('')
 const showModal = ref(false)
 const editingExam = ref(null)
+const showConfirmDialog = ref(false)
+const examToDelete = ref(null)
 const examForm = ref({ subject: '', exam_date: '', exam_time: '', exam_type: 'midterm', duration_minutes: 120, room: '' })
 
 const upcomingExams = computed(() => exams.value.filter(e => new Date(e.exam_date) > new Date()).length)
@@ -154,8 +184,7 @@ const completedExams = computed(() => exams.value.filter(e => new Date(e.exam_da
 const filteredExams = computed(() => {
   let list = exams.value
   if (searchQuery.value) {
-    const q = searchQuery.value.toLowerCase()
-    list = list.filter(e => e.subject_name?.toLowerCase().includes(q) || e.subject_code?.toLowerCase().includes(q))
+    list = list.filter(e => smartSearch(e, searchQuery.value, ['subject_name', 'subject_code', 'room', 'exam_type']))
   }
   if (typeFilter.value) list = list.filter(e => e.exam_type === typeFilter.value)
   if (statusFilter.value === 'upcoming') list = list.filter(e => new Date(e.exam_date) > new Date())
@@ -164,7 +193,9 @@ const filteredExams = computed(() => {
   return list.sort((a, b) => new Date(a.exam_date) - new Date(b.exam_date))
 })
 
-const formatDate = (date) => new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+// Use shared formatDate utility
+const formatDate = (date) => formatDateUtil(date)
+
 const getStatus = (date) => new Date(date).toDateString() === new Date().toDateString() ? 'Today' : new Date(date) > new Date() ? 'Upcoming' : 'Completed'
 const getStatusBadge = (date) => getStatus(date) === 'Today' ? 'bg-info' : getStatus(date) === 'Upcoming' ? 'bg-success' : 'bg-secondary'
 
@@ -175,9 +206,18 @@ const loadExams = async () => {
     exams.value = response.data.results || response.data
   } catch (error) {
     console.error('Error loading exams:', error)
-    alert.value = { show: true, type: 'danger', title: 'Error', message: 'Failed to load exams' }
+    showAlert('error', 'Failed to load exams', 'Error')
   } finally {
     loading.value = false
+  }
+}
+
+const loadSubjects = async () => {
+  try {
+    const response = await subjectService.getAllSubjects()
+    subjects.value = normalizeToArray(response)
+  } catch (error) {
+    console.error('Error loading subjects:', error)
   }
 }
 
@@ -193,33 +233,42 @@ const editExam = (exam) => {
   showModal.value = true
 }
 
-const deleteExam = async (exam) => {
-  if (confirm(`Delete exam "${exam.subject_name || exam.subject_code}"?`)) {
-    try {
-      await examService.delete(exam.id)
-      exams.value = exams.value.filter(e => e.id !== exam.id)
-      alert.value = { show: true, type: 'success', title: 'Success', message: 'Exam deleted' }
-    } catch (error) {
-      console.error('Error deleting exam:', error)
-      alert.value = { show: true, type: 'danger', title: 'Error', message: 'Failed to delete exam' }
-    }
+const deleteExam = (exam) => {
+  examToDelete.value = exam
+  showConfirmDialog.value = true
+}
+
+const confirmDeleteExam = async () => {
+  try {
+    await examService.delete(examToDelete.value.id)
+    exams.value = exams.value.filter(e => e.id !== examToDelete.value.id)
+    showAlert('success', 'Exam deleted', 'Success')
+  } catch (error) {
+    console.error('Error deleting exam:', error)
+    showAlert('error', 'Failed to delete exam', 'Error')
+  } finally {
+    showConfirmDialog.value = false
+    examToDelete.value = null
   }
 }
 
 const saveExam = async () => {
+  saving.value = true
   try {
     if (editingExam.value) {
       await examService.update(editingExam.value.id, examForm.value)
-      alert.value = { show: true, type: 'success', title: 'Success', message: 'Exam updated' }
+      showAlert('success', 'Exam updated', 'Success')
     } else {
       await examService.create(examForm.value)
-      alert.value = { show: true, type: 'success', title: 'Success', message: 'Exam added' }
+      showAlert('success', 'Exam added', 'Success')
     }
     closeModal()
     loadExams()
   } catch (error) {
     console.error('Error saving exam:', error)
-    alert.value = { show: true, type: 'danger', title: 'Error', message: 'Failed to save exam' }
+    showAlert('error', 'Failed to save exam', 'Error')
+  } finally {
+    saving.value = false
   }
 }
 
@@ -231,11 +280,14 @@ const closeModal = () => {
 
 let searchTimeout
 watch(searchQuery, () => {
-  clearTimeout(searchTimeout)
-  searchTimeout = setTimeout(loadExams, 300)
+  // Local filtering only
 })
 
-onMounted(loadExams)
+onMounted(() => {
+  loadExams()
+  loadSubjects()
+})
 </script>
+
 
 

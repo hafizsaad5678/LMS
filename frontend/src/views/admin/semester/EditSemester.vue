@@ -5,6 +5,16 @@
     icon="bi bi-pencil-square"
     :breadcrumbs="breadcrumbs"
   >
+    <ConfirmDialog
+      v-model="showConfirmDialog"
+      title="Discard Changes"
+      message="Are you sure? All unsaved changes will be lost."
+      type="warning"
+      theme="admin"
+      confirm-text="Discard"
+      @confirm="confirmCancel"
+    />
+
     <div class="row justify-content-center">
       <div class="col-lg-6">
         <div class="card border-0 shadow-sm">
@@ -21,15 +31,13 @@
               :auto-close-duration="3000"
               @close="alert.show = false"
             />
-            <div v-if="loading" class="text-center py-5">
-              <div class="spinner-border text-admin"></div>
-            </div>
+            <LoadingSpinner v-if="loading" theme="admin" />
             <form v-else @submit.prevent="submitForm">
               <div class="mb-3">
                 <label for="program-select" class="form-label">Program <span class="text-danger">*</span></label>
                 <select id="program-select" v-model="form.program" class="form-select" required>
                   <option value="" disabled>Select Program</option>
-                  <option v-for="p in programs" :key="p.id" :value="p.id">{{ p.name }}</option>
+                  <option v-for="p in programs" :key="p.id" :value="String(p.id)">{{ p.name }}</option>
                 </select>
               </div>
 
@@ -53,13 +61,12 @@
               </div>
 
               <div class="mb-3">
-                <label for="semester-status" class="form-label">Status</label>
-                <select id="semester-status" v-model="form.status" class="form-select">
-                  <option value="draft">Draft</option>
-                  <option value="active">Active</option>
-                  <option value="completed">Completed</option>
-                  <option value="archived">Archived</option>
-                </select>
+                <SelectInput
+                  v-model="form.status"
+                  :options="SEMESTER_STATUS_OPTIONS"
+                  label="Status"
+                  placeholder="Select status"
+                />
               </div>
 
               <div class="d-flex justify-content-end gap-2 mt-4">
@@ -79,26 +86,30 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch, computed } from 'vue'
+import { useAlert } from '@/composables/shared'
 import { useRouter, useRoute } from 'vue-router'
-import AdminPageTemplate from '@/components/navbar/AdminPageTemplate.vue'
-import BaseInput from '@/components/common/BaseInput.vue'
-import AlertMessage from '@/components/common/AlertMessage.vue'
-import { semesterService } from '@/services/semesterService'
-import api from '@/services/api'
+import { AdminPageTemplate } from '@/components/shared/panels'
+import { BaseInput, AlertMessage, ConfirmDialog, LoadingSpinner, BaseButton, SelectInput } from '@/components/shared/common'
+import { semesterService, programService, cacheService } from '@/services/shared'
+import { api } from '@/services/shared'
+import { ADMIN_ROUTES } from '@/utils/constants/routes'
+import { SEMESTER_STATUS_OPTIONS } from '@/utils/constants/options'
 
 const router = useRouter()
 const route = useRoute()
+const semesterId = computed(() => route.params.id)
 const breadcrumbs = [
-  { name: 'Dashboard', href: '/admin-dashboard' },
-  { name: 'Semesters', href: '/admin-dashboard/semesters' },
+  { name: 'Dashboard', href: ADMIN_ROUTES.DASHBOARD.path },
+  { name: 'Semesters', href: ADMIN_ROUTES.SEMESTER_LIST.path },
   { name: 'Edit' }
 ]
 
 const loading = ref(true)
 const submitting = ref(false)
 const programs = ref([])
-const alert = ref({ show: false, type: 'success', title: '', message: '' })
+const { alert, showAlert } = useAlert()
+const showConfirmDialog = ref(false)
 
 const form = ref({
   program: '',
@@ -109,17 +120,15 @@ const form = ref({
   status: 'draft'
 })
 
-const showAlert = (type, message, title = null) => {
-  alert.value = { show: true, type, title, message }
-}
 
-onMounted(async () => {
-  const id = route.params.id
+const loadSemester = async () => {
+  const id = semesterId.value
   if (!id) {
-    router.push('/admin-dashboard/semesters')
+    loading.value = false
     return
   }
   
+  loading.value = true
   try {
     const [sem, progRes] = await Promise.all([
       semesterService.getById(id),
@@ -127,27 +136,35 @@ onMounted(async () => {
     ])
     
     programs.value = Array.isArray(progRes.data) ? progRes.data : (progRes.data.results || progRes.data)
-    form.value = {
-      program: sem.program,
-      name: sem.name,
-      number: sem.number,
-      start_date: sem.start_date || '',
-      end_date: sem.end_date || '',
-      status: sem.status || 'draft'
-    }
+    
+    // Assign each field individually to ensure reactivity
+    // Extract program ID - it can be an object or a string/UUID
+    form.value.program = sem.program ? (typeof sem.program === 'object' ? String(sem.program.id) : String(sem.program)) : ''
+    form.value.name = sem.name || ''
+    form.value.number = sem.number || 1
+    form.value.start_date = sem.start_date || ''
+    form.value.end_date = sem.end_date || ''
+    form.value.status = sem.status || 'draft'
   } catch (e) {
     console.error('Error loading semester:', e)
     showAlert('error', 'Failed to load semester details', 'Error')
-    setTimeout(() => router.push('/admin-dashboard/semesters'), 2000)
+    setTimeout(() => router.push({ name: ADMIN_ROUTES.SEMESTER_LIST.name }), 2000)
   } finally {
     loading.value = false
   }
+}
+
+onMounted(async () => {
+  await loadSemester()
 })
 
 const handleCancel = () => {
-  if (confirm('Are you sure? All unsaved changes will be lost.')) {
-    router.back()
-  }
+  showConfirmDialog.value = true
+}
+
+const confirmCancel = () => {
+  showConfirmDialog.value = false
+  router.back()
 }
 
 const submitForm = async () => {
@@ -159,9 +176,14 @@ const submitForm = async () => {
       return
     }
 
-    await semesterService.update(route.params.id, form.value)
+    await semesterService.update(semesterId.value, form.value)
+    
+    // Clear cache to ensure list refreshes with updated data
+    cacheService.clear('semesters_list')
+    cacheService.clearPattern('semester')
+    
     showAlert('success', 'Semester updated successfully!', 'Success!')
-    setTimeout(() => router.push('/admin-dashboard/semesters'), 1500)
+    setTimeout(() => router.push({ name: ADMIN_ROUTES.SEMESTER_LIST.name }), 1500)
   } catch (e) {
     console.error('Error updating semester:', e.response?.data || e.message)
     const msg = e.response?.data?.detail || e.response?.data?.non_field_errors?.[0] || 'Failed to update semester'
@@ -170,4 +192,13 @@ const submitForm = async () => {
     submitting.value = false
   }
 }
+
+// Watch for route param changes to reload data
+watch(() => route.params.id, (newId) => {
+  if (newId) {
+    loadSemester()
+  }
+}, { immediate: false })
 </script>
+
+

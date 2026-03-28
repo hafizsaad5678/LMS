@@ -7,67 +7,39 @@
     :actions="actions"
     :show-content-card="false"
   >
+    <AlertMessage v-if="alert.show" :type="alert.type" :message="alert.message" :title="alert.title" :auto-close="true" :auto-close-duration="3000" @close="alert.show = false" />
+
+    <ConfirmDialog
+      v-model="showConfirmDialog"
+      :title="confirmTitle"
+      :message="confirmMessage"
+      type="info"
+      theme="admin"
+      confirm-text="Confirm"
+      @confirm="handleConfirm"
+    />
+
     <!-- No session ID provided -->
     <div v-if="!sessionId" class="text-center py-5">
       <i class="bi bi-calendar-event display-1 text-muted"></i>
       <h4 class="text-muted mt-3">Please Select a Session</h4>
       <p class="text-muted">Choose a session from the sessions list to view its details.</p>
-      <button @click="router.push('/admin-dashboard/sessions')" class="btn btn-admin-primary mt-3">
+      <button @click="router.push({ name: ADMIN_ROUTES.SESSION_LIST.name })" class="btn btn-admin-primary mt-3">
         <i class="bi bi-list-ul me-2"></i>Go to Sessions List
       </button>
     </div>
 
-    <div v-else-if="loading" class="text-center py-5">
-      <div class="spinner-border text-danger" role="status">
-        <span class="visually-hidden">Loading...</span>
-      </div>
-      <p class="text-muted mt-3">Loading session profile...</p>
-    </div>
+    <LoadingSpinner v-else-if="loading" text="Loading session profile..." theme="admin" />
 
     <div v-else-if="!session.id" class="text-center py-5">
       <i class="bi bi-x-circle display-1 text-muted"></i>
       <h4 class="text-muted mt-3">Session Not Found</h4>
-      <button @click="router.push('/admin-dashboard/sessions')" class="btn btn-admin-primary mt-3">
+      <button @click="router.push({ name: ADMIN_ROUTES.SESSION_LIST.name })" class="btn btn-admin-primary mt-3">
         <i class="bi bi-arrow-left me-2"></i>Back to Sessions
       </button>
     </div>
 
     <div v-else>
-      <!-- Session Header -->
-      <div class="card border-0 shadow-sm mb-4">
-        <div class="card-body p-4">
-          <div class="row align-items-center">
-            <div class="col-auto">
-              <div class="session-avatar">
-                {{ session.session_code?.substring(0, 2) || 'AS' }}
-              </div>
-            </div>
-            <div class="col">
-              <h3 class="mb-1 fw-bold">{{ session.session_name }}</h3>
-              <p class="text-muted mb-2">
-                <i class="bi bi-hash me-1"></i>{{ session.session_code }}
-              </p>
-              <div class="d-flex flex-wrap gap-2">
-                <span :class="getStatusBadgeClass(session.status)">
-                  {{ session.status }}
-                </span>
-                <span class="badge bg-info">
-                  {{ session.program_name }}
-                </span>
-                <span class="badge bg-dark">
-                  {{ session.start_year }} - {{ session.end_year }}
-                </span>
-              </div>
-            </div>
-            <div class="col-auto">
-              <button @click="router.push(`/admin-dashboard/sessions/${session.id}/edit`)" class="btn btn-admin-primary">
-                <i class="bi bi-pencil me-2"></i>Edit Session
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
       <div class="row g-4 mb-4">
         <!-- Key Metrics -->
         <div class="col-md-3">
@@ -194,15 +166,14 @@
                         :disabled="activatingId === sem.id"
                         title="Activate this semester"
                       >
-                        <span v-if="activatingId === sem.id" class="spinner-border spinner-border-sm me-1"></span>
-                        <i v-else class="bi bi-check-circle me-1"></i>
-                        {{ activatingId === sem.id ? 'Activating...' : 'Activate' }}
+                        <span v-if="activatingId === sem.id" class="spinner-border spinner-border-sm"></span>
+                        <i v-else class="bi bi-check-circle"></i>
                       </button>
                       <span :class="['badge', sem.status === 'active' ? 'bg-success' : 'bg-light text-dark border']">
                         {{ sem.status === 'active' ? 'Active' : sem.status }}
                       </span>
                       <button 
-                        @click="router.push(`/admin-dashboard/semesters/${sem.id}`)"
+                        @click="router.push({ name: ADMIN_ROUTES.SEMESTER_PROFILE.name, params: { id: sem.id } })"
                         class="btn btn-sm btn-light text-muted border"
                         title="View Semester Details"
                       >
@@ -243,7 +214,7 @@
                   <tbody>
                     <tr v-for="student in students.slice(0, 10)" :key="student.id">
                       <td>
-                        <router-link :to="`/admin-dashboard/students/${student.id}`" class="text-decoration-none fw-bold text-dark">
+                        <router-link :to="`${ADMIN_ROUTES.STUDENT_LIST.path}/${student.id}`" class="text-decoration-none fw-bold text-dark">
                           {{ student.full_name }}
                         </router-link>
                       </td>
@@ -251,13 +222,13 @@
                       <td>{{ student.email }}</td>
                       <td>{{ student.phone || '-' }}</td>
                       <td>
-                        <span :class="['badge', student.is_active ? 'bg-success' : 'bg-danger']">
-                          {{ student.is_active ? 'Active' : 'Inactive' }}
+                        <span :class="['badge', getActiveBadgeClass(student.is_active)]">
+                          {{ getActiveStatusText(student.is_active) }}
                         </span>
                       </td>
                       <td>
                         <button 
-                          @click="router.push(`/admin-dashboard/students/${student.id}`)" 
+                          @click="router.push({ name: ADMIN_ROUTES.STUDENT_PROFILE.name, params: { id: student.id } })" 
                           class="btn btn-sm btn-light text-primary" 
                           title="View Student Profile"
                         >
@@ -269,7 +240,7 @@
                 </table>
               </div>
               <div v-if="students.length > 10" class="card-footer text-center bg-white border-0 py-3">
-                <button class="btn btn-link text-admin" @click="router.push('/admin-dashboard/students?session=' + session.id)">
+                <button class="btn btn-link text-admin" @click="router.push(`${ADMIN_ROUTES.STUDENT_LIST.path}?session=${session.id}`)">
                   View all enrolled students
                 </button>
               </div>
@@ -284,22 +255,29 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import AdminPageTemplate from '@/components/navbar/AdminPageTemplate.vue'
-import sessionService from '@/services/sessionService'
-import { semesterService } from '@/services/semesterService'
+import { AdminPageTemplate } from '@/components/shared/panels'
+import sessionService from '@/services/shared'
+import { semesterService } from '@/services/shared'
+import { ConfirmDialog, LoadingSpinner, AlertMessage } from '@/components/shared/common'
+import { useAlert } from '@/composables/shared'
+import { formatDate as formatDateUtil } from '@/utils/formatters'
+import { ADMIN_ROUTES } from '@/utils/constants/routes'
+import { getActiveBadgeClass, getActiveStatusText } from '@/utils/badgeHelpers'
 
 const router = useRouter()
 const route = useRoute()
 const sessionId = route.params.id
+const { alert, showAlert } = useAlert()
 
 const breadcrumbs = [
-  { name: 'Dashboard', href: '/admin-dashboard' },
-  { name: 'Sessions', href: '/admin-dashboard/sessions' },
+  { name: 'Dashboard', href: ADMIN_ROUTES.DASHBOARD.path },
+  { name: 'Sessions', href: ADMIN_ROUTES.SESSION_LIST.path },
   { name: 'Profile' }
 ]
 
 const actions = [
-  { label: 'Back to List', icon: 'bi bi-arrow-left', variant: 'btn-admin-outline', onClick: () => router.push('/admin-dashboard/sessions') }
+  { label: 'Edit Session', icon: 'bi bi-pencil', variant: 'btn-admin-primary', onClick: () => router.push({ name: ADMIN_ROUTES.SESSION_EDIT.name, params: { id: sessionId } }) },
+  { label: 'Back to List', icon: 'bi bi-arrow-left', variant: 'btn-admin-outline', onClick: () => router.push({ name: ADMIN_ROUTES.SESSION_LIST.name }) }
 ]
 
 const loading = ref(true)
@@ -307,6 +285,11 @@ const session = ref({})
 const semesters = ref([])
 const students = ref([])
 const activatingId = ref(null)
+const showConfirmDialog = ref(false)
+const confirmAction = ref(null)
+const confirmMessage = ref('')
+const confirmTitle = ref('')
+const semesterToActivate = ref(null)
 
 const stats = computed(() => ({
   students: students.value.length,
@@ -317,10 +300,8 @@ const stats = computed(() => ({
     : 0
 }))
 
-const formatDate = (dateString) => {
-  if (!dateString) return 'N/A'
-  return new Date(dateString).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
-}
+// Use shared formatDate utility with custom options
+const formatDate = (dateString) => formatDateUtil(dateString, { year: 'numeric', month: 'long', day: 'numeric' })
 
 const getStatusBadgeClass = (status) => {
   const map = {
@@ -335,14 +316,20 @@ const getStatusBadgeClass = (status) => {
 const loadSessionData = async () => {
   loading.value = true
   try {
+    // Helper to extract array from response
+    const extractArray = (data) => {
+      if (!data) return []
+      return Array.isArray(data) ? data : (data.results || [])
+    }
+
     // 1. Get Session Details
-    const sessionRes = await sessionService.getSession(sessionId)
-    session.value = sessionRes.data
-    
+    const sessionData = await sessionService.getSession(sessionId)
+    session.value = sessionData || {}
+
     // 2. Get Semesters
     try {
-      const semesterRes = await sessionService.getSessionSemesters(sessionId)
-      semesters.value = Array.isArray(semesterRes.data) ? semesterRes.data : (semesterRes.data.results || [])
+      const semesterData = await sessionService.getSessionSemesters(sessionId)
+      semesters.value = extractArray(semesterData)
     } catch (semErr) {
       console.error('Error loading semesters:', semErr)
       semesters.value = []
@@ -350,13 +337,13 @@ const loadSessionData = async () => {
 
     // 3. Get Enrolled Students
     try {
-      const studentRes = await sessionService.getSessionStudents(sessionId)
-      students.value = Array.isArray(studentRes.data) ? studentRes.data : (studentRes.data.results || [])
+      const studentData = await sessionService.getSessionStudents(sessionId)
+      students.value = extractArray(studentData)
     } catch (stuErr) {
       console.error('Error loading students:', stuErr)
       students.value = []
     }
-    
+
   } catch (error) {
     console.error('Error loading session profile:', error)
   } finally {
@@ -364,35 +351,57 @@ const loadSessionData = async () => {
   }
 }
 
-const setupSemesters = async () => {
-  if (!confirm('Are you sure you want to auto-generate all semesters for this session?')) return
+const setupSemesters = () => {
+  confirmTitle.value = 'Generate Semesters'
+  confirmMessage.value = 'Are you sure you want to auto-generate all semesters for this session?'
+  confirmAction.value = 'setupSemesters'
+  showConfirmDialog.value = true
+}
 
+const confirmSetupSemesters = async () => {
   try {
     await sessionService.setupSemesters(sessionId)
-    alert('Semesters generated successfully!')
-    loadSessionData() // Refresh
+    showAlert('success', 'Semesters generated successfully!', 'Success')
+    loadSessionData()
   } catch (error) {
     console.error('Error generating semesters:', error)
-    alert('Failed to generate semesters. ' + (error.response?.data?.error || ''))
+    showAlert('error', 'Failed to generate semesters. ' + (error.response?.data?.error || ''), 'Error')
+  } finally {
+    showConfirmDialog.value = false
   }
 }
 
-const activateSemester = async (semester) => {
-  if (!confirm(`Activate "${semester.name}"? This will set it as the current active semester.`)) return
-  
+const activateSemester = (semester) => {
+  semesterToActivate.value = semester
+  confirmTitle.value = 'Activate Semester'
+  confirmMessage.value = `Activate "${semester.name}"? This will set it as the current active semester.`
+  confirmAction.value = 'activateSemester'
+  showConfirmDialog.value = true
+}
+
+const confirmActivateSemester = async () => {
+  const semester = semesterToActivate.value
   activatingId.value = semester.id
   try {
     await semesterService.activate(semester.id)
-    // Update local state
     semester.status = 'active'
-    alert(`${semester.name} has been activated successfully!`)
-    // Refresh to get updated subject data
+    showAlert('success', `${semester.name} has been activated successfully!`, 'Success')
     loadSessionData()
   } catch (error) {
     console.error('Error activating semester:', error)
-    alert('Failed to activate semester. ' + (error.response?.data?.error || error.message || ''))
+    showAlert('error', 'Failed to activate semester. ' + (error.response?.data?.error || error.message || ''), 'Error')
   } finally {
     activatingId.value = null
+    showConfirmDialog.value = false
+    semesterToActivate.value = null
+  }
+}
+
+const handleConfirm = () => {
+  if (confirmAction.value === 'setupSemesters') {
+    confirmSetupSemesters()
+  } else if (confirmAction.value === 'activateSemester') {
+    confirmActivateSemester()
   }
 }
 
@@ -404,5 +413,4 @@ onMounted(() => {
   }
 })
 </script>
-
 

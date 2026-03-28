@@ -7,6 +7,17 @@
     :actions="actions"
     content-title="Department List"
   >
+    <!-- Alert Message -->
+    <AlertMessage
+      v-if="alert.show"
+      :type="alert.type"
+      :message="alert.message"
+      :title="alert.title"
+      :auto-close="true"
+      :auto-close-duration="3000"
+      @close="alert.show = false"
+    />
+
     <!-- Stats Section -->
     <template #stats>
       <div class="row g-3 g-lg-4">
@@ -20,7 +31,7 @@
           <StatCard title="Inactive" :value="stats.inactive" icon="bi bi-x-circle" bg-color="bg-warning-light" icon-color="text-warning" :is-positive="false" />
         </div>
         <div class="col-6 col-xl-3">
-          <StatCard title="Total Teachers" :value="stats.totalTeachers" icon="bi bi-person-workspace" bg-color="bg-info-light" icon-color="text-info" />
+          <StatCard title="Total Teachers" :value="totalTeachers" icon="bi bi-person-workspace" bg-color="bg-info-light" icon-color="text-info" />
         </div>
       </div>
     </template>
@@ -32,7 +43,7 @@
         v-model:status-value="filters.status"
         search-placeholder="Search by name, code, or head..."
         :loading="loading"
-        @refresh="loadDepartments"
+        @refresh="handleRefresh"
         @reset="resetFilters"
       />
     </template>
@@ -40,21 +51,20 @@
     <!-- Main Content -->
     <DataTable
       :columns="tableColumns"
-      :data="departments"
+      :data="filteredData"
       :loading="loading"
       loading-text="Loading departments..."
       empty-icon="bi bi-building"
       empty-title="No departments found"
       empty-subtitle="Try adjusting your filters or add a new department"
     >
-      <template #cell-code="{ value }">
-        <span class="badge bg-dark fw-semibold">{{ value }}</span>
-      </template>
-
       <template #cell-name="{ row }">
         <div class="d-flex align-items-center">
           <div class="avatar-circle avatar-dept me-2"><i class="bi bi-building"></i></div>
-          <div class="fw-semibold text-dark">{{ row.name }}</div>
+          <div>
+            <div class="fw-semibold text-dark">{{ row.name }}</div>
+            <small class="text-muted d-none d-md-block">{{ row.code }}</small>
+          </div>
         </div>
       </template>
 
@@ -71,8 +81,8 @@
       </template>
 
       <template #cell-is_active="{ row }">
-        <span :class="['badge', row.is_active ? 'bg-success' : 'bg-warning']">
-          {{ row.is_active ? 'Active' : 'Inactive' }}
+        <span :class="['badge', getActiveBadgeClass(row.is_active)]">
+          {{ getActiveStatusText(row.is_active) }}
         </span>
       </template>
 
@@ -80,142 +90,90 @@
         <ActionButtons
           :item="row"
           :show-toggle="true"
-          @view="router.push(`/admin-dashboard/departments/${row.id}`)"
-          @edit="router.push(`/admin-dashboard/departments/edit/${row.id}`)"
-          @delete="router.push(`/admin-dashboard/departments/delete/${row.id}`)"
-          @toggle="toggleStatus(row)"
+          @view="router.push({ name: ADMIN_ROUTES.DEPARTMENT_PROFILE.name, params: { id: row.id } })"
+          @edit="router.push({ name: ADMIN_ROUTES.DEPARTMENT_EDIT.name, params: { id: row.id } })"
+          @delete="router.push({ name: ADMIN_ROUTES.DEPARTMENT_DELETE.name, params: { id: row.id } })"
+          @toggle="handleToggle(row)"
         />
       </template>
     </DataTable>
 
     <template #footer>
-      <p class="text-muted small mb-0">Total: {{ departments.length }} departments</p>
+      <p class="text-muted small mb-0">Total: {{ filteredData.length }} departments</p>
     </template>
   </AdminPageTemplate>
 </template>
 
 <script setup>
-import { ref, onMounted, computed, watch } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import AdminPageTemplate from '@/components/navbar/AdminPageTemplate.vue'
-import { StatCard, DataTable, SearchFilter, ActionButtons } from '@/components/common'
-import { departmentService } from '@/services/departmentService'
-import cacheService from '@/services/cacheService'
+import { AdminPageTemplate } from '@/components/shared/panels'
+import { StatCard, DataTable, SearchFilter, ActionButtons, AlertMessage } from '@/components/shared/common'
+import { useEntityList, useAlert } from '@/composables/shared'
+import { departmentService } from '@/services/shared'
+import { ADMIN_ROUTES } from '@/utils/constants/routes'
+import { getActiveBadgeClass, getActiveStatusText } from '@/utils/badgeHelpers'
 
 const router = useRouter()
 
+// Use shared alert composable
+const { alert, showAlert } = useAlert()
+
 const breadcrumbs = [
-  { name: 'Dashboard', href: '/admin-dashboard' },
+  { name: 'Dashboard', href: ADMIN_ROUTES.DASHBOARD.path },
   { name: 'Departments' }
 ]
 
 const actions = [
-  { label: 'Add Department', icon: 'bi bi-plus-circle', variant: 'btn-admin-primary', onClick: () => router.push('/admin-dashboard/departments/add') }
+  { label: 'Add Department', icon: 'bi bi-plus-circle', variant: 'btn-admin-primary', onClick: () => router.push({ name: ADMIN_ROUTES.DEPARTMENT_ADD.name }) }
 ]
 
 const tableColumns = [
-  { key: 'code', label: 'Code' },
   { key: 'name', label: 'Department' },
   { key: 'head_of_department', label: 'HOD', hideOnMobile: true, default: 'Not Assigned' },
   { key: 'institution_name', label: 'Institution', hideOnMobile: true },
-  { key: 'program_count', label: 'Programs', hideOnMobile: true },
-  { key: 'teacher_count', label: 'Teachers', hideOnMobile: true },
+  { key: 'program_count', label: 'Programs', hideOnMobile: true, center: true },
+  { key: 'teacher_count', label: 'Teachers', hideOnMobile: true, center: true },
   { key: 'is_active', label: 'Status' },
   { key: 'actions', label: 'Actions', center: true }
 ]
 
-const loading = ref(true)
-const departments = ref([])
-const filters = ref({ search: '', status: '' })
-
-const stats = computed(() => {
-  const total = departments.value.length
-  const active = departments.value.filter(d => d.is_active).length
-  const totalTeachers = departments.value.reduce((sum, d) => sum + (d.teacher_count || 0), 0)
-  return { total, active, inactive: total - active, totalTeachers }
+// Use composable
+const {
+  loading,
+  data,
+  filteredData,
+  filters,
+  stats,
+  loadData,
+  resetFilters,
+  refresh,
+  toggleStatus
+} = useEntityList({
+  cacheKey: 'departments_list',
+  searchFields: ['name', 'code', 'head_of_department'],
+  statusField: 'is_active'
 })
 
-// Cache key
-const CACHE_KEY = 'departments_list'
+// Extra computed for total teachers
+const totalTeachers = computed(() => 
+  data.value.reduce((sum, d) => sum + (d.teacher_count || 0), 0)
+)
 
-const loadDepartments = async (useCache = true) => {
-  // Check cache first
-  if (useCache) {
-    const cached = cacheService.get(CACHE_KEY)
-    if (cached) {
-      applyFilters(cached)
-      return
-    }
-  }
+// Methods
+const fetchDepartments = () => departmentService.getAllDepartments()
 
-  loading.value = true
+const handleRefresh = () => refresh(fetchDepartments)
+
+const handleToggle = async (dept) => {
   try {
-    const response = await departmentService.getAllDepartments()
-    const data = Array.isArray(response) ? response : (response.results || response.data || [])
-    
-    // Store in cache
-    cacheService.set(CACHE_KEY, data)
-    applyFilters(data)
-  } catch (error) {
-    console.error('Error loading departments:', error)
-  } finally {
-    loading.value = false
+    await toggleStatus(dept, departmentService.toggleStatus)
+    showAlert('success', 'Department status updated successfully')
+  } catch {
+    showAlert('error', 'Failed to update status')
   }
 }
 
-const applyFilters = (sourceData = null) => {
-  // Use provided data or get from cache
-  const cachedData = sourceData || cacheService.get(CACHE_KEY) || []
-  let data = [...cachedData]
-  
-  if (filters.value.search) {
-    const q = filters.value.search.toLowerCase()
-    data = data.filter(d => 
-      d.name?.toLowerCase().includes(q) || 
-      d.code?.toLowerCase().includes(q) || 
-      d.head_of_department?.toLowerCase().includes(q)
-    )
-  }
-  
-  if (filters.value.status) {
-    const isActive = filters.value.status === 'active'
-    data = data.filter(d => d.is_active === isActive)
-  }
-  
-  departments.value = data
-}
-
-const resetFilters = () => {
-  filters.value = { search: '', status: '' }
-  applyFilters()
-}
-
-const toggleStatus = async (dept) => {
-  try {
-    await departmentService.toggleStatus(dept.id)
-    cacheService.clear(CACHE_KEY) // Invalidate cache
-    await loadDepartments(false)
-  } catch (error) {
-    console.error('Error toggling status:', error)
-    alert('Failed to update status')
-  }
-}
-
-// Debounce search filter
-let searchTimeout = null
-watch(() => filters.value.search, () => {
-  clearTimeout(searchTimeout)
-  searchTimeout = setTimeout(() => {
-    applyFilters()
-  }, 300)
-})
-
-// Watch other filters without debounce
-watch(() => filters.value.status, () => {
-  applyFilters()
-})
-
-onMounted(loadDepartments)
+onMounted(() => loadData(fetchDepartments))
 </script>
-
 

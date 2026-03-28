@@ -5,8 +5,8 @@
       <p class="text-muted mb-0">Welcome back! Here's what's happening today.</p>
     </div>
     
-    <!-- Compact Search Bar -->
-    <div class="search-container position-relative" style="min-width: 300px;">
+    <!-- Search Bar -->
+    <div class="search-container position-relative">
       <div class="input-group">
         <span class="input-group-text bg-white border-end-0 ps-3">
           <i class="bi bi-search text-muted"></i>
@@ -18,116 +18,41 @@
           placeholder="Search profiles..." 
           @keyup.enter="handleSearch"
         >
-        <button @click="handleSearch" class="btn btn-admin-primary px-3">
+        <button @click="handleSearch" class="btn btn-admin-primary px-3" :disabled="loadingSearch">
           <i class="bi bi-arrow-right"></i>
         </button>
       </div>
       <div v-if="loadingSearch" class="position-absolute top-100 start-0 w-100 mt-1">
-        <div class="progress" style="height: 2px;">
-          <div class="progress-bar progress-bar-striped progress-bar-animated bg-admin-primary" style="width: 100%"></div>
+        <div class="progress search-progress">
+          <div class="progress-bar progress-bar-striped progress-bar-animated w-100 bg-admin"></div>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Stats Grid -->
-  <!-- Stats Grid -->
+  <!-- Alert Message -->
+  <AlertMessage v-if="alert.show" :type="alert.type" :message="alert.message" :title="alert.title" :auto-close="true" :auto-close-duration="3000" @close="alert.show = false" />
+
+  <!-- Stats Grid Row 1 -->
+  <div class="row g-4 mb-4">
+    <div class="col-xl-3 col-md-6" v-for="stat in statsRow1" :key="stat.title">
+      <StatCard v-bind="stat" role="admin" :loading="loading" @click="router.push(stat.route)" />
+    </div>
+  </div>
+
+  <!-- Stats Grid Row 2 -->
   <div class="row g-4 mb-5">
-    <!-- Row 1 -->
-    <div class="col-xl-3 col-md-6">
-      <div class="stat-card bg-gradient-red" @click="router.push('/admin-dashboard/students')">
-        <div class="stat-icon">
-          <i class="bi bi-people"></i>
-        </div>
-        <div class="stat-content">
-          <h3>{{ stats.students.value }}</h3>
-          <p>Total Students</p>
-        </div>
-      </div>
-    </div>
-    
-    <div class="col-xl-3 col-md-6">
-      <div class="stat-card bg-gradient-rose" @click="router.push('/admin-dashboard/teachers')">
-        <div class="stat-icon">
-          <i class="bi bi-person-badge"></i>
-        </div>
-        <div class="stat-content">
-          <h3>{{ stats.teachers.value }}</h3>
-          <p>Total Teachers</p>
-        </div>
-      </div>
-    </div>
-    
-    <div class="col-xl-3 col-md-6">
-      <div class="stat-card bg-gradient-sunset" @click="router.push('/admin-dashboard/sessions')">
-        <div class="stat-icon">
-          <i class="bi bi-calendar-event"></i>
-        </div>
-        <div class="stat-content">
-          <h3>{{ stats.sessions.value }}</h3>
-          <p>Active Sessions</p>
-        </div>
-      </div>
-    </div>
-    
-    <div class="col-xl-3 col-md-6">
-      <div class="stat-card bg-gradient-dark-red" @click="router.push('/admin-dashboard/fees-collection')">
-        <div class="stat-icon">
-          <i class="bi bi-currency-dollar"></i>
-        </div>
-        <div class="stat-content">
-          <h3>{{ stats.revenue.value }}</h3>
-          <p>Total Revenue</p>
-        </div>
-      </div>
-    </div>
-    
-    <!-- Row 2 -->
-    <div class="col-xl-3 col-md-4">
-      <div class="stat-card bg-gradient-ruby" @click="router.push('/admin-dashboard/departments')">
-        <div class="stat-icon">
-          <i class="bi bi-building"></i>
-        </div>
-        <div class="stat-content">
-          <h3>{{ stats.departments.value }}</h3>
-          <p>Departments</p>
-        </div>
-      </div>
-    </div>
-    
-    <div class="col-xl-3 col-md-4">
-      <div class="stat-card bg-gradient-tomato" @click="router.push('/admin-dashboard/courses')">
-        <div class="stat-icon">
-          <i class="bi bi-mortarboard"></i>
-        </div>
-        <div class="stat-content">
-          <h3>{{ stats.programs.value }}</h3>
-          <p>Total Programs</p>
-        </div>
-      </div>
-    </div>
-    
-    <div class="col-xl-3 col-md-4">
-      <div class="stat-card bg-gradient-crimson" @click="router.push('/admin-dashboard/subjects')">
-        <div class="stat-icon">
-          <i class="bi bi-book"></i>
-        </div>
-        <div class="stat-content">
-          <h3>{{ stats.subjects.value }}</h3>
-          <p>Total Subjects</p>
-        </div>
-      </div>
+    <div class="col-xl-3 col-md-4" v-for="stat in statsRow2" :key="stat.title">
+      <StatCard v-bind="stat" role="admin" :loading="loading" @click="router.push(stat.route)" />
     </div>
   </div>
 
   <!-- Content Grid -->
   <div class="row g-4">
-    <!-- Recent Activities -->
     <div class="col-lg-6">
-      <ActivityFeed :activities="recentActivities" />
+      <ActivityFeed :activities="recentActivities" :loading="loadingActivities" />
     </div>
 
-    <!-- Quick Actions -->
     <div class="col-lg-6">
       <div class="card border-0 shadow-sm h-100">
         <div class="card-body">
@@ -141,7 +66,7 @@
                 bg-gradient="bg-light"
                 icon-bg-color="bg-admin-light"
                 icon-color="text-admin"
-                @click="router.push('/admin-dashboard/students/add')"
+                @click="router.push({ name: ADMIN_ROUTES.STUDENT_ADD.name })"
               />
             </div>
             <div class="col-md-6">
@@ -152,7 +77,7 @@
                 bg-gradient="bg-light"
                 icon-bg-color="bg-success-light"
                 icon-color="text-success"
-                @click="router.push('/admin-dashboard/teachers/add')"
+                @click="router.push({ name: ADMIN_ROUTES.TEACHER_ADD.name })"
               />
             </div>
             <div class="col-md-6">
@@ -163,7 +88,7 @@
                 bg-gradient="bg-light"
                 icon-bg-color="bg-info-light"
                 icon-color="text-info"
-                @click="router.push('/admin-dashboard/departments/add')"
+                @click="router.push({ name: ADMIN_ROUTES.DEPARTMENT_ADD.name })"
               />
             </div>
             <div class="col-md-6">
@@ -174,7 +99,7 @@
                 bg-gradient="bg-light"
                 icon-bg-color="bg-warning-light"
                 icon-color="text-warning"
-                @click="router.push('/admin-dashboard/fees-collection')"
+                @click="router.push({ name: ADMIN_ROUTES.FEES.name })"
               />
             </div>
           </div>
@@ -185,193 +110,101 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import ActivityFeed from '@/components/common/ActivityFeed.vue'
-import QuickActionCard from '@/components/common/QuickActionCard.vue'
-import { studentService } from '@/services/studentservices'
-import { teacherService } from '@/services/teacherService'
-import { departmentService } from '@/services/departmentService'
-import { feeService } from '@/services/managementService'
-import { assignmentService } from '@/services/assignmentService'
-import sessionService from '@/services/sessionService'
-import { programService } from '@/services/programService'
-import { subjectService } from '@/services/subjectService'
+import { useAuth } from '@/store/auth'
+import { ActivityFeed, QuickActionCard, StatCard, AlertMessage } from '@/components/shared/common'
+import { useAlert } from '@/composables/shared'
+import adminPanelService from '@/services/admin/adminPanelService'
+import { ADMIN_ROUTES } from '@/utils/constants/routes'
+import { CURRENCY } from '@/utils/constants/config'
 
 const router = useRouter()
+const authStore = useAuth()
+const { alert, showAlert } = useAlert()
 const searchQuery = ref('')
 const loadingSearch = ref(false)
-const loading = ref(false)
+const cachedStats = adminPanelService.getCachedStats()
+const loading = ref(!cachedStats)
+const loadingActivities = ref(true)
 
 const stats = ref({
-  students: { value: '0', change: '+0%' },
-  teachers: { value: '0', change: '+0%' },
-  departments: { value: '0', change: '+0%' },
-  revenue: { value: 'PKR 0', change: '+0%' },
-  sessions: { value: '0', change: 'Active' },
-  programs: { value: '0', change: 'Total' },
-  subjects: { value: '0', change: 'Total' }
+  students: cachedStats?.students || 0,
+  teachers: cachedStats?.teachers || 0,
+  departments: cachedStats?.departments || 0,
+  revenue: cachedStats?.revenue || 0,
+  sessions: cachedStats?.sessions || 0,
+  programs: cachedStats?.programs || 0,
+  subjects: cachedStats?.subjects || 0
 })
+
+const statsRow1 = computed(() => [
+  { value: stats.value.students, title: 'Total Students', icon: 'bi bi-people', type: 'student', variant: 'glass', route: { name: ADMIN_ROUTES.STUDENT_LIST.name } },
+  { value: stats.value.teachers, title: 'Total Teachers', icon: 'bi bi-person-badge', type: 'teacher', variant: 'glass', route: { name: ADMIN_ROUTES.TEACHER_LIST.name } },
+  { value: stats.value.sessions, title: 'Active Sessions', icon: 'bi bi-calendar-event', type: 'finance', variant: 'glass', route: { name: ADMIN_ROUTES.SESSION_LIST.name } }, // Use finance/greenish for sessions
+  { value: `${CURRENCY} ${Number(stats.value.revenue).toLocaleString()}`, title: 'Total Revenue', icon: 'bi bi-currency-dollar', type: 'finance', variant: 'glass', route: { name: ADMIN_ROUTES.FEES.name } }
+])
+
+const statsRow2 = computed(() => [
+  { value: stats.value.departments, title: 'Departments', icon: 'bi bi-building', type: 'department', variant: 'glass', route: { name: ADMIN_ROUTES.DEPARTMENT_LIST.name } },
+  { value: stats.value.programs, title: 'Total Programs', icon: 'bi bi-mortarboard', type: 'course', variant: 'glass', route: { name: ADMIN_ROUTES.COURSE_LIST.name } },
+  { value: stats.value.subjects, title: 'Total Subjects', icon: 'bi bi-book', type: 'course', variant: 'glass', route: { name: ADMIN_ROUTES.SUBJECT_LIST.name } }
+])
 
 const recentActivities = ref([])
 
-const loadDashboardData = async () => {
-  loading.value = true
+const loadDashboard = async () => {
+  if (!authStore.isAuthenticated) {
+    router.push({ name: 'Login' })
+    return
+  }
+
   try {
-    // BATCH 1: Load stats in parallel (7 calls reduced to 7 - unavoidable for different endpoints)
-    const [studentsRes, teachersRes, deptsRes, feeStatsRes, sessionsRes, programsRes, subjectsRes] = await Promise.all([
-      studentService.getAllStudents({ page_size: 1 }),
-      teacherService.getAllTeachers({ page_size: 1 }),
-      departmentService.getAllDepartments({ page_size: 1 }),
-      feeService.statistics(),
-      sessionService.getSessions({ status: 'active' }),
-      programService.getAllPrograms({ page_size: 1 }),
-      subjectService.getAllSubjects({ page_size: 1 })
-    ])
-
-    const studentCount = studentsRes.count || (studentsRes.results ? studentsRes.results.length : 0)
-    const teacherCount = teachersRes.count || (teachersRes.results ? teachersRes.results.length : 0)
-    const deptCount = deptsRes.count || (deptsRes.results ? deptsRes.results.length : 0)
-    const sessionsData = sessionsRes.data || []
-    const activeSessionsCount = sessionsData.length || (sessionsData.results ? sessionsData.results.length : 0)
-    const programCount = programsRes.count || (programsRes.results ? programsRes.results.length : 0)
-    const subjectCount = subjectsRes.count || (subjectsRes.results ? subjectsRes.results.length : 0)
-    const totalRevenue = feeStatsRes.data ? feeStatsRes.data.total_collected : 0
-    
-    stats.value = {
-      students: { value: studentCount.toLocaleString(), change: '+12%' }, 
-      teachers: { value: teacherCount.toLocaleString(), change: '+3%' },
-      departments: { value: deptCount.toLocaleString(), change: '+1%' },
-      revenue: { value: `PKR ${totalRevenue.toLocaleString()}`, change: '+8%' },
-      sessions: { value: activeSessionsCount.toLocaleString(), change: 'Active' },
-      programs: { value: programCount.toLocaleString(), change: 'Total' },
-      subjects: { value: subjectCount.toLocaleString(), change: 'Total' }
-    }
-
-    // BATCH 2: Load recent activities (3 calls - load in background after stats)
-    setTimeout(async () => {
-      try {
-        const [recentStudents, recentFees, recentAssignments] = await Promise.all([
-          studentService.getAllStudents({ ordering: '-created_at', page_size: 2 }),
-          feeService.getAll({ ordering: '-created_at', page_size: 2 }),
-          assignmentService.getAllAssignments({ ordering: '-created_at', page_size: 2 })
-        ])
-
-        const activities = []
-
-        if (recentStudents.results) {
-          recentStudents.results.forEach(s => {
-            activities.push({
-              id: `student-${s.id}`,
-              message: `New student enrolled: ${s.full_name}`,
-              time: getTimeAgo(s.created_at),
-              timestamp: new Date(s.created_at)
-            })
-          })
-        }
-
-        if (recentFees.data && recentFees.data.results) {
-          recentFees.data.results.forEach(f => {
-            if (f.status === 'paid') {
-              activities.push({
-                id: `fee-${f.id}`,
-                message: `Fee payment received from ${f.student_name}`,
-                time: getTimeAgo(f.payment_date || f.updated_at),
-                timestamp: new Date(f.payment_date || f.updated_at)
-              })
-            }
-          })
-        }
-
-        if (recentAssignments.results) {
-          recentAssignments.results.forEach(a => {
-            activities.push({
-              id: `assign-${a.id}`,
-              message: `New assignment created: ${a.title}`,
-              time: getTimeAgo(a.created_at),
-              timestamp: new Date(a.created_at)
-            })
-          })
-        }
-
-        recentActivities.value = activities
-          .sort((a, b) => b.timestamp - a.timestamp)
-          .slice(0, 5)
-      } catch (error) {
-        console.error('Error loading activities:', error)
-      }
-    }, 100) // Load activities after stats are displayed
-
-  } catch (error) {
-    console.error('Error loading dashboard data:', error)
-  } finally {
+    if (!cachedStats) loading.value = true
+    const dashboardStats = await adminPanelService.getDashboardStats()
+    stats.value = dashboardStats
     loading.value = false
+
+    // Load activities in parallel (no setTimeout needed)
+    loadActivities()
+  } catch (error) {
+    console.error('Dashboard error:', error)
+    loading.value = false
+    loadingActivities.value = false
   }
 }
 
-const getTimeAgo = (dateString) => {
-  if (!dateString) return 'Recently'
-  const date = new Date(dateString)
-  const now = new Date()
-  const seconds = Math.floor((now - date) / 1000)
-  
-  let interval = seconds / 31536000
-  if (interval > 1) return Math.floor(interval) + " years ago"
-  interval = seconds / 2592000
-  if (interval > 1) return Math.floor(interval) + " months ago"
-  interval = seconds / 86400
-  if (interval > 1) return Math.floor(interval) + " days ago"
-  interval = seconds / 3600
-  if (interval > 1) return Math.floor(interval) + " hours ago"
-  interval = seconds / 60
-  if (interval > 1) return Math.floor(interval) + " minutes ago"
-  return Math.floor(seconds) + " seconds ago"
+const loadActivities = async () => {
+  try {
+    recentActivities.value = await adminPanelService.getRecentActivities()
+  } catch (error) {
+    console.error('Activities error:', error)
+  } finally {
+    loadingActivities.value = false
+  }
 }
 
 const handleSearch = async () => {
   if (!searchQuery.value.trim()) return
-  
   loadingSearch.value = true
   const query = searchQuery.value.toLowerCase()
   
   try {
-    const students = await studentService.getAllStudents({ search: query })
-    const studentList = students.results || students || []
-    
-    if (studentList.length > 0) {
-      if (studentList.length === 1) {
-        router.push(`/admin-dashboard/students/${studentList[0].id}`)
-        return
-      } else {
-        router.push({ path: '/admin-dashboard/students', query: { search: query } })
-        return
-      }
+    const { students, teachers } = await adminPanelService.searchProfiles(query)
+    if (students.length > 0) {
+      if (students.length === 1) router.push({ name: ADMIN_ROUTES.STUDENT_PROFILE.name, params: { id: students[0].id } })
+      else router.push({ path: ADMIN_ROUTES.STUDENT_LIST.path, query: { search: query } })
+      return
     }
-    
-    const teachers = await teacherService.getAllTeachers({ search: query })
-    const teacherList = teachers.results || teachers || []
-    
-    if (teacherList.length > 0) {
-      if (teacherList.length === 1) {
-        router.push(`/admin-dashboard/teachers/${teacherList[0].id}`)
-        return
-      } else {
-        router.push({ path: '/admin-dashboard/teachers', query: { search: query } })
-        return
-      }
+    if (teachers.length > 0) {
+      if (teachers.length === 1) router.push({ name: ADMIN_ROUTES.TEACHER_PROFILE.name, params: { id: teachers[0].id } })
+      else router.push({ path: ADMIN_ROUTES.TEACHER_LIST.path, query: { search: query } })
+      return
     }
-    
-    alert('No direct profile found. Try browsing the lists.')
-    
-  } catch (error) {
-    console.error('Search error:', error)
-  } finally {
-    loadingSearch.value = false
-  }
+    showAlert('info', 'No direct profile found. Try browsing the lists.', 'Search')
+  } catch (error) { console.error('Search error:', error) }
+  finally { loadingSearch.value = false }
 }
 
-onMounted(() => {
-  loadDashboardData()
-})
+onMounted(() => loadDashboard())
 </script>
-

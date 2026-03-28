@@ -9,7 +9,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "optimize-images": "node scripts/optimize-images.js"
   },
   "dependencies": {
     "@vuepic/vue-datepicker": "^12.1.0",
@@ -19,10 +20,13 @@
     "pinia": "^3.0.4",
     "sweetalert2": "^11.26.3",
     "vue": "^3.5.22",
-    "vue-router": "^4.6.3"
+    "vue-router": "^4.6.3",
+    "vuedraggable": "^4.1.0"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^6.0.1",
+    "sass": "^1.97.2",
+    "sharp": "^0.33.5",
     "vite": "^7.1.11",
     "vite-plugin-vue-devtools": "^8.0.3"
   }

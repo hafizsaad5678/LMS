@@ -1,259 +1,289 @@
 <template>
   <TeacherPageTemplate
-    title="Grade Students"
-    subtitle="Enter and manage student grades"
-    icon="bi bi-award"
+    title="Assessment Manager"
+    subtitle="Manage assessments and enter grades"
+    icon="bi bi-clipboard-check"
     :breadcrumbs="breadcrumbs"
     :actions="actions"
   >
-    <div class="row g-4">
-      <!-- Filters Card -->
-      <div class="col-lg-4">
-        <div class="card border-0 shadow-sm sticky-top" style="top: 80px;">
-          <div class="card-header bg-white border-bottom">
-            <h6 class="mb-0 fw-semibold">
-              <i class="bi bi-funnel me-2 text-teacher"></i>Filters
-            </h6>
-          </div>
-          <div class="card-body">
-            <div class="mb-3">
-              <label class="form-label small fw-semibold">Class</label>
-              <select v-model="selectedClass" class="form-select">
-                <option value="">Select a class...</option>
-                <option v-for="cls in classes" :key="cls.id" :value="cls.id">
-                  {{ cls.name }}
-                </option>
-              </select>
-            </div>
+    <AlertMessage
+      v-if="alert.show"
+      :type="alert.type"
+      :message="alert.message"
+      :title="alert.title"
+      :auto-close="true"
+      :auto-close-duration="3000"
+      @close="alert.show = false"
+    />
 
-            <div class="mb-3">
-              <label class="form-label small fw-semibold">Assessment Type</label>
-              <select v-model="assessmentType" class="form-select">
-                <option value="assignment">Assignment</option>
-                <option value="quiz">Quiz</option>
-                <option value="midterm">Midterm</option>
-                <option value="final">Final Exam</option>
-              </select>
-            </div>
+    <ConfirmDialog
+      v-model="showConfirmDialog"
+      title="Delete Assessment"
+      message="This will delete all student grades associated with this assessment! Are you sure?"
+      type="danger"
+      theme="teacher"
+      confirm-text="Delete"
+      @confirm="confirmDeleteComponent"
+    />
 
-            <div class="mb-3">
-              <label class="form-label small fw-semibold">Assessment</label>
-              <select v-model="selectedAssessment" class="form-select" :disabled="!selectedClass">
-                <option value="">Select assessment...</option>
-                <option v-for="assessment in assessments" :key="assessment.id" :value="assessment.id">
-                  {{ assessment.title }}
-                </option>
-              </select>
-            </div>
+    <!-- Filters -->
+    <ClassFilterCard
+      v-model="selectedSubject"
+      v-model:department="selectedDepartment"
+      v-model:program="selectedProgram"
+      :departments="departments"
+      :programs="programs"
+      :filtered-subjects="filteredSubjects"
+      @change="loadComponents"
+    />
 
-            <div v-if="selectedAssessment" class="alert alert-info border-0 small">
-              <div class="mb-2"><strong>Total Marks:</strong> {{ currentAssessment?.total_marks }}</div>
-              <div><strong>Students:</strong> {{ students.length }}</div>
-            </div>
-
-            <button @click="loadGrades" class="btn btn-teacher-primary w-100" :disabled="!selectedAssessment">
-              <i class="bi bi-arrow-clockwise me-2"></i>Load Grades
-            </button>
-          </div>
-        </div>
+    <!-- Main Content: Split View -->
+    <div v-if="selectedSubject" class="row g-4">
+      <!-- Left Sidebar: Assessments List -->
+      <div class="col-lg-4 col-xl-3">
+        <AssessmentSidebar
+          :items="components"
+          :loading="loading"
+          :selected-id="selectedComponent?.id"
+          @create="openCreateModal"
+          @select="openMarksEntry"
+          @edit="editComponent"
+          @delete="deleteComponent"
+        />
       </div>
 
-      <!-- Grades Table -->
-      <div class="col-lg-8">
-        <div v-if="!selectedAssessment" class="text-center py-5">
-          <i class="bi bi-award display-1 text-muted"></i>
-          <h4 class="text-muted mt-3">Select Assessment</h4>
-          <p class="text-muted">Choose a class and assessment to start grading</p>
-        </div>
+      <!-- Right Detail: Grading Interface -->
+      <div class="col-lg-8 col-xl-9">
+        <div class="card border-0 shadow-sm h-100">
+          <div v-if="!selectedComponent" class="card-body d-flex flex-column align-items-center justify-content-center py-5 text-center text-muted">
+            <div class="bg-light rounded-circle p-4 mb-4">
+              <i class="bi bi-arrow-left-circle display-4 text-teacher opacity-50"></i>
+            </div>
+            <h5>Select an assessment to start grading</h5>
+            <p class="small mw-300">Choose from the list on the left to view students and enter marks for a specific component.</p>
+          </div>
 
-        <div v-else class="card border-0 shadow-sm">
-          <div class="card-header bg-white border-bottom">
-            <div class="d-flex justify-content-between align-items-center">
-              <h6 class="mb-0 fw-semibold">
-                <i class="bi bi-table me-2 text-teacher"></i>Grade Entry
-              </h6>
-              <div class="d-flex gap-2">
-                <span class="badge bg-success">{{ gradedCount }} Graded</span>
-                <span class="badge bg-warning text-dark">{{ pendingCount }} Pending</span>
-              </div>
-            </div>
-          </div>
-          <div class="card-body p-0">
-            <div class="table-responsive">
-              <table class="table table-hover mb-0">
-                <thead class="table-light">
-                  <tr>
-                    <th style="width: 50px;">#</th>
-                    <th>Student Name</th>
-                    <th>Roll No</th>
-                    <th class="text-center">Obtained Marks</th>
-                    <th class="text-center">Percentage</th>
-                    <th class="text-center">Grade</th>
-                    <th>Remarks</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="(student, index) in students" :key="student.id">
-                    <td>{{ index + 1 }}</td>
-                    <td>
-                      <div class="d-flex align-items-center">
-                        <div class="avatar-circle avatar-circle-sm me-2">
-                          {{ student.name.charAt(0) }}
-                        </div>
-                        <span class="fw-semibold">{{ student.name }}</span>
-                      </div>
-                    </td>
-                    <td>{{ student.roll_no }}</td>
-                    <td>
-                      <input 
-                        v-model.number="student.obtained_marks" 
-                        type="number" 
-                        class="form-control form-control-sm text-center"
-                        :max="currentAssessment?.total_marks"
-                        min="0"
-                        @input="calculateGrade(student)"
-                      >
-                    </td>
-                    <td class="text-center">
-                      <span class="fw-semibold">{{ student.percentage }}%</span>
-                    </td>
-                    <td class="text-center">
-                      <span :class="['badge', getGradeBadge(student.grade)]">
-                        {{ student.grade }}
-                      </span>
-                    </td>
-                    <td>
-                      <input 
-                        v-model="student.remarks" 
-                        type="text" 
-                        class="form-control form-control-sm"
-                        placeholder="Optional remarks"
-                      >
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-          <div class="card-footer bg-white border-top">
-            <div class="d-flex justify-content-between align-items-center">
-              <div class="text-muted small">
-                <i class="bi bi-info-circle me-1"></i>
-                Changes are saved automatically
+          <div v-else class="card-body p-4">
+            <!-- Focused Header -->
+            <div class="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom">
+              <div>
+                <h5 class="fw-bold mb-1">{{ selectedComponent.name }}</h5>
+                <div class="d-flex align-items-center gap-3">
+                  <span class="small text-muted"><i class="bi bi-bullseye me-1"></i>Max Marks: <strong>{{ selectedComponent.max_marks }}</strong></span>
+                  <span class="small text-muted"><i class="bi bi-people me-1"></i>Students: <strong>{{ marksData.length }}</strong></span>
+                  <div class="vr mx-1"></div>
+                  <div class="d-flex align-items-center small" :class="selectedComponent.is_visible_to_students ? 'text-success' : 'text-muted'">
+                    <i class="bi" :class="selectedComponent.is_visible_to_students ? 'bi-eye-fill' : 'bi-eye-slash'"></i>
+                    <span class="ms-1">{{ selectedComponent.is_visible_to_students ? 'Visible' : 'Hidden' }}</span>
+                  </div>
+                </div>
               </div>
               <div class="d-flex gap-2">
-                <button @click="exportGrades" class="btn btn-outline-secondary">
-                  <i class="bi bi-download me-2"></i>Export
-                </button>
-                <button @click="publishGrades" class="btn btn-teacher-primary" :disabled="publishing">
-                  <span v-if="publishing">
-                    <span class="spinner-border spinner-border-sm me-2"></span>Publishing...
-                  </span>
-                  <span v-else>
-                    <i class="bi bi-send me-2"></i>Publish Grades
-                  </span>
+                <button @click="saveMarks" class="btn btn-teacher rounded-pill px-4 shadow-sm" :disabled="saving || !marksData.some(m => m.is_dirty)">
+                  <span v-if="saving" class="spinner-border spinner-border-sm me-2"></span>
+                  <i v-else class="bi bi-cloud-check me-2"></i>
+                  Save Grades
                 </button>
               </div>
             </div>
+
+            <!-- Grading Table -->
+            <GradingTable :marks-data="marksData" :max-marks="Number(selectedComponent.max_marks)" />
           </div>
         </div>
       </div>
     </div>
+
+    <!-- Empty State (No Subject Selected) -->
+    <div v-else class="text-center py-5 mt-5">
+      <div class="mb-4">
+        <div class="bg-light rounded-circle p-5 d-inline-block shadow-sm mb-4">
+          <i class="bi bi-journal-check display-1 text-teacher opacity-50"></i>
+        </div>
+      </div>
+      <h3 class="fw-bold text-dark mb-2">Ready to Grade?</h3>
+      <p class="text-muted mx-auto max-w-450">
+        Choose a <span class="text-teacher fw-bold">Department</span> and <span class="text-teacher fw-bold">Class</span> above to view your assessments and start entering student marks.
+      </p>
+    </div>
+
+    <!-- Create/Edit Modal -->
+    <AssessmentFormModal
+      v-model="showModal"
+      :form="form"
+      :subjects="filteredSubjects"
+      :is-editing="isEditing"
+      :loading="false"
+      @submit="submitComponent"
+    />
   </TeacherPageTemplate>
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import TeacherPageTemplate from '@/components/navbar/TeacherPageTemplate.vue'
+import { TeacherPageTemplate } from '@/components/shared/panels'
+import { AlertMessage, ConfirmDialog } from '@/components/shared/common'
+import { ClassFilterCard, AssessmentSidebar, AssessmentFormModal } from '@/components/teacher/shared'
+import GradingTable from '@/components/teacher/grades/GradingTable.vue'
+import { useClassFilters } from '@/composables/teacher/useClassFilters'
+import { useCrudModal } from '@/composables/shared'
+import teacherPanelService from '@/services/teacher/teacherPanelService'
+import { TEACHER_ROUTES } from '@/utils/constants/routes'
 
 const router = useRouter()
 
+// Use composables
+const { 
+  departments, 
+  programs, 
+  selectedDepartment, 
+  selectedProgram, 
+  selectedSubject, 
+  filteredSubjects, 
+  loadClasses 
+} = useClassFilters()
+
+// State
+const components = ref([])
+const loading = ref(false)
+const selectedComponent = ref(null)
+const marksData = ref([])
+const saving = ref(false)
+
+const loadComponents = async () => {
+  if (!selectedSubject.value) return
+  loading.value = true
+  try {
+    const res = await teacherPanelService.getComponents({ subject: selectedSubject.value })
+    components.value = res.results || res || []
+  } catch (e) {
+    console.error(e)
+  } finally {
+    loading.value = false
+  }
+}
+
+// Use CRUD modal composable
+const {
+  alert,
+  showSuccess,
+  showError,
+  showInfo,
+  showModal,
+  showConfirmDialog,
+  editMode: isEditing,
+  submitting,
+  form,
+  selectedItem: componentToDelete,
+  openCreateModal,
+  openEditModal,
+  handleSubmit: submitComponent,
+  confirmDelete: deleteComponent,
+  handleDelete: confirmDeleteComponent
+} = useCrudModal({
+  entityName: 'Assessment',
+  createFn: (data) => teacherPanelService.createComponent({ ...data, subject: selectedSubject.value }),
+  updateFn: teacherPanelService.updateComponent,
+  deleteFn: teacherPanelService.deleteComponent,
+  onSuccess: loadComponents,
+  defaultForm: {
+    name: '',
+    component_type: 'quiz',
+    max_marks: 10,
+    weightage: 0,
+    is_visible_to_students: false,
+    status: 'draft',
+    description: ''
+  }
+})
+
+
+// Breadcrumbs and Actions for TeacherPageTemplate
 const breadcrumbs = [
-  { name: 'Dashboard', href: '/teacher/dashboard' },
-  { name: 'Grades', href: '/teacher/grades/students' },
+  { name: 'Dashboard', href: TEACHER_ROUTES.DASHBOARD.path },
+  { name: 'Grades', href: TEACHER_ROUTES.GRADE_MANAGEMENT.path },
   { name: 'Grade Students' }
 ]
 
-const actions = [
-  { label: 'View Reports', icon: 'bi bi-graph-up', variant: 'btn-teacher-outline', onClick: () => router.push('/teacher/grades/report') }
-]
-
-const selectedClass = ref('')
-const assessmentType = ref('assignment')
-const selectedAssessment = ref('')
-const publishing = ref(false)
-
-const classes = ref([
-  { id: 1, name: 'Data Structures - CS201' },
-  { id: 2, name: 'Database Systems - CS301' },
-  { id: 3, name: 'Web Development - CS202' }
-])
-
-const assessments = ref([
-  { id: 1, title: 'Assignment 1 - Binary Trees', total_marks: 100 },
-  { id: 2, title: 'Quiz 1 - Data Structures Basics', total_marks: 50 },
-  { id: 3, title: 'Midterm Exam', total_marks: 100 }
-])
-
-const students = ref([])
-
-const mockStudents = [
-  { id: 1, name: 'Ahmed Ali', roll_no: 'CS-2023-001', obtained_marks: 85, percentage: 85, grade: 'A', remarks: '' },
-  { id: 2, name: 'Fatima Khan', roll_no: 'CS-2023-002', obtained_marks: 92, percentage: 92, grade: 'A+', remarks: 'Excellent work' },
-  { id: 3, name: 'Hassan Raza', roll_no: 'CS-2023-003', obtained_marks: 78, percentage: 78, grade: 'B+', remarks: '' },
-  { id: 4, name: 'Ayesha Malik', roll_no: 'CS-2023-004', obtained_marks: 88, percentage: 88, grade: 'A', remarks: '' },
-  { id: 5, name: 'Usman Ahmed', roll_no: 'CS-2023-005', obtained_marks: 0, percentage: 0, grade: 'F', remarks: 'Not submitted' }
-]
-
-const currentAssessment = computed(() => {
-  return assessments.value.find(a => a.id === selectedAssessment.value)
+const actions = computed(() => {
+  if (!selectedSubject.value) return []
+  return [
+    {
+      label: 'New Assessment',
+      icon: 'bi bi-plus-lg',
+      variant: 'btn-teacher-outline',
+      onClick: () => openCreateModal()
+    }
+  ]
 })
 
-const gradedCount = computed(() => students.value.filter(s => s.obtained_marks > 0).length)
-const pendingCount = computed(() => students.value.filter(s => s.obtained_marks === 0).length)
-
-watch(selectedClass, () => {
-  selectedAssessment.value = ''
-  students.value = []
-})
-
-const calculateGrade = (student) => {
-  const totalMarks = currentAssessment.value?.total_marks || 100
-  student.percentage = Math.round((student.obtained_marks / totalMarks) * 100)
+const editComponent = (comp) => {
+  openEditModal(comp)
+}
+const openMarksEntry = async (comp) => {
+  selectedComponent.value = comp
+  marksData.value = []
   
-  if (student.percentage >= 90) student.grade = 'A+'
-  else if (student.percentage >= 85) student.grade = 'A'
-  else if (student.percentage >= 80) student.grade = 'A-'
-  else if (student.percentage >= 75) student.grade = 'B+'
-  else if (student.percentage >= 70) student.grade = 'B'
-  else if (student.percentage >= 65) student.grade = 'B-'
-  else if (student.percentage >= 60) student.grade = 'C+'
-  else if (student.percentage >= 55) student.grade = 'C'
-  else if (student.percentage >= 50) student.grade = 'C-'
-  else student.grade = 'F'
+  try {
+    await teacherPanelService.initializeStudents(comp.id)
+    const res = await teacherPanelService.getComponentMarks(comp.id)
+    const marks = Array.isArray(res) ? res : (res.results || [])
+    
+    marksData.value = marks.map(m => ({
+      ...m,
+      is_dirty: false,
+      is_locked: m.is_locked || false
+    }))
+  } catch (e) {
+    console.error(e)
+    showError('Failed to load marks')
+  }
 }
 
-const getGradeBadge = (grade) => {
-  if (grade.startsWith('A')) return 'bg-success'
-  if (grade.startsWith('B')) return 'bg-info'
-  if (grade.startsWith('C')) return 'bg-warning text-dark'
-  return 'bg-danger'
+const saveMarks = async () => {
+  const dirtyRows = marksData.value.filter(m => m.is_dirty)
+  if (dirtyRows.length === 0) {
+    showInfo('No changes to save')
+    return
+  }
+  
+  saving.value = true
+  try {
+    const payload = dirtyRows.map(m => ({
+      student_id: m.student,
+      marks_obtained: m.marks_obtained,
+      remarks: m.remarks,
+      is_locked: m.is_locked || false
+    }))
+    
+    await teacherPanelService.bulkUpdateMarks(selectedComponent.value.id, payload)
+    marksData.value.forEach(m => m.is_dirty = false)
+    showSuccess('Grades saved successfully!')
+  } catch (e) {
+    showError('Failed to save grades')
+  } finally {
+    saving.value = false
+  }
 }
 
-const loadGrades = () => {
-  students.value = JSON.parse(JSON.stringify(mockStudents))
-}
-
-const exportGrades = () => {
-  alert('Exporting grades to CSV...')
-}
-
-const publishGrades = () => {
-  publishing.value = true
-  setTimeout(() => {
-    publishing.value = false
-    alert('Grades published successfully!')
-  }, 1000)
-}
+onMounted(async () => {
+  await loadClasses()
+  
+  // Check for query parameters from route
+  const route = router.currentRoute.value
+  if (route.query.subject) {
+    selectedSubject.value = route.query.subject
+    await loadComponents()
+    
+    // If component ID is provided, open it directly
+    if (route.query.component) {
+      const comp = components.value.find(c => c.id === route.query.component)
+      if (comp) {
+        await openMarksEntry(comp)
+      }
+    }
+  }
+})
 </script>
+

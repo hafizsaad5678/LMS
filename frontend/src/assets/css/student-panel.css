@@ -1,0 +1,266 @@
+.fw-black {
+  font-weight: 800;
+}
+
+.smaller {
+  font-size: 0.72rem;
+}
+
+.month-pill {
+  font-size: 0.85rem;
+  letter-spacing: 0.4px;
+}
+
+.week-pill {
+  font-size: 0.78rem;
+}
+
+.text-student-50 {
+  color: rgba(46, 125, 50, 0.7) !important;
+}
+
+.text-success-50 {
+  color: rgba(25, 135, 84, 0.7) !important;
+}
+
+.text-truncate-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.line-clamp-3 {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.letter-spacing-1 {
+  letter-spacing: 0.5px;
+}
+
+.student-status-card-header {
+  position: relative;
+  overflow: hidden;
+}
+
+.student-status-card-header::after {
+  content: '';
+  position: absolute;
+  top: -50%;
+  right: -50%;
+  width: 150px;
+  height: 150px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 50%;
+  z-index: 0;
+}
+
+.student-status-icon {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 12px;
+  font-size: 1.5rem;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
+  position: relative;
+  z-index: 1;
+}
+
+.student-status-title,
+.student-status-subtitle,
+.student-status-card-header .badge {
+  position: relative;
+  z-index: 1;
+}
+
+.day-toggle {
+  cursor: pointer;
+}
+
+.class-item-v2 {
+  min-height: 100px;
+}
+
+.schedule-class-card {
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.schedule-class-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 20px rgba(0, 0, 0, 0.08) !important;
+}
+
+.schedule-class-icon {
+  width: 36px;
+  height: 36px;
+}
+
+.timeline-dot {
+  left: -9px;
+  top: 15px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  z-index: 10;
+}
+
+.ring-student {
+  box-shadow: 0 0 0 4px rgba(46, 125, 50, 0.2);
+}
+
+.shadow-student {
+  box-shadow: 0 0 8px rgba(46, 125, 50, 0.4);
+}
+
+.shadow-warning {
+  box-shadow: 0 0 8px rgba(255, 193, 7, 0.4);
+}
+
+.hover-light:hover {
+  background-color: #f8f9fa;
+  transform: translateX(4px);
+}
+
+.pulse-primary {
+  width: 8px;
+  height: 8px;
+  background: #2e7d32;
+  border-radius: 50%;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(46, 125, 50, 0.7);
+  }
+
+  70% {
+    transform: scale(1);
+    box-shadow: 0 0 0 10px rgba(46, 125, 50, 0);
+  }
+
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(46, 125, 50, 0);
+  }
+}
+
+.att-card {
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.att-card:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.09) !important;
+}
+
+.att-card-header {
+  position: relative;
+  overflow: hidden;
+}
+
+.att-card-header::after {
+  content: '';
+  position: absolute;
+  top: -40%;
+  right: -40%;
+  width: 100px;
+  height: 100px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 50%;
+  z-index: 0;
+}
+
+.att-card-icon {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 10px;
+  font-size: 1.2rem;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.06);
+  position: relative;
+  z-index: 1;
+}
+
+.att-header-present {
+  background: linear-gradient(135deg, #d1fae5, #a7f3d0);
+}
+
+.att-header-absent {
+  background: linear-gradient(135deg, #fee2e2, #fca5a5);
+}
+
+.att-header-late {
+  background: linear-gradient(135deg, #fef3c7, #fde68a);
+}
+
+.att-header-excused {
+  background: linear-gradient(135deg, #dbeafe, #93c5fd);
+}
+
+.att-header-default {
+  background: linear-gradient(135deg, #f1f5f9, #e2e8f0);
+}
+
+.quiz-card,
+.assignment-card,
+.submission-card {
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.quiz-card:hover,
+.assignment-card:hover,
+.submission-card:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.1) !important;
+}
+
+.book-card,
+.announcement-card {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.book-card:hover,
+.announcement-card:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 15px 30px rgba(0, 0, 0, 0.1) !important;
+}
+
+.meta-item i {
+  font-size: 1.1rem;
+}
+
+.animate__animated {
+  animation-duration: 0.4s;
+}
+
+.size-48 {
+  width: 48px;
+  height: 48px;
+}
+
+.text-xxs-65 {
+  font-size: 0.65rem;
+}
+
+.text-xxs-70 {
+  font-size: 0.7rem;
+}
+
+.teacher-avatar-xs {
+  width: 24px;
+  height: 24px;
+  font-size: 0.7rem;
+}

@@ -4,25 +4,59 @@
  */
 
 /* ==================== CARD STYLES ==================== */
+/* Minimal card styles - Bootstrap handles most */
 .card {
     border-radius: 12px;
     overflow: hidden;
-}
-
-.card-header {
-    padding: 1.25rem 1.5rem;
-}
-
-.card-body {
-    padding: 1.5rem;
 }
 
 .card-header-gradient {
     background: linear-gradient(135deg, rgba(220, 53, 69, 0.05) 0%, rgba(220, 53, 69, 0.02) 100%);
 }
 
+/* ==================== PAGE TEMPLATES & HEADERS ==================== */
+.page-icon-admin {
+    background: linear-gradient(135deg, var(--admin-primary) 0%, var(--admin-primary-dark) 100%) !important;
+    box-shadow: 0 4px 12px rgba(220, 53, 69, 0.3) !important;
+}
+
+.page-icon-teacher {
+    background: linear-gradient(135deg, var(--teacher-primary) 0%, var(--teacher-primary-dark) 100%) !important;
+    box-shadow: 0 4px 12px rgba(13, 110, 253, 0.3) !important;
+}
+
+.page-icon-student {
+    background: linear-gradient(135deg, var(--student-primary) 0%, var(--student-primary-dark) 100%) !important;
+    box-shadow: 0 4px 12px rgba(25, 135, 84, 0.3) !important;
+}
+
+.breadcrumb-link-admin:hover {
+    color: var(--admin-primary) !important;
+}
+
+.breadcrumb-link-teacher:hover {
+    color: var(--teacher-primary) !important;
+}
+
+.breadcrumb-link-student:hover {
+    color: var(--student-primary) !important;
+}
+
+.admin-page-template {
+    --template-color: var(--admin-primary);
+}
+
+.teacher-page-template {
+    --template-color: var(--teacher-primary);
+}
+
+.student-page-template {
+    --template-color: var(--student-primary);
+}
+
 /* ==================== STAT CARDS ==================== */
-.stat-card {
+/* Dashboard Feature Cards (The Gradient ones) */
+.dash-card {
     display: flex;
     align-items: center;
     padding: 1.5rem;
@@ -31,16 +65,26 @@
     transition: all 0.3s ease;
     cursor: pointer;
     backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 255, 255, 0.5);
+    border: 1px solid rgba(0, 0, 0, 0.05);
 }
 
-.stat-card:hover {
+.dash-card:hover {
     transform: translateY(-5px);
-    box-shadow: 0 10px 25px rgba(255, 50, 50, 0.15);
-    border-color: rgba(255, 50, 50, 0.3);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
 }
 
-.stat-card:hover .stat-icon {
+/* Standard List/Dashboard Stat Cards (Assignment Style) */
+.stat-card-icon {
+    width: 48px;
+    height: 48px;
+    transition: all 0.3s ease;
+}
+
+.stat-card:hover .stat-card-icon {
+    transform: scale(1.1);
+}
+
+.dash-card:hover .stat-icon {
     transform: scale(1.1);
 }
 
@@ -59,6 +103,7 @@
     margin: 0;
     font-size: 1.75rem;
     font-weight: 700;
+    color: inherit;
 }
 
 .stat-content p {
@@ -67,10 +112,32 @@
     font-size: 0.85rem;
 }
 
+/* Ensure text is readable on gradient backgrounds */
+[class^="bg-gradient-"] .stat-content p,
+[class*=" bg-gradient-"] .stat-content p {
+    color: rgba(255, 255, 255, 0.85) !important;
+}
+
+[class^="bg-gradient-"] .stat-content h3,
+[class*=" bg-gradient-"] .stat-content h3 {
+    color: white !important;
+}
+
+[class^="bg-gradient-"] .stat-icon,
+[class*=" bg-gradient-"] .stat-icon {
+    background: rgba(255, 255, 255, 0.2) !important;
+    color: white !important;
+}
+
+/* ==================== DASHBOARD GRADIENTS ==================== */
+/* DASHBOARD GRADIENTS MOVED TO CUSTOM.CSS */
+
 /* ==================== AVATAR STYLES ==================== */
 .avatar-circle {
     width: 40px;
     height: 40px;
+    min-width: 40px;
+    min-height: 40px;
     border-radius: 50%;
     background: linear-gradient(135deg, var(--admin-primary) 0%, var(--admin-primary-dark) 100%);
     color: white;
@@ -79,6 +146,7 @@
     justify-content: center;
     font-weight: 600;
     font-size: 1rem;
+    flex-shrink: 0;
 }
 
 .avatar-circle-sm {
@@ -245,6 +313,330 @@
     box-shadow: 0 4px 15px rgba(56, 239, 125, 0.3);
 }
 
+/* ==================== BUTTON UTILITIES ==================== */
+.btn-action {
+    width: 38px;
+    height: 38px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px;
+    padding: 0;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    border-width: 1.5px;
+    background: white;
+}
+
+.btn-action:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+}
+
+.btn-action i {
+    font-size: 1.1rem;
+}
+
+@media (max-width: 576px) {
+    .btn-action {
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+    }
+}
+
+/* ==================== QUIZ EXPERIENCE ==================== */
+.quiz-header-sticky {
+    position: sticky;
+    top: 10px;
+    z-index: 1020;
+}
+
+.quiz-timer-pill {
+    border-radius: 999px;
+    padding: 0.45rem 0.9rem;
+    font-weight: 700;
+    min-width: 120px;
+    text-align: center;
+}
+
+.quiz-timer-pill.is-safe {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.quiz-timer-pill.is-warning {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.quiz-timer-pill.is-danger {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.quiz-question-text {
+    white-space: pre-line;
+    font-size: 1.02rem;
+}
+
+.quiz-answer-btn {
+    border: 1px solid #dbe2e8;
+    border-radius: 12px;
+    padding: 0.75rem 0.9rem;
+    transition: all 0.2s ease;
+    background: #ffffff;
+}
+
+.quiz-answer-btn:hover {
+    border-color: #7cc7a5;
+    background: #f3fbf7;
+}
+
+.quiz-answer-btn.is-selected {
+    border-color: var(--student-primary);
+    background: rgba(25, 135, 84, 0.1);
+    color: #14532d;
+}
+
+.quiz-palette-grid {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(44px, 1fr));
+    gap: 0.55rem;
+}
+
+.quiz-palette-btn {
+    position: relative;
+    height: 42px;
+    border-radius: 10px;
+    font-weight: 700;
+    border: 1px solid transparent;
+}
+
+.quiz-palette-btn.is-current {
+    background: #166534;
+    color: #ffffff;
+}
+
+.quiz-palette-btn.is-answered {
+    background: #22c55e;
+    color: #ffffff;
+}
+
+.quiz-palette-btn.is-visited {
+    background: #e2e8f0;
+    color: #0f172a;
+}
+
+.quiz-palette-btn.is-not-visited {
+    background: #ffffff;
+    border-color: #cbd5e1;
+    color: #334155;
+}
+
+.quiz-flag-dot {
+    position: absolute;
+    top: -3px;
+    right: -2px;
+    color: #f59e0b;
+    font-size: 0.7rem;
+}
+
+.quiz-palette-legend .legend-box {
+    display: inline-block;
+    width: 11px;
+    height: 11px;
+    border-radius: 3px;
+    margin-right: 0.35rem;
+}
+
+.quiz-palette-legend .legend-box.not-visited {
+    background: #ffffff;
+    border: 1px solid #94a3b8;
+}
+
+.quiz-palette-legend .legend-box.visited {
+    background: #e2e8f0;
+}
+
+.quiz-palette-legend .legend-box.answered {
+    background: #22c55e;
+}
+
+.quiz-palette-legend .legend-box.flagged {
+    background: #f59e0b;
+}
+
+.quiz-summary-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+}
+
+.quiz-summary-grid .summary-item {
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 0.6rem 0.75rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.quiz-review-question-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 0.75rem;
+}
+
+.quiz-review-mark-box {
+    text-align: right;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 0.35rem 0.65rem;
+    min-width: 120px;
+}
+
+.quiz-review-mark-value {
+    font-weight: 700;
+    color: #0f172a;
+}
+
+.quiz-answer-panels {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+}
+
+.quiz-answer-panel {
+    border: 1px solid #e2e8f0;
+    background: #ffffff;
+    border-radius: 10px;
+    padding: 0.75rem;
+    min-height: 78px;
+}
+
+.review-option {
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 0.6rem 0.75rem;
+    background: #ffffff;
+}
+
+.review-option.is-correct {
+    border-color: #22c55e;
+    background: #ecfdf3;
+}
+
+.review-option.is-wrong {
+    border-color: #ef4444;
+    background: #fef2f2;
+}
+
+.quiz-explanation-box {
+    border-left: 4px solid #22c55e;
+    background: #f8fafc;
+    padding: 0.75rem;
+    border-radius: 8px;
+}
+
+@media (max-width: 991px) {
+    .quiz-header-sticky {
+        position: static;
+    }
+
+    .quiz-palette-grid {
+        grid-template-columns: repeat(6, minmax(40px, 1fr));
+    }
+}
+
+@media (max-width: 575px) {
+    .quiz-summary-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .quiz-answer-panels {
+        grid-template-columns: 1fr;
+    }
+
+    .quiz-review-mark-box {
+        min-width: auto;
+    }
+
+    .quiz-palette-grid {
+        grid-template-columns: repeat(5, minmax(36px, 1fr));
+    }
+}
+
+/* ==================== TEACHER ASSIGNMENT STYLES ==================== */
+/* Avatar for teacher panels */
+.avatar-circle-teacher {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    background: white;
+    color: var(--teacher-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    font-weight: bold;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    border: 1px solid #eee;
+}
+
+/* Small variant for lists */
+.avatar-circle-teacher.sm {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: rgba(var(--teacher-primary-rgb), 0.1);
+    font-size: 0.9rem;
+    font-weight: normal;
+    box-shadow: none;
+    border: none;
+}
+
+/* Letter spacing utility */
+.tracking-wider {
+    letter-spacing: 0.05em;
+}
+
+/* Teacher form focus states */
+.teacher-form .form-control:focus,
+.teacher-form .form-select:focus {
+    border-color: var(--teacher-primary);
+    box-shadow: 0 0 0 0.25rem rgba(var(--teacher-primary-rgb), 0.1);
+}
+
+/* ==================== GRADE REPORT STYLES ==================== */
+/* Grade bar item spacing */
+.grade-bar-item {
+    padding: 0.5rem 0;
+}
+
+/* Rank badge for top performers */
+.rank-badge {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--teacher-primary), #6366f1);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: 700;
+    box-shadow: 0 2px 4px rgba(79, 70, 229, 0.2);
+}
+
+/* Hover effect for list items */
+.hover-bg-light:hover {
+    background-color: #f8f9fa;
+    transition: background-color 0.2s ease;
+}
+
+
 /* ==================== TABLE STYLES ==================== */
 .table-hover tbody tr {
     transition: all 0.2s ease;
@@ -261,10 +653,17 @@
 }
 
 /* ==================== FORM STYLES ==================== */
+/* Consolidated form focus states */
 .form-control:focus,
 .form-select:focus {
     border-color: var(--admin-primary);
     box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.15);
+}
+
+.teacher-form .form-control:focus,
+.teacher-form .form-select:focus {
+    border-color: var(--teacher-primary);
+    box-shadow: 0 0 0 0.25rem rgba(74, 144, 226, 0.1);
 }
 
 /* ==================== INFO ROW STYLES ==================== */
@@ -328,6 +727,17 @@
 
 .modal-footer {
     border-top: 1px solid #dee2e6;
+}
+
+/* Fix navbar shrink when modal opens - Bootstrap adds padding-right to body for scrollbar compensation */
+.modal-open .navbar.fixed-top {
+    padding-right: inherit !important;
+}
+
+/* Prevent body scroll shift affecting fixed elements */
+body.modal-open {
+    padding-right: 0 !important;
+    overflow: hidden;
 }
 
 /* ==================== WIZARD STYLES ==================== */
@@ -1191,3 +1601,1921 @@
         font-size: 0.75rem;
     }
 }
+
+
+/* ==================== VUE DATEPICKER STYLES ==================== */
+/* Override VueDatePicker variables to match Bootstrap */
+:root {
+    --dp-font-family: inherit;
+    --dp-border-radius: 0.375rem;
+    /* Bootstrap .rounded */
+    --dp-input-padding: 0.375rem 0.75rem 0.375rem 2.5rem;
+    /* Bootstrap .form-control padding with space for icon */
+    --dp-menu-min-width: 100%;
+    /* Full width menu */
+    --dp-primary-color: #0d6efd;
+    /* Bootstrap primary */
+}
+
+/* Specific adjustments */
+.dp__input {
+    display: block;
+    width: 100%;
+    padding: 0.375rem 0.75rem 0.375rem 2.5rem;
+    font-size: 1rem;
+    font-weight: 400;
+    line-height: 1.5;
+    color: #212529;
+    background-color: #fff;
+    background-clip: padding-box;
+    border: 1px solid #dee2e6;
+    appearance: none;
+    border-radius: 0.375rem;
+    transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+    height: 38px;
+    /* Match bootstrap standard input height */
+}
+
+.dp__input:focus {
+    color: #212529;
+    background-color: #fff;
+    border-color: #86b7fe;
+    outline: 0;
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+}
+
+.dp__input_invalid {
+    border-color: #dc3545;
+    padding-right: calc(1.5em + 0.75rem);
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' width='12' height='12' fill='none' stroke='%23dc3545'%3e%3ccircle cx='6' cy='6' r='4.5'/%3e%3cpath stroke-linejoin='round' d='M5.8 3.6h.4L6 6.5zM6 8.2a.3.3 0 00-.6 0 .3.3 0 00.6 0z'/%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right calc(0.375em + 0.1875rem) center;
+    background-size: calc(0.75em + 0.375rem) calc(0.75em + 0.375rem);
+}
+
+.dp__input_invalid:focus {
+    border-color: #dc3545;
+    box-shadow: 0 0 0 0.25rem rgba(220, 53, 69, 0.25);
+}
+
+.input-icon-slot {
+    margin-left: 10px;
+    color: #6c757d;
+}
+
+.custom-datepicker-wrapper {
+    position: relative;
+}
+
+
+/* ==================== ADMIN PANEL FORM STYLES ==================== */
+/* Consolidated form styles - removed duplicates */
+.teacher-form .card,
+.student-form .card,
+.subject-form .card,
+.session-form .card {
+    border-radius: 12px;
+}
+
+.teacher-form .card-header {
+    background: linear-gradient(135deg, rgba(13, 110, 253, 0.05) 0%, rgba(13, 110, 253, 0.02) 100%);
+}
+
+.student-form .card-header,
+.subject-form .card-header {
+    background: linear-gradient(135deg, rgba(220, 53, 69, 0.05) 0%, rgba(220, 53, 69, 0.02) 100%);
+}
+
+/* Subject grid layouts */
+.teacher-form .subjects-grid,
+.student-form .subjects-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 0.75rem;
+    max-height: 250px;
+    overflow-y: auto;
+    padding: 1rem;
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    background: #f8f9fa;
+}
+
+.teacher-form .subject-item,
+.student-form .subject-item {
+    background: white;
+    padding: 0.75rem;
+    border-radius: 6px;
+    border: 1px solid #dee2e6;
+    transition: all 0.2s;
+}
+
+.teacher-form .subject-item:hover {
+    border-color: #0d6efd;
+    background: rgba(13, 110, 253, 0.02);
+}
+
+.student-form .subject-item:hover {
+    border-color: #dc3545;
+}
+
+.teacher-form .form-check-input:checked {
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+}
+
+.student-form .form-check-input:checked,
+.subject-form .form-check-input:checked {
+    background-color: #dc3545;
+    border-color: #dc3545;
+}
+
+/* Institution Forms */
+.institution-form .form-control:focus,
+.institution-form .form-select:focus {
+    border-color: #0d6efd;
+    box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.15);
+}
+
+/* ==================== ADMIN PANEL MODAL STYLES ==================== */
+/* Custom modal backdrop for admin panel */
+.modal-backdrop-custom {
+    background: rgba(0, 0, 0, 0.5);
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1050;
+}
+
+/* ==================== ADMIN PANEL PROGRESS BARS ==================== */
+/* Session capacity progress */
+.capacity-progress {
+    height: 6px;
+}
+
+/* ==================== ADMIN PANEL TABLE STYLES ==================== */
+/* Sticky table headers */
+.table thead.sticky-top {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+/* Table column widths */
+.table th[style*="width: 60px"],
+.table th[style*="width: 100px"] {
+    white-space: nowrap;
+}
+
+/* ==================== ADMIN PANEL RESPONSIVE TABLES ==================== */
+.table-responsive[style*="max-height"] {
+    overflow-y: auto;
+}
+
+
+/* ==================== BASE PAGE TEMPLATE STYLES ==================== */
+.admin-page-template,
+.teacher-page-template,
+.student-page-template {
+    animation: pageTemplateIn 0.3s ease-in;
+}
+
+@keyframes pageTemplateIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Page Icon Theme Variants */
+.page-icon-admin {
+    background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+    box-shadow: 0 4px 16px rgba(220, 53, 69, 0.3);
+}
+
+.page-icon-admin:hover {
+    box-shadow: 0 6px 20px rgba(220, 53, 69, 0.4);
+}
+
+.page-icon-teacher {
+    background: linear-gradient(135deg, #0d6efd 0%, #0b5ed7 100%);
+    box-shadow: 0 4px 16px rgba(13, 110, 253, 0.3);
+}
+
+.page-icon-teacher:hover {
+    box-shadow: 0 6px 20px rgba(13, 110, 253, 0.4);
+}
+
+.page-icon-student {
+    background: linear-gradient(135deg, #198754 0%, #157347 100%);
+    box-shadow: 0 4px 16px rgba(25, 135, 84, 0.3);
+}
+
+.page-icon-student:hover {
+    box-shadow: 0 6px 20px rgba(25, 135, 84, 0.4);
+}
+
+/* Breadcrumb Theme Links */
+.breadcrumb-link-admin {
+    color: #dc3545;
+}
+
+.breadcrumb-link-admin:hover {
+    color: #c82333;
+}
+
+.breadcrumb-link-teacher {
+    color: #0d6efd;
+}
+
+.breadcrumb-link-teacher:hover {
+    color: #0b5ed7;
+}
+
+.breadcrumb-link-student {
+    color: #198754;
+}
+
+.breadcrumb-link-student:hover {
+    color: #146c43;
+}
+
+/* Section Animations */
+.stats-section {
+    animation: sectionSlideUp 0.4s ease-out 0.1s both;
+}
+
+.filters-section {
+    animation: sectionSlideUp 0.4s ease-out 0.2s both;
+}
+
+.content-section {
+    animation: sectionSlideUp 0.4s ease-out 0.3s both;
+}
+
+@keyframes sectionSlideUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* ==================== CONFIRM DIALOG STYLES ==================== */
+.confirm-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    padding: 1rem;
+}
+
+.confirm-dialog {
+    background: white;
+    border-radius: 16px;
+    padding: 2rem;
+    max-width: 400px;
+    width: 100%;
+    text-align: center;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.confirm-icon {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 1.5rem;
+    font-size: 1.75rem;
+}
+
+.confirm-icon.icon-warning {
+    background: rgba(255, 193, 7, 0.15);
+    color: #ffc107;
+}
+
+.confirm-icon.icon-danger {
+    background: rgba(220, 53, 69, 0.15);
+    color: #dc3545;
+}
+
+.confirm-icon.icon-info {
+    background: rgba(13, 202, 240, 0.15);
+    color: #0dcaf0;
+}
+
+.confirm-icon.icon-success {
+    background: rgba(25, 135, 84, 0.15);
+    color: #198754;
+}
+
+.confirm-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #1a1a1a;
+    margin-bottom: 0.5rem;
+}
+
+.confirm-message {
+    color: #6c757d;
+    margin-bottom: 1.5rem;
+    line-height: 1.5;
+}
+
+.confirm-actions {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: center;
+}
+
+.confirm-dialog .btn-cancel,
+.confirm-dialog .btn-confirm {
+    padding: 0.625rem 1.5rem;
+    border-radius: 10px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: none;
+}
+
+.confirm-dialog .btn-cancel {
+    background: #f8f9fa;
+    color: #495057;
+    border: 1px solid #dee2e6;
+}
+
+.confirm-dialog .btn-cancel:hover {
+    background: #e9ecef;
+}
+
+.confirm-dialog .btn-confirm.btn-admin {
+    background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+    color: white;
+}
+
+.confirm-dialog .btn-confirm.btn-teacher {
+    background: linear-gradient(135deg, #0d6efd 0%, #0b5ed7 100%);
+    color: white;
+}
+
+.confirm-dialog .btn-confirm.btn-student {
+    background: linear-gradient(135deg, #198754 0%, #157347 100%);
+    color: white;
+}
+
+.confirm-dialog .btn-confirm:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.confirm-dialog .btn-confirm:disabled,
+.confirm-dialog .btn-cancel:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* Confirm Dialog Transitions */
+.fade-enter-active,
+.fade-leave-active {
+    transition: opacity 0.2s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+    opacity: 0;
+}
+
+.scale-enter-active,
+.scale-leave-active {
+    transition: all 0.2s ease;
+}
+
+.scale-enter-from,
+.scale-leave-to {
+    opacity: 0;
+    transform: scale(0.9);
+}
+
+/* ==================== SIDEBAR OVERLAY ==================== */
+.sidebar-overlay {
+    display: none;
+    position: fixed;
+    top: 56px;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 1019;
+    transition: opacity 0.3s ease;
+}
+
+@media (max-width: 992px) {
+    .sidebar-overlay.show {
+        display: block;
+    }
+}
+
+/* ==================== THEME DEEP SELECTORS (for PageTemplate wrappers) ==================== */
+/* Admin Theme */
+.admin-page-template .text-admin {
+    color: #dc3545 !important;
+}
+
+.admin-page-template .bg-admin-light {
+    background-color: rgba(220, 53, 69, 0.1) !important;
+}
+
+.admin-page-template .border-admin {
+    border-color: #dc3545 !important;
+}
+
+.admin-page-template .btn-admin-outline {
+    background: transparent;
+    border: 1px solid #dee2e6;
+    color: #495057;
+    font-weight: 500;
+    padding: 0.625rem 1.5rem;
+    border-radius: 10px;
+    transition: all 0.3s ease;
+}
+
+.admin-page-template .btn-admin-outline:hover {
+    background: #f8f9fa;
+    border-color: #dc3545;
+    color: #dc3545;
+}
+
+/* Teacher Theme */
+.teacher-page-template .text-teacher {
+    color: #0d6efd !important;
+}
+
+.teacher-page-template .bg-teacher-light {
+    background-color: rgba(13, 110, 253, 0.1) !important;
+}
+
+.teacher-page-template .border-teacher {
+    border-color: #0d6efd !important;
+}
+
+.teacher-page-template .btn-teacher-outline {
+    background: transparent;
+    border: 1px solid #dee2e6;
+    color: #495057;
+    font-weight: 500;
+    padding: 0.625rem 1.5rem;
+    border-radius: 10px;
+    transition: all 0.3s ease;
+}
+
+.teacher-page-template .btn-teacher-outline:hover {
+    background: #f8f9fa;
+    border-color: #0d6efd;
+    color: #0d6efd;
+}
+
+/* Student Theme */
+.student-page-template .text-student {
+    color: #198754 !important;
+}
+
+/* ==================== STUDENT AI CHATBOT ==================== */
+.student-ai-chatbot .assistant-header-avatar {
+    background: linear-gradient(135deg, #0ea46f 0%, #09895d 100%);
+}
+
+.student-ai-chatbot .message-row {
+    background: transparent;
+}
+
+.student-ai-chatbot .message-bubble {
+    max-width: 100%;
+    width: fit-content;
+    padding: 0.8rem 1rem;
+    border-radius: 1rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.student-ai-chatbot .message-content-wrap {
+    max-width: 78%;
+    width: 100%;
+}
+
+.student-ai-chatbot .assistant-content-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+}
+
+.student-ai-chatbot .bubble-assistant {
+    background: #f7fbf9;
+    border: 1px solid #e2efe8;
+    border-bottom-left-radius: 0.3rem;
+}
+
+.student-ai-chatbot .bubble-user {
+    background: linear-gradient(135deg, #2d7be0 0%, #1e62bb 100%);
+    color: #ffffff;
+    border-bottom-right-radius: 0.3rem;
+    min-width: 84px;
+    text-align: left;
+}
+
+.student-ai-chatbot .bubble-user .markdown-body,
+.student-ai-chatbot .bubble-user .markdown-body *,
+.student-ai-chatbot .bubble-user strong {
+    color: #ffffff !important;
+    white-space: pre-wrap;
+    word-break: normal !important;
+    overflow-wrap: normal !important;
+}
+
+.student-ai-chatbot .assistant-avatar {
+    width: 36px;
+    height: 36px;
+    background: linear-gradient(135deg, #0ea46f 0%, #09895d 100%);
+    color: #fff;
+}
+
+.student-ai-chatbot .user-avatar {
+    width: 36px;
+    height: 36px;
+    background: linear-gradient(135deg, #2d7be0 0%, #1e62bb 100%);
+    color: #fff;
+}
+
+.student-ai-chatbot .loading-state {
+    min-width: 64px;
+}
+
+.student-ai-chatbot .user-content-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+}
+
+.student-ai-chatbot .message-bubble .markdown-body {
+    white-space: normal;
+    overflow-wrap: break-word;
+    word-break: normal;
+}
+
+.student-ai-chatbot .message-actions-bottom {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap;
+    justify-content: flex-end;
+    min-height: 26px;
+    opacity: 0;
+    transform: translateY(-4px);
+    pointer-events: none;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    padding-top: 0.35rem;
+}
+
+.student-ai-chatbot .message-row:hover .message-actions-bottom,
+.student-ai-chatbot .message-row:focus-within .message-actions-bottom {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+}
+
+.student-ai-chatbot .message-action-btn {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    color: #000000 !important;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+    transition: all 0.2s ease;
+}
+
+.student-ai-chatbot .message-action-btn:hover {
+    color: #000000 !important;
+    background: rgba(0, 0, 0, 0.08);
+}
+
+.student-ai-chatbot .bubble-assistant + .message-actions-bottom .message-action-btn {
+    color: #64748b;
+}
+
+.student-ai-chatbot .inline-edit-composer {
+    max-width: 78%;
+    background: #f3f6fb;
+    border: 1px solid #d6dfeb;
+    border-radius: 1.25rem;
+    padding: 0.45rem 0.7rem 0.5rem 0.7rem;
+    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+}
+
+.student-ai-chatbot .inline-edit-composer textarea {
+    min-height: 47px;
+    max-height: 220px;
+    resize: none;
+    font-size: 1rem;
+    line-height: 1.5;
+}
+
+.student-ai-chatbot .inline-edit-input {
+    padding: 0.05rem 0.2rem 0.15rem 0.2rem !important;
+    color: #0f172a !important;
+}
+
+.student-ai-chatbot .inline-edit-actions {
+    margin-top: 0.2rem;
+    padding-top: 0.2rem;
+    border-top: 1px solid #d6deea;
+}
+
+.student-ai-chatbot .inline-btn-cancel,
+.student-ai-chatbot .inline-btn-send {
+    border-radius: 999px;
+    padding: 0.35rem 0.9rem;
+    font-weight: 600;
+}
+
+.student-ai-chatbot .inline-btn-cancel {
+    border: none;
+    background: #1f2937;
+    color: #ffffff;
+}
+
+.student-ai-chatbot .inline-btn-cancel:hover {
+    background: #111827;
+    color: #ffffff;
+}
+
+.student-ai-chatbot .inline-btn-send {
+    border: none;
+    background: #ffffff;
+    color: #111827;
+}
+
+.student-ai-chatbot .inline-btn-send:hover {
+    background: #f8fafc;
+}
+
+@media (max-width: 768px) {
+    .student-ai-chatbot .message-content-wrap {
+        max-width: 86%;
+    }
+
+    .student-ai-chatbot .inline-edit-composer {
+        max-width: 86%;
+        border-radius: 1rem;
+        padding: 0.65rem 0.7rem;
+    }
+}
+
+.student-page-template .bg-student-light {
+    background-color: rgba(25, 135, 84, 0.1) !important;
+}
+
+.student-page-template .border-student {
+    border-color: #198754 !important;
+}
+
+.student-page-template .btn-student-outline {
+    background: transparent;
+    border: 1px solid #dee2e6;
+    color: #495057;
+    font-weight: 500;
+    padding: 0.625rem 1.5rem;
+    border-radius: 10px;
+    transition: all 0.3s ease;
+}
+
+.student-page-template .btn-student-outline:hover {
+    background: #f8f9fa;
+    border-color: #198754;
+    color: #198754;
+}
+
+.student-page-template .btn-student-primary {
+    background: linear-gradient(135deg, #198754 0%, #157347 100%);
+    border: none;
+    color: white;
+}
+
+.student-page-template .border-start-student-thick {
+    border-left: 4px solid #198754 !important;
+}
+
+
+/* ==================== MOBILE NAVBAR RESPONSIVE FIX ==================== */
+@media (max-width: 991.98px) {
+
+    /* Mobile navbar - slide from right as sidebar */
+    .navbar-collapse {
+        position: fixed;
+        top: 0;
+        right: -280px;
+        width: 280px;
+        height: 100vh;
+        padding: 1rem;
+        box-shadow: -4px 0 20px rgba(0, 0, 0, 0.25);
+        overflow-y: auto;
+        transition: right 0.3s ease;
+        z-index: 1050;
+    }
+
+    .navbar-collapse.show {
+        right: 0;
+    }
+
+    /* Mobile nav close button */
+    .mobile-nav-close {
+        top: 0.75rem;
+        right: 0.75rem;
+        padding: 0.5rem;
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.15);
+        z-index: 10;
+    }
+
+    .mobile-nav-close:hover {
+        background: rgba(255, 255, 255, 0.25);
+    }
+
+    /* Close area / overlay */
+    .navbar-collapse.show::before {
+        content: '';
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 280px;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: -1;
+    }
+
+    /* Admin navbar (red) */
+    .navbar.bg-danger .navbar-collapse,
+    .bg-admin .navbar-collapse {
+        background: linear-gradient(180deg, #dc3545 0%, #c82333 100%) !important;
+    }
+
+    /* Teacher navbar (blue) */
+    .navbar.bg-primary .navbar-collapse,
+    .bg-teacher .navbar-collapse {
+        background: linear-gradient(180deg, #4a90e2 0%, #0f4983 100%) !important;
+    }
+
+    /* Student navbar (green) */
+    .navbar.bg-success .navbar-collapse,
+    .bg-student .navbar-collapse {
+        background: linear-gradient(180deg, #198754 0%, #146c43 100%) !important;
+    }
+
+    .navbar-collapse .navbar-nav {
+        flex-direction: column;
+        align-items: stretch !important;
+        gap: 0.25rem !important;
+        padding-top: 3rem;
+    }
+
+    .navbar-collapse .nav-item {
+        width: 100%;
+    }
+
+    .navbar-collapse .nav-link {
+        padding: 0.875rem 1rem !important;
+        border-radius: 10px;
+        transition: background 0.2s;
+        color: white !important;
+        font-weight: 500;
+    }
+
+    .navbar-collapse .nav-link:hover,
+    .navbar-collapse .nav-link.router-link-active {
+        background: rgba(255, 255, 255, 0.2);
+    }
+
+    /* User info card in mobile */
+    .navbar-collapse .nav-item[style*="background-color"] {
+        background-color: rgba(255, 255, 255, 0.2) !important;
+        justify-content: center;
+        margin: 1rem 0;
+        border-radius: 10px;
+    }
+
+    /* Logout button */
+    .navbar-collapse .btn-outline-light {
+        width: 100%;
+        justify-content: center;
+        padding: 0.875rem 1rem;
+        margin-top: 0.5rem;
+        background: rgba(255, 255, 255, 0.15);
+        border-color: rgba(255, 255, 255, 0.4);
+        border-radius: 10px;
+    }
+
+    .navbar-collapse .btn-outline-light:hover {
+        background: rgba(255, 255, 255, 0.3);
+        border-color: white;
+    }
+
+    /* Toggler button styling */
+    .navbar-toggler {
+        border: 2px solid rgba(255, 255, 255, 0.6) !important;
+        padding: 0.4rem 0.6rem;
+        border-radius: 8px;
+        transition: all 0.2s;
+    }
+
+    .navbar-toggler:focus {
+        box-shadow: 0 0 0 0.2rem rgba(255, 255, 255, 0.25);
+        background: rgba(255, 255, 255, 0.15);
+    }
+
+    .navbar-toggler-icon {
+        width: 1.25em;
+        height: 1.25em;
+    }
+
+    /* Collapsing animation override */
+    .navbar-collapse.collapsing {
+        right: -280px;
+        transition: right 0.3s ease;
+        height: 100vh !important;
+    }
+}
+
+/* Extra small devices */
+@media (max-width: 575.98px) {
+    .navbar-brand span {
+        font-size: 1rem;
+    }
+
+    .navbar-collapse {
+        width: 260px;
+        right: -260px;
+    }
+
+    .navbar-collapse.show::before {
+        right: 260px;
+    }
+
+    .navbar-collapse .nav-link {
+        padding: 0.75rem 0.875rem !important;
+        font-size: 0.95rem;
+    }
+}/* Exam Schedule Component Styles */
+.exam-list {
+  max-height: 600px;
+  overflow-y: auto;
+}
+
+.exam-card {
+  transition: background-color 0.2s ease;
+}
+
+.exam-card:hover {
+  background-color: #f8f9fa;
+}
+
+.info-box {
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
+}
+
+.info-box:hover {
+  border-color: #dee2e6;
+  transform: translateY(-2px);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.stat-icon {
+  width: 50px;
+  height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+}
+
+.stat-card {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+/* ==================== AI CHATBOT (STUDENT PANEL) ==================== */
+.student-ai-chatbot {
+  position: fixed;
+  bottom: 2rem;
+  right: 2rem;
+  z-index: 1050;
+}
+
+.chat-toggle-btn {
+  width: 56px;
+  height: 56px;
+  background: #198754;
+  border: none;
+  transition: transform 0.2s, background 0.2s;
+}
+
+.chat-toggle-btn:hover {
+  transform: scale(1.1);
+  background: #157347;
+}
+
+.chat-window {
+    width: 100% !important;
+    height: auto !important;
+    min-height: 520px !important;
+    max-width: 100% !important;
+    max-height: 85vh !important; /* prevent clipping at footer */
+  border-radius: 1rem;
+  overflow: hidden;
+  background: white;
+  display: flex;
+}
+
+/* Sidebar Styling */
+.chat-sidebar {
+  width: 260px;
+  background: #f8f9fa;
+  border-right: 1px solid #e5e7eb;
+  display: flex;
+  flex-direction: column;
+}
+
+.history-container {
+  overflow-y: auto;
+}
+
+.history-item {
+  cursor: pointer;
+  padding: 0.6rem 1rem;
+  border-radius: 0.5rem;
+  margin-bottom: 0.25rem;
+  font-size: 0.85rem;
+  color: #4b5563;
+  transition: background 0.2s;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.history-item:hover {
+  background: #f3f4f6;
+}
+
+.history-item.active {
+  background: #d1fae5;
+  color: #065f46;
+  font-weight: 500;
+}
+
+/* Chat Bubbles */
+.message-wrapper {
+  display: flex;
+  margin-bottom: 1.5rem;
+  width: 100%;
+}
+
+.message-wrapper.user {
+  flex-direction: row-reverse;
+}
+
+.message-content-modern {
+  max-width: 80%;
+  padding: 0.75rem 1rem;
+  border-radius: 1.25rem;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  position: relative;
+}
+
+.user .message-content-modern {
+  background: #198754;
+  color: white;
+  border-bottom-right-radius: 4px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.assistant .message-content-modern {
+  background: white;
+  color: #1f2937;
+  border-bottom-left-radius: 4px;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.avatar-message {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* Input Styles */
+.input-group-modern {
+  background: #f4f4f4;
+  border-radius: 2rem;
+  padding: 0.5rem 1rem;
+  display: flex;
+  align-items: center;
+}
+
+.input-group-modern input {
+  border: none;
+  background: transparent;
+  width: 100%;
+  outline: none;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.9rem;
+}
+
+.input-group-modern input:focus {
+  box-shadow: none;
+}
+
+/* Animations */
+.slide-up-enter-active, .slide-up-leave-active {
+  transition: all 0.3s ease-out;
+}
+.slide-up-enter-from, .slide-up-leave-to {
+  transform: translateY(20px);
+  opacity: 0;
+}
+
+/* Custom Scrollbar */
+.history-container::-webkit-scrollbar { width: 4px; }
+.history-container::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 10px; }
+
+/* ==================== 3D AI BUTTON STYLING ==================== */
+.btn-ai-3d {
+  position: relative;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white !important;
+  border-radius: 14px;
+  box-shadow: 0 4px 0 #047857, 0 8px 15px rgba(16, 185, 129, 0.3);
+  transition: all 0.15s ease;
+  transform: translateY(-2px);
+  overflow: hidden;
+}
+
+.btn-ai-3d:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 6px 0 #047857, 0 12px 20px rgba(16, 185, 129, 0.4);
+  filter: brightness(1.1);
+}
+
+.btn-ai-3d:active {
+  transform: translateY(2px);
+  box-shadow: 0 0px 0 #047857, 0 4px 8px rgba(16, 185, 129, 0.2);
+}
+
+.ai-icon-container {
+  background: rgba(255, 255, 255, 0.2);
+  padding: 6px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-ai-3d .tracking-tight {
+  letter-spacing: -0.02em;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.2);
+}
+
+/* Subtle pulse animation for the icon */
+@keyframes ai-pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+  100% { transform: scale(1); }
+}
+
+.btn-ai-3d:hover i {
+  animation: ai-pulse 1s infinite ease-in-out;
+}
+
+/* ==================== PREMIUM GLASSS-3D AI BUTTON ==================== */
+.btn-ai-premium {
+  --btn-bg: #10b981;
+  --btn-shadow: #059669;
+  --btn-glow: rgba(16, 185, 129, 0.4);
+  
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 24px;
+  background: var(--btn-bg);
+  color: white !important;
+  border-radius: 16px;
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 
+    0 6px 0 var(--btn-shadow),
+    0 12px 24px var(--btn-glow);
+  transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.btn-ai-premium::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.2),
+    transparent
+  );
+  transition: 0.5s;
+}
+
+.btn-ai-premium:hover::before {
+  left: 100%;
+}
+
+.btn-ai-premium:hover {
+  transform: translateY(-4px);
+  box-shadow: 
+    0 8px 0 var(--btn-shadow),
+    0 15px 30px var(--btn-glow);
+  filter: brightness(1.1);
+}
+
+.btn-ai-premium:active {
+  transform: translateY(4px);
+  box-shadow: 
+    0 2px 0 var(--btn-shadow),
+    0 5px 10px var(--btn-glow);
+}
+
+.ai-icon-premium {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 10px;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
+  font-size: 1.1rem;
+}
+
+@keyframes float-ai {
+  0% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(-3px) rotate(5deg); }
+  100% { transform: translateY(0px) rotate(0deg); }
+}
+
+.btn-ai-premium i {
+  animation: float-ai 2s infinite ease-in-out;
+}
+
+/* ==================== PREMIUM JELLY-GLASS 3D AI BUTTON ==================== */
+.btn-ai-premium {
+  --jelly-bg: rgba(16, 185, 129, 0.15);
+  --jelly-border: rgba(16, 185, 129, 0.4);
+  --jelly-glow: rgba(16, 185, 129, 0.25);
+  --jelly-text: #059669;
+
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 24px;
+  background: var(--jelly-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  color: var(--jelly-text) !important;
+  border-radius: 18px;
+  font-weight: 800;
+  text-transform: uppercase;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  border: 1.5px solid var(--jelly-border);
+  box-shadow: 
+    0 4px 0 var(--jelly-border),
+    0 8px 20px var(--jelly-glow),
+    inset 0 1px 1px rgba(255, 255, 255, 0.5);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.btn-ai-premium::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.4),
+    transparent
+  );
+  transition: 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.btn-ai-premium:hover {
+  transform: translateY(-4px) scale(1.02);
+  background: rgba(16, 185, 129, 0.25);
+  border-color: #10b981;
+  box-shadow: 
+    0 6px 0 #10b981,
+    0 12px 30px var(--jelly-glow),
+    inset 0 1px 2px rgba(255, 255, 255, 0.8);
+}
+
+.btn-ai-premium:hover::before {
+  left: 100%;
+}
+
+.btn-ai-premium:active {
+  transform: translateY(2px) scale(0.98);
+  box-shadow: 
+    0 1px 0 #10b981,
+    0 4px 10px var(--jelly-glow);
+}
+
+.ai-icon-premium {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  background: white;
+  color: #10b981;
+  border-radius: 12px;
+  box-shadow: 0 4px 10px rgba(16, 185, 129, 0.2);
+  font-size: 1.2rem;
+  transition: all 0.3s ease;
+}
+
+.btn-ai-premium:hover .ai-icon-premium {
+  transform: rotate(15deg) scale(1.1);
+  box-shadow: 0 6px 15px rgba(16, 185, 129, 0.3);
+}
+
+@keyframes jelly-float {
+  0%, 100% { transform: translateY(0) scale(1, 1); }
+  50% { transform: translateY(-3px) scale(1.05, 0.95); }
+}
+
+.btn-ai-premium span {
+  display: inline-block;
+  animation: jelly-float 3s infinite ease-in-out;
+}
+
+/* ==================== PREMIUM ENHANCED CHAT UI ==================== */
+.chat-window {
+    width: 1000px !important;
+    height: 750px !important;
+    border-radius: 20px !important;
+}
+
+/* Sidebar Dark Theme Improvements */
+.bg-dark-soft { background: #1a1a1a !important; }
+.extra-tiny { font-size: 0.6rem; }
+.bg-f8 { background: #f8f9fa !important; }
+
+/* Message Layouts - ChatGPT Like */
+.message-row {
+    transition: background 0.2s ease;
+}
+.max-width-chat {
+    max-width: 768px;
+    width: 100%;
+}
+.line-height-relaxed { line-height: 1.6; }
+
+.history-item.active {
+    background: #2D2D2D !important;
+    color: #10b981 !important;
+}
+
+/* Modern Input Container */
+.input-container-modern {
+    background: white;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.08);
+    transition: box-shadow 0.2s ease;
+}
+
+.input-container-modern:focus-within {
+    box-shadow: 0 10px 50px rgba(16, 185, 129, 0.1);
+    border-color: rgba(16, 185, 129, 0.3) !important;
+}
+
+.bg-light-soft { background: #fdfdfd; }
+.btn-xs { padding: 0.2rem 0.5rem; font-size: 0.75rem; }
+.extra-tiny { font-size: 10px; }
+
+/* Scrollbar Sidebar */
+.history-container::-webkit-scrollbar { width: 4px; }
+.history-container::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; }
+
+.transition-all { transition: all 0.2s ease; }
+.italic { font-style: italic; }
+
+.message-row.bg-f8 { border-top: 1px solid rgba(0,0,0,0.02); }
+
+/* ==================== CLEANED PREMIUM AI CHATBOT STYLES ==================== */
+.student-ai-chatbot {
+  position: fixed;
+  bottom: 40px !important;
+  right: 60px !important; /* keep away from right-side cards */
+  z-index: 9999 !important;
+}
+
+.chat-toggle-btn {
+  width: 48px;
+  height: 48px;
+  background: #198754;
+  border: none;
+  border-radius: 50% !important;
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  box-shadow: 0 8px 28px rgba(25, 135, 84, 0.35);
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.chat-toggle-btn:hover {
+  transform: scale(1.1) rotate(5deg);
+  background: #157347;
+}
+
+.chat-window {
+  width: 900px !important;
+  height: 650px !important;
+    max-width: 92vw !important;
+    max-height: 84vh !important; /* allow more height toward footer */
+  border: 1px solid rgba(0,0,0,0.08) !important;
+  border-radius: 16px !important;
+  display: flex !important;
+  flex-direction: row !important;
+  z-index: 10000 !important;
+  box-shadow: 0 20px 80px rgba(0,0,0,0.18) !important;
+  overflow: hidden !important;
+    position: fixed !important;
+    bottom: 24px !important; /* small cushion from footer */
+    right: 25px !important;
+    top: auto !important;
+    background: white !important;
+}
+
+/* Sidebar Styling - Fix Centering & Padding */
+.chat-sidebar {
+  width: 260px !important;
+  background: #0f0f0f !important;
+  color: white !important;
+  border-right: 1px solid #1f1f1f !important;
+  display: flex !important;
+  flex-direction: column !important;
+  transition: all 0.3s ease;
+  height: 100% !important;
+}
+
+.chat-sidebar .p-3 {
+  padding: 1.25rem !important;
+  width: 100% !important;
+  display: flex !important;
+  justify-content: center !important;
+}
+
+.chat-sidebar .btn-outline-light {
+  border-color: rgba(255,255,255,0.15) !important;
+  background: rgba(255,255,255,0.03) !important;
+  font-size: 0.85rem !important;
+  font-weight: 500 !important;
+  color: #fff !important;
+  padding: 10px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 100% !important;
+}
+
+.chat-sidebar .btn-outline-light:hover {
+  background: rgba(255,255,255,0.08) !important;
+  border-color: #10b981 !important;
+  color: #10b981 !important;
+}
+
+.bg-dark-soft { 
+  background: #141414 !important; 
+}
+
+.history-container {
+  overflow-y: auto;
+  flex-grow: 1;
+  padding: 0 1rem;
+  height: calc(100% - 150px);
+}
+
+.history-item {
+  cursor: pointer;
+  padding: 0.75rem 1rem !important;
+  border-radius: 8px;
+  margin-bottom: 0.4rem;
+  font-size: 0.85rem;
+  color: #a0a0a0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  transition: all 0.2s ease;
+}
+
+.history-item:hover {
+  background: #1f1f1f;
+  color: white;
+}
+
+.history-item.active {
+  background: #1f1f1f !important;
+  color: #10b981 !important;
+  font-weight: 500;
+}
+
+/* Header Alignment Clean-up */
+.chat-header {
+  border-bottom: 1px solid #f1f5f9;
+  padding: 0 20px !important;
+  background: white;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  height: 64px !important;
+  flex-shrink: 0;
+}
+
+.chat-header .avatar-sm {
+  width: 34px !important;
+  height: 34px !important;
+  border-radius: 8px !important;
+  background: #10b981 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  color: white !important;
+}
+
+.chat-header h6 {
+  margin: 0 !important;
+  font-size: 0.95rem !important;
+  font-weight: 700 !important;
+  color: #111827 !important;
+  line-height: normal !important;
+}
+
+/* Input Bar Redesign - One integrated capsule */
+.chat-footer {
+  padding: 15px 30px 20px !important;
+  background: white !important;
+  border-top: none !important;
+  flex-shrink: 0;
+}
+
+.input-container-modern {
+  background: #f9fafb !important;
+  border: 1.5px solid #e2e8f0 !important;
+  border-radius: 12px !important;
+  overflow: hidden !important;
+  transition: all 0.2s ease !important;
+    margin-bottom: 0px !important;
+    min-width: 340px;
+    width: 100%;
+}
+
+.input-container-modern:focus-within {
+  background: white !important;
+  border-color: #10b981 !important;
+  box-shadow: 0 8px 30px rgba(16, 185, 129, 0.1) !important;
+}
+
+.input-container-modern textarea {
+    min-height: 52px !important;
+    max-height: 120px !important;
+    padding: 14px 18px 10px !important;
+    font-size: 0.9rem !important;
+    line-height: 1.4 !important;
+    color: #111827 !important;
+    border: none !important;
+    background: transparent !important;
+    outline: none !important;
+    box-shadow: none !important;
+}
+
+.chat-input-shell {
+    background: linear-gradient(180deg, rgba(248, 250, 252, 0.92) 0%, rgba(255, 255, 255, 0.98) 100%);
+}
+
+.chat-input-icon {
+    color: #94a3b8;
+    font-size: 0.95rem;
+}
+
+.chat-main-input {
+    min-height: 48px !important;
+}
+
+.chat-main-input::placeholder {
+    color: #94a3b8;
+}
+
+/* Scoped input polish for student chatbot */
+.student-ai-chatbot .chat-footer {
+    padding: 14px 24px 18px !important;
+}
+
+.student-ai-chatbot .input-container-modern {
+    background: #ffffff !important;
+    border: 1px solid #d7e1ec !important;
+    border-radius: 16px !important;
+    box-shadow: 0 10px 22px rgba(15, 23, 42, 0.06) !important;
+}
+
+.student-ai-chatbot .input-container-modern:focus-within {
+    border-color: #6ba4df !important;
+    box-shadow: 0 0 0 3px rgba(45, 123, 224, 0.14), 0 10px 24px rgba(15, 23, 42, 0.08) !important;
+}
+
+.student-ai-chatbot .chat-input-shell {
+    background: #ffffff;
+    padding: 0.45rem 0.85rem 0.2rem 0.85rem !important;
+    gap: 0.65rem !important;
+}
+
+.student-ai-chatbot .chat-input-icon {
+    color: #64748b;
+    width: 30px;
+    height: 30px;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: #f1f5f9;
+    margin-top: 0.15rem !important;
+}
+
+.student-ai-chatbot .chat-main-input {
+    min-height: 44px !important;
+    max-height: 110px !important;
+    font-size: 0.92rem !important;
+    padding-top: 0.45rem !important;
+}
+
+.student-ai-chatbot .chat-main-input::placeholder {
+    color: #7c8ea5;
+}
+
+.student-ai-chatbot .bg-light-soft {
+    background: #fbfcfe !important;
+    border-top: 1px solid #e8eef5 !important;
+    padding: 0.5rem 0.85rem 0.7rem 0.85rem !important;
+}
+
+.student-ai-chatbot .chat-footer .btn-success {
+    border-radius: 10px !important;
+    padding: 0.45rem 0.85rem !important;
+}
+
+.student-ai-chatbot .inline-edit-composer {
+    background: #ffffff;
+    border: 1px solid #d8e3ef;
+    box-shadow: 0 8px 18px rgba(15, 23, 42, 0.07);
+    padding: 0.3rem 0.55rem 0.35rem 0.55rem;
+}
+
+.student-ai-chatbot .inline-edit-composer textarea {
+    min-height: 28px;
+    max-height: 96px;
+}
+
+.bg-light-soft { 
+  background: rgba(249, 250, 251, 0.95) !important; 
+  padding: 8px 18px !important;
+  border-top: 1px solid rgba(0,0,0,0.04) !important;
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+}
+
+.chat-main {
+  background: white;
+  display: flex !important;
+  flex-direction: column !important;
+  flex-grow: 1;
+  position: relative;
+}
+
+.chat-body {
+  height: 100%;
+  background: white !important;
+  overflow-y: auto;
+}
+
+.extra-tiny { font-size: 11px !important; }
+.tiny-text { font-size: 11px !important; }
+
+/* Message Rows */
+.message-row {
+  width: 100%;
+  padding: 1.5rem 2.5rem !important;
+  border-bottom: 1px solid rgba(0,0,0,0.02);
+  transition: background 0.15s ease;
+}
+
+.message-row:hover {
+  background: rgba(248, 249, 250, 0.4);
+}
+
+.bg-f8 { 
+  background: #f8f9fa !important; 
+}
+
+.max-width-chat {
+    max-width: 768px;
+    margin: 0 auto;
+    display: flex;
+    gap: 1.5rem;
+}
+
+/* Chat footer should span full width within window */
+.chat-footer .max-width-chat {
+    max-width: 100% !important;
+    width: 100% !important;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+}
+
+.avatar-msg {
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.line-height-relaxed {
+  line-height: 1.6;
+}
+
+.resize-none {
+  resize: none;
+}
+
+/* Animations & Toggles */
+.slide-up-enter-active, .slide-up-leave-active {
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.slide-up-enter-from, .slide-up-leave-to {
+  transform: translateY(30px);
+  opacity: 0;
+}
+
+/* ==================== FINAL CLEANUP AI STYLES ==================== */
+.assistant-stars-icon {
+  width: 64px;
+  height: 64px;
+}
+
+.empty-chat-text {
+  max-width: 280px;
+}
+
+/* ==================== TEACHER MATERIAL DOWNLOAD UI ==================== */
+.material-download-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1rem;
+    align-items: stretch;
+}
+
+.material-download-item {
+    width: 100%;
+}
+
+.material-download-card {
+    width: 100%;
+    border-radius: 14px !important;
+    border: 1px solid #e7edf4 !important;
+    box-shadow: 0 8px 22px rgba(15, 23, 42, 0.06) !important;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.material-download-card:hover {
+    transform: translateY(-3px);
+    border-color: #cfdcee !important;
+    box-shadow: 0 14px 28px rgba(15, 23, 42, 0.1) !important;
+}
+
+.material-download-card .card-body {
+    padding: 1rem 1rem 0.95rem 1rem;
+}
+
+.material-download-card .file-icon {
+    width: 40px;
+    height: 40px;
+    min-width: 40px;
+    border-radius: 10px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.material-download-card .file-icon i {
+    font-size: 1rem;
+}
+
+.material-download-card .badge {
+    letter-spacing: 0.02em;
+}
+
+.material-download-card .material-meta-row {
+    padding: 0.4rem 0.55rem;
+    border-radius: 10px;
+    background: #f8fafc;
+}
+
+.material-download-card .material-action-row {
+    margin-top: 0.3rem;
+}
+
+.material-download-card .material-action-btn {
+    border-radius: 10px;
+    font-weight: 600;
+}
+
+.material-download-card .material-icon-btn {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+}
+
+@media (max-width: 991px) {
+    .material-download-grid {
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    }
+}
+
+.avatar-xs {
+  width: 24px; 
+  height: 24px;
+}
+
+.italic {
+  font-style: italic;
+
+  line-height: 1.5 !important;
+  color: #1a202c !important;
+  border: none !important;
+}
+
+.bg-light-soft { 
+  background: #f9fafb !important; 
+  padding: 6px 16px !important;
+  border-top: 1px solid rgba(0,0,0,0.02) !important;
+}
+
+.resize-none {
+  resize: none;
+}
+
+/* Animations & Toggles */
+.extra-tiny { font-size: 0.6rem; }
+.extra-small { font-size: 0.75rem; font-weight: 700; }
+
+.slide-up-enter-active, .slide-up-leave-active {
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.slide-up-enter-from, .slide-up-leave-to {
+  transform: translateY(30px);
+  opacity: 0;
+}
+
+/* ==================== FINAL CLEANUP AI STYLES ==================== */
+.assistant-stars-icon {
+  width: 64px;
+  height: 64px;
+}
+
+.empty-chat-text {
+  max-width: 280px;
+}
+
+.avatar-xs {
+  width: 24px; 
+  height: 24px;
+}
+
+.avatar-msg {
+  width: 30px;
+  height: 30px;
+}
+
+.avatar-sm {
+  width: 32px;
+  height: 32px;
+}
+
+.extra-tiny {
+  font-size: 10px;
+}
+
+.tiny-text {
+  font-size: 0.65rem;
+}
+
+.italic {
+  font-style: italic;
+}
+
+/* ==================== CHATBOT TYPING INDICATOR ==================== */
+.typing-indicator span {
+    width: 6px;
+    height: 6px;
+    background-color: #adb5bd;
+    border-radius: 50%;
+    display: inline-block;
+    animation: bounce 1.4s infinite ease-in-out both; 
+}
+
+.typing-indicator span:nth-child(1) {
+    animation-delay: -0.32s;
+}
+
+.typing-indicator span:nth-child(2) {
+    animation-delay: -0.16s;
+}
+
+@keyframes bounce {
+    0%, 80%, 100% { 
+        transform: scale(0);
+        opacity: 0.5; 
+    }
+    40% { 
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+
+/* ==================== CHATBOT HISTORY ITEMS ==================== */
+.history-item:hover .delete-btn {
+    opacity: 1 !important;
+}
+
+.history-item.active .delete-btn {
+    opacity: 0.5;
+}
+
+.history-item.active:hover .delete-btn {
+    opacity: 1;
+}
+
+.cursor-pointer {
+    cursor: pointer;
+}
+

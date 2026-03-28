@@ -2,6 +2,16 @@
   <AdminPageTemplate title="Events Management" subtitle="Manage academic and institutional events" icon="bi bi-calendar-event" :breadcrumbs="breadcrumbs" :actions="actions" content-title="Event List">
     <AlertMessage v-if="alert.show" :type="alert.type" :message="alert.message" :title="alert.title" :auto-close="true" :auto-close-duration="3000" @close="alert.show = false" />
 
+    <ConfirmDialog
+      v-model="showConfirmDialog"
+      title="Delete Event"
+      :message="eventToDelete ? `Delete event '${eventToDelete.title}'?` : 'Delete this event?'"
+      type="danger"
+      theme="admin"
+      confirm-text="Delete"
+      @confirm="confirmDeleteEvent"
+    />
+
     <!-- Stats Section -->
     <template #stats>
       <div class="row g-3 g-lg-4">
@@ -26,31 +36,25 @@
         v-model="searchQuery"
         search-placeholder="Search events..."
         :show-status-filter="false"
-        search-col-size="col-md-4 col-12"
-        actions-col-size="col-md-2 col-6"
         :loading="loading"
         @refresh="loadEvents"
         @reset="resetFilters"
       >
         <template #filters>
           <div class="col-md-3 col-6">
-            <label class="form-label small fw-semibold text-dark">Type</label>
             <select v-model="typeFilter" class="form-select" @change="loadEvents">
               <option value="">All Types</option>
-              <option value="academic">Academic</option>
-              <option value="cultural">Cultural</option>
-              <option value="sports">Sports</option>
-              <option value="seminar">Seminar</option>
-              <option value="workshop">Workshop</option>
+              <option v-for="opt in EVENT_TYPE_OPTIONS" :key="opt.value" :value="opt.value">
+                {{ opt.label }}
+              </option>
             </select>
           </div>
           <div class="col-md-3 col-6">
-            <label class="form-label small fw-semibold text-dark">Status</label>
             <select v-model="statusFilter" class="form-select" @change="loadEvents">
               <option value="">All Status</option>
-              <option value="upcoming">Upcoming</option>
-              <option value="today">Today</option>
-              <option value="past">Past</option>
+              <option v-for="opt in EVENT_TIME_STATUS_OPTIONS" :key="opt.value" :value="opt.value">
+                {{ opt.label }}
+              </option>
             </select>
           </div>
         </template>
@@ -87,42 +91,53 @@
       </template>
     </DataTable>
 
-    <!-- Add/Edit Modal -->
-    <div v-if="showAddModal" class="modal show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5);">
-      <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-          <div class="modal-header"><h5 class="modal-title">{{ editingEvent ? 'Edit Event' : 'Add New Event' }}</h5><button type="button" class="btn-close" @click="closeModal"></button></div>
-          <div class="modal-body">
-            <form @submit.prevent="saveEvent">
-              <div class="mb-3"><label class="form-label">Event Title <span class="text-danger">*</span></label><input v-model="eventForm.title" type="text" class="form-control" required></div>
-              <div class="mb-3"><label class="form-label">Description</label><textarea v-model="eventForm.description" class="form-control" rows="2"></textarea></div>
-              <div class="row">
-                <div class="col-md-6 mb-3"><BaseInput v-model="eventForm.event_date" label="Date" type="date" :required="true" /></div>
-                <div class="col-md-6 mb-3"><label class="form-label">Time</label><input v-model="eventForm.event_time" type="time" class="form-control"></div>
-              </div>
-              <div class="row">
-                <div class="col-md-6 mb-3"><label class="form-label">Type <span class="text-danger">*</span></label><select v-model="eventForm.event_type" class="form-select" required><option value="academic">Academic</option><option value="cultural">Cultural</option><option value="sports">Sports</option><option value="seminar">Seminar</option><option value="workshop">Workshop</option></select></div>
-                <div class="col-md-6 mb-3"><label class="form-label">Location</label><input v-model="eventForm.location" type="text" class="form-control" placeholder="e.g., Main Auditorium"></div>
-              </div>
-              <div class="d-flex gap-2 justify-content-end">
-                <button type="button" @click="closeModal" class="btn btn-secondary">Cancel</button>
-                <button type="submit" class="btn btn-admin-primary">{{ editingEvent ? 'Update' : 'Add' }} Event</button>
-              </div>
-            </form>
-          </div>
+    <!-- Add/Edit Modal using reusable component -->
+    <EntityFormModal
+      v-model="showAddModal"
+      :title="editingEvent ? 'Edit Event' : 'Add New Event'"
+      icon="bi bi-calendar-event"
+      :loading="saving"
+      :confirm-text="editingEvent ? 'Update Event' : 'Add Event'"
+      @confirm="saveEvent"
+      @close="closeModal"
+    >
+      <form @submit.prevent="saveEvent">
+        <div class="mb-3"><label class="form-label">Event Title <span class="text-danger">*</span></label><input v-model="eventForm.title" type="text" class="form-control" required></div>
+        <div class="mb-3"><label class="form-label">Description</label><textarea v-model="eventForm.description" class="form-control" rows="2"></textarea></div>
+        <div class="row">
+          <div class="col-md-6 mb-3"><BaseInput v-model="eventForm.event_date" label="Date" type="date" :required="true" /></div>
+          <div class="col-md-6 mb-3"><label class="form-label">Time</label><input v-model="eventForm.event_time" type="time" class="form-control"></div>
         </div>
-      </div>
-    </div>
+        <div class="row">
+          <div class="col-md-6 mb-3">
+            <SelectInput
+              v-model="eventForm.event_type"
+              :options="EVENT_TYPE_OPTIONS"
+              label="Type"
+              placeholder="Select event type"
+              :required="true"
+            />
+          </div>
+          <div class="col-md-6 mb-3"><label class="form-label">Location</label><input v-model="eventForm.location" type="text" class="form-control" placeholder="e.g., Main Auditorium"></div>
+        </div>
+      </form>
+    </EntityFormModal>
   </AdminPageTemplate>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
-import AdminPageTemplate from '@/components/navbar/AdminPageTemplate.vue'
-import { StatCard, DataTable, SearchFilter, ActionButtons, AlertMessage, BaseInput } from '@/components/common'
-import { eventService } from '@/services/managementService'
+import { AdminPageTemplate } from '@/components/shared/panels'
+import { StatCard, DataTable, SearchFilter, ActionButtons, AlertMessage, BaseInput, ConfirmDialog, EntityFormModal, SelectInput } from '@/components/shared/common'
+import { useAlert } from '@/composables/shared'
+import { eventService } from '@/services/admin/managementService'
+import { formatDate as formatDateUtil, truncateText } from '@/utils/formatters'
+import { ADMIN_ROUTES } from '@/utils/constants/routes'
+import { EVENT_TYPE_OPTIONS, EVENT_TIME_STATUS_OPTIONS } from '@/utils/constants/options'
+import { smartSearch } from '@/utils'
+import { generateBreadcrumbs } from '@/utils/navigation'
 
-const breadcrumbs = [{ name: 'Dashboard', href: '/admin-dashboard' }, { name: 'Events' }]
+const breadcrumbs = generateBreadcrumbs('admin', 'Events')
 const actions = [{ label: 'Add Event', icon: 'bi bi-plus-circle', variant: 'btn-admin-primary', onClick: () => showAddModal.value = true }]
 
 const tableColumns = [
@@ -134,14 +149,18 @@ const tableColumns = [
   { key: 'actions', label: 'Actions', center: true }
 ]
 
-const alert = ref({ show: false, type: 'success', title: '', message: '' })
+// Use shared alert composable
+const { alert, showAlert } = useAlert()
 const loading = ref(false)
+const saving = ref(false)
 const events = ref([])
 const searchQuery = ref('')
 const typeFilter = ref('')
 const statusFilter = ref('')
 const showAddModal = ref(false)
 const editingEvent = ref(null)
+const showConfirmDialog = ref(false)
+const eventToDelete = ref(null)
 const eventForm = ref({ title: '', description: '', event_date: '', event_time: '', event_type: 'academic', location: '' })
 
 const upcomingCount = computed(() => events.value.filter(e => new Date(e.event_date) > new Date()).length)
@@ -151,8 +170,8 @@ const pastCount = computed(() => events.value.filter(e => new Date(e.event_date)
 const filteredEvents = computed(() => {
   let list = events.value
   if (searchQuery.value) {
-    const q = searchQuery.value.toLowerCase()
-    list = list.filter(e => e.title?.toLowerCase().includes(q) || e.description?.toLowerCase().includes(q))
+    const searchFields = ['title', 'description', 'location', 'event_type']
+    list = list.filter(e => smartSearch(e, searchQuery.value, searchFields))
   }
   if (typeFilter.value) list = list.filter(e => e.event_type === typeFilter.value)
   if (statusFilter.value === 'upcoming') list = list.filter(e => new Date(e.event_date) > new Date())
@@ -161,8 +180,12 @@ const filteredEvents = computed(() => {
   return list.sort((a, b) => new Date(b.event_date) - new Date(a.event_date))
 })
 
-const formatDate = (date) => new Date(date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
-const truncate = (text, length) => text && text.length > length ? text.substring(0, length) + '...' : text || ''
+// Use shared formatDate utility
+const formatDate = (date) => formatDateUtil(date)
+
+// Use shared truncateText utility
+const truncate = (text, length) => truncateText(text, length)
+
 const getStatus = (date) => new Date(date).toDateString() === new Date().toDateString() ? 'Today' : new Date(date) > new Date() ? 'Upcoming' : 'Past'
 const getStatusBadge = (date) => getStatus(date) === 'Today' ? 'bg-info' : getStatus(date) === 'Upcoming' ? 'bg-success' : 'bg-secondary'
 
@@ -173,7 +196,7 @@ const loadEvents = async () => {
     events.value = response.data.results || response.data
   } catch (error) {
     console.error('Error loading events:', error)
-    alert.value = { show: true, type: 'danger', title: 'Error', message: 'Failed to load events' }
+    showAlert('error', 'Failed to load events', 'Error')
   } finally {
     loading.value = false
   }
@@ -191,33 +214,42 @@ const editEvent = (event) => {
   showAddModal.value = true
 }
 
-const deleteEvent = async (event) => {
-  if (confirm(`Delete event "${event.title}"?`)) {
-    try {
-      await eventService.delete(event.id)
-      events.value = events.value.filter(e => e.id !== event.id)
-      alert.value = { show: true, type: 'success', title: 'Success', message: 'Event deleted successfully' }
-    } catch (error) {
-      console.error('Error deleting event:', error)
-      alert.value = { show: true, type: 'danger', title: 'Error', message: 'Failed to delete event' }
-    }
+const deleteEvent = (event) => {
+  eventToDelete.value = event
+  showConfirmDialog.value = true
+}
+
+const confirmDeleteEvent = async () => {
+  try {
+    await eventService.delete(eventToDelete.value.id)
+    events.value = events.value.filter(e => e.id !== eventToDelete.value.id)
+    showAlert('success', 'Event deleted successfully', 'Success')
+  } catch (error) {
+    console.error('Error deleting event:', error)
+    showAlert('error', 'Failed to delete event', 'Error')
+  } finally {
+    showConfirmDialog.value = false
+    eventToDelete.value = null
   }
 }
 
 const saveEvent = async () => {
+  saving.value = true
   try {
     if (editingEvent.value) {
       await eventService.update(editingEvent.value.id, eventForm.value)
-      alert.value = { show: true, type: 'success', title: 'Success', message: 'Event updated successfully' }
+      showAlert('success', 'Event updated successfully', 'Success')
     } else {
       await eventService.create(eventForm.value)
-      alert.value = { show: true, type: 'success', title: 'Success', message: 'Event added successfully' }
+      showAlert('success', 'Event added successfully', 'Success')
     }
     closeModal()
     loadEvents()
   } catch (error) {
     console.error('Error saving event:', error)
-    alert.value = { show: true, type: 'danger', title: 'Error', message: 'Failed to save event' }
+    showAlert('error', 'Failed to save event', 'Error')
+  } finally {
+    saving.value = false
   }
 }
 
@@ -229,8 +261,7 @@ const closeModal = () => {
 
 let searchTimeout
 watch(searchQuery, () => {
-  clearTimeout(searchTimeout)
-  searchTimeout = setTimeout(loadEvents, 300)
+  // Local filtering only
 })
 
 onMounted(loadEvents)

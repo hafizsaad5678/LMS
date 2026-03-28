@@ -142,7 +142,7 @@
         </button>
         <div v-else></div>
         <div class="d-flex gap-2">
-          <router-link to="/admin-dashboard/sessions" class="btn btn-outline-secondary">Cancel</router-link>
+          <router-link :to="ADMIN_ROUTES.SESSION_LIST.path" class="btn btn-outline-secondary">Cancel</router-link>
           <button v-if="currentStep < 3" @click="nextStep" class="btn btn-admin-primary" :disabled="!canProceed">
             Next<i class="bi bi-arrow-right ms-2"></i>
           </button>
@@ -158,30 +158,30 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { useAlert } from '@/composables/shared'
 import { useRouter } from 'vue-router'
-import AdminPageTemplate from '@/components/navbar/AdminPageTemplate.vue'
-import AlertMessage from '@/components/common/AlertMessage.vue'
-import sessionService from '@/services/sessionService'
-import { programService } from '@/services/programService'
-import cacheService from '@/services/cacheService'
+import { AdminPageTemplate } from '@/components/shared/panels'
+import { AlertMessage } from '@/components/shared/common'
+import { sessionService, programService, cacheService } from '@/services/shared'
+import { ADMIN_ROUTES } from '@/utils/constants/routes'
 
 const router = useRouter()
 
 const breadcrumbs = [
-  { name: 'Dashboard', href: '/admin-dashboard' },
-  { name: 'Sessions', href: '/admin-dashboard/sessions' },
+  { name: 'Dashboard', href: ADMIN_ROUTES.DASHBOARD.path },
+  { name: 'Sessions', href: ADMIN_ROUTES.SESSION_LIST.path },
   { name: 'Create Session' }
 ]
 
 const actions = [
-  { label: 'Back to List', icon: 'bi bi-arrow-left', variant: 'btn-admin-outline', onClick: () => router.push('/admin-dashboard/sessions') }
+  { label: 'Back to List', icon: 'bi bi-arrow-left', variant: 'btn-admin-outline', onClick: () => router.push({ name: ADMIN_ROUTES.SESSION_LIST.name }) }
 ]
 
 const currentStep = ref(1)
 const programs = ref([])
 const saving = ref(false)
 const autoSetupSemesters = ref(true)
-const alert = ref({ show: false, type: 'success', title: '', message: '' })
+const { alert, showAlert } = useAlert()
 
 const formData = ref({
   program: '',
@@ -210,9 +210,6 @@ const canProceed = computed(() => {
   }
 })
 
-const showAlert = (type, message, title = null) => {
-  alert.value = { show: true, type, title, message }
-}
 
 const loadPrograms = async () => {
   try {
@@ -242,7 +239,7 @@ const onProgramChange = async () => {
     // Check for existing sessions to determine next start year
     try {
       const res = await sessionService.getSessionsByProgram(selectedProgram.value.id)
-      const sessions = Array.isArray(res.data) ? res.data : (res.data.results || [])
+      const sessions = normalizeToArray(res)
       
       if (sessions.length > 0) {
         // Find latest session by start year
@@ -301,6 +298,11 @@ const createSession = async () => {
     if (!formData.value.end_year) formData.value.end_year = suggestedEndYear.value
     const response = await sessionService.createSession(formData.value)
     const sessionId = response.data.id
+    
+    // Clear caches to update list view
+    cacheService.clear('sessions_list')
+    cacheService.clearPattern('session')
+    
     showAlert('success', 'Session created successfully!', 'Success!')
     
     if (autoSetupSemesters.value) {
@@ -310,7 +312,7 @@ const createSession = async () => {
         console.error('Error setting up semesters:', error)
       }
     }
-    setTimeout(() => router.push('/admin-dashboard/sessions'), 1500)
+    setTimeout(() => router.push({ name: ADMIN_ROUTES.SESSION_LIST.name }), 1500)
   } catch (error) {
     console.error('Error creating session:', error)
     showAlert('error', error.response?.data?.error || 'Failed to create session', 'Error!')
@@ -322,6 +324,4 @@ const createSession = async () => {
 onMounted(loadPrograms)
 </script>
 
-<style scoped>
-/* Component-specific styles only - common styles are in custom.css */
-</style>
+

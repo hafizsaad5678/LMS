@@ -18,19 +18,14 @@
     />
 
     <!-- Loading State -->
-    <div v-if="loading && sessionId" class="text-center py-5">
-      <div class="spinner-border text-admin" role="status">
-        <span class="visually-hidden">Loading...</span>
-      </div>
-      <p class="text-muted mt-3">Loading session data...</p>
-    </div>
+    <LoadingSpinner v-if="loading && sessionId" text="Loading session data..." theme="admin" />
 
     <!-- No ID provided -->
     <div v-else-if="!sessionId" class="text-center py-5">
       <i class="bi bi-pencil-square display-1 text-muted"></i>
       <h4 class="text-muted mt-3">No Session Selected</h4>
       <p class="text-muted">Select a session from the list to edit.</p>
-      <router-link to="/admin-dashboard/sessions" class="btn btn-admin-primary mt-3">
+      <router-link :to="ADMIN_ROUTES.SESSION_LIST.path" class="btn btn-admin-primary mt-3">
         <i class="bi bi-arrow-left me-2"></i>Go to Session List
       </router-link>
     </div>
@@ -93,13 +88,12 @@
                     <small class="text-muted">Current: {{ session.current_enrollment || 0 }} enrolled</small>
                   </div>
                   <div class="col-md-4">
-                    <label class="form-label">Status</label>
-                    <select v-model="formData.status" class="form-select">
-                      <option value="upcoming">Upcoming</option>
-                      <option value="active">Active</option>
-                      <option value="completed">Completed</option>
-                      <option value="archived">Archived</option>
-                    </select>
+                    <SelectInput
+                      v-model="formData.status"
+                      :options="SESSION_STATUS_OPTIONS"
+                      label="Status"
+                      placeholder="Select status"
+                    />
                   </div>
                   <div class="col-12">
                     <label class="form-label">Description</label>
@@ -110,7 +104,7 @@
 
               <!-- Form Actions -->
               <div class="d-flex gap-3 justify-content-end pt-3 border-top">
-                <router-link to="/admin-dashboard/sessions" class="btn btn-admin-outline px-4">
+                <router-link :to="ADMIN_ROUTES.SESSION_LIST.path" class="btn btn-admin-outline px-4">
                   <i class="bi bi-x-circle me-2"></i>Cancel
                 </router-link>
                 <button type="submit" class="btn btn-admin-primary px-4" :disabled="saving">
@@ -127,29 +121,32 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch, computed } from 'vue'
+import { useAlert } from '@/composables/shared'
 import { useRouter, useRoute } from 'vue-router'
-import AdminPageTemplate from '@/components/navbar/AdminPageTemplate.vue'
-import AlertMessage from '@/components/common/AlertMessage.vue'
-import sessionService from '@/services/sessionService'
+import { AdminPageTemplate } from '@/components/shared/panels'
+import { AlertMessage, LoadingSpinner, SelectInput } from '@/components/shared/common'
+import { sessionService, cacheService } from '@/services/shared'
+import { ADMIN_ROUTES } from '@/utils/constants/routes'
+import { SESSION_STATUS_OPTIONS } from '@/utils/constants/options'
 
 const router = useRouter()
 const route = useRoute()
-const sessionId = route.params.id
+const sessionId = computed(() => route.params.id)
 
 const breadcrumbs = [
-  { name: 'Dashboard', href: '/admin-dashboard' },
-  { name: 'Sessions', href: '/admin-dashboard/sessions' },
+  { name: 'Dashboard', href: ADMIN_ROUTES.DASHBOARD.path },
+  { name: 'Sessions', href: ADMIN_ROUTES.SESSION_LIST.path },
   { name: 'Edit Session' }
 ]
 
 const actions = [
-  { label: 'Back to List', icon: 'bi bi-arrow-left', variant: 'btn-admin-outline', onClick: () => router.push('/admin-dashboard/sessions') }
+  { label: 'Back to List', icon: 'bi bi-arrow-left', variant: 'btn-admin-outline', onClick: () => router.push({ name: ADMIN_ROUTES.SESSION_LIST.name }) }
 ]
 
 const loading = ref(true)
 const saving = ref(false)
-const alert = ref({ show: false, type: 'success', title: '', message: '' })
+const { alert, showAlert } = useAlert()
 const session = ref({})
 
 const formData = ref({
@@ -162,25 +159,27 @@ const formData = ref({
   description: ''
 })
 
-const showAlert = (type, message, title = null) => {
-  alert.value = { show: true, type, title, message }
-}
 
 const loadSession = async () => {
+  const id = sessionId.value
+  if (!id) {
+    loading.value = false
+    return
+  }
   loading.value = true
   try {
-    const response = await sessionService.getSession(sessionId)
-    session.value = response.data
-    
-    formData.value = {
-      session_name: session.value.session_name,
-      session_code: session.value.session_code,
-      start_year: session.value.start_year,
-      end_year: session.value.end_year,
-      total_capacity: session.value.total_capacity,
-      status: session.value.status,
-      description: session.value.description || ''
-    }
+    // sessionService.getSession already returns response.data
+    const sessionData = await sessionService.getSession(id)
+    session.value = sessionData
+
+    // Assign each field individually to ensure reactivity
+    formData.value.session_name = sessionData.session_name || ''
+    formData.value.session_code = sessionData.session_code || ''
+    formData.value.start_year = sessionData.start_year || null
+    formData.value.end_year = sessionData.end_year || null
+    formData.value.total_capacity = sessionData.total_capacity || 0
+    formData.value.status = sessionData.status || 'upcoming'
+    formData.value.description = sessionData.description || ''
   } catch (error) {
     console.error('Error loading session:', error)
     showAlert('error', 'Failed to load session data', 'Error!')
@@ -204,9 +203,14 @@ const updateSession = async () => {
     
     if (formData.value.description) updateData.description = formData.value.description
     
-    await sessionService.updateSession(sessionId, updateData)
+    await sessionService.updateSession(sessionId.value, updateData)
+    
+    // Clear cache to ensure list refreshes with updated data
+    cacheService.clear('sessions_list')
+    cacheService.clearPattern('session')
+    
     showAlert('success', 'Session updated successfully!', 'Success!')
-    setTimeout(() => router.push('/admin-dashboard/sessions'), 1500)
+    setTimeout(() => router.push({ name: ADMIN_ROUTES.SESSION_LIST.name }), 1500)
   } catch (error) {
     console.error('Error updating session:', error)
     const errorMsg = error.response?.data?.error || error.response?.data?.detail || 'Failed to update session'
@@ -216,12 +220,16 @@ const updateSession = async () => {
   }
 }
 
-onMounted(() => {
-  if (sessionId) loadSession()
-  else loading.value = false
+// Watch for route param changes to reload data
+watch(() => route.params.id, (newId) => {
+  if (newId) {
+    loadSession()
+  }
+}, { immediate: false })
+
+onMounted(async () => {
+  await loadSession()
 })
 </script>
 
-<style scoped>
-/* Component-specific styles only - common styles are in custom.css */
-</style>
+

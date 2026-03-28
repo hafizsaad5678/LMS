@@ -1,262 +1,192 @@
 <template>
-  <TeacherPageTemplate
-    title="Assignments"
-    subtitle="Manage and review student assignments"
-    icon="bi bi-clipboard-check"
-    :breadcrumbs="breadcrumbs"
-    :actions="actions"
-  >
+  <TeacherPageTemplate title="Assignments" subtitle="Create and manage student assignments"
+    icon="bi bi-file-earmark-text" :breadcrumbs="breadcrumbs" :actions="actions">
+    <AlertMessage v-if="alert.show" v-bind="alert" :auto-close="true" @close="clearAlert" />
+
+    <ConfirmDialog v-model="showDeleteModal" title="Delete Assignment"
+      :message="`Are you sure you want to delete '${selectedAssignment?.title}'? This action cannot be undone.`"
+      type="danger" theme="teacher" :loading="deleting" confirm-text="Delete Permanently" @confirm="handleDelete" />
+
+    <!-- Stats Section -->
     <template #stats>
       <div class="row g-3 mb-4">
-        <div class="col-md-3 col-6">
-          <div class="stat-card bg-gradient-primary text-white">
-            <i class="bi bi-file-earmark-text stat-icon"></i>
-            <div class="stat-content">
-              <h3>{{ assignments.length }}</h3>
-              <p>Total Assignments</p>
-            </div>
-          </div>
-        </div>
-        <div class="col-md-3 col-6">
-          <div class="stat-card bg-gradient-warning text-white">
-            <i class="bi bi-hourglass-split stat-icon"></i>
-            <div class="stat-content">
-              <h3>{{ pendingReviews }}</h3>
-              <p>Pending Reviews</p>
-            </div>
-          </div>
-        </div>
-        <div class="col-md-3 col-6">
-          <div class="stat-card bg-gradient-success text-white">
-            <i class="bi bi-check-circle stat-icon"></i>
-            <div class="stat-content">
-              <h3>{{ gradedCount }}</h3>
-              <p>Graded</p>
-            </div>
-          </div>
-        </div>
-        <div class="col-md-3 col-6">
-          <div class="stat-card bg-gradient-info text-white">
-            <i class="bi bi-calendar-event stat-icon"></i>
-            <div class="stat-content">
-              <h3>{{ upcomingDeadlines }}</h3>
-              <p>Due This Week</p>
-            </div>
-          </div>
+        <div v-for="stat in statsCards" :key="stat.title" class="col-md-3 col-6">
+          <StatCard v-bind="stat" />
         </div>
       </div>
     </template>
 
     <template #filters>
-      <SearchFilter
-        v-model="searchQuery"
-        :show-status-filter="false"
-        search-placeholder="Search assignments..."
-        @refresh="loadAssignments"
-        @reset="resetFilters"
-      >
+      <SearchFilter v-model="filters.search" :show-card="true" :show-status-filter="false" :show-refresh="true"
+        :show-reset="true" :show-labels="false" search-placeholder="Search assignments..." search-col-size="col-md-5"
+        actions-col-size="col-md-3" theme="teacher" @refresh="refreshAssignments" @reset="resetFilters">
         <template #filters>
-          <div class="col-md-3">
-            <label class="form-label small fw-semibold">Class</label>
-            <select v-model="filters.class" class="form-select">
-              <option value="">All Classes</option>
-              <option value="1">Data Structures</option>
-              <option value="2">Database Systems</option>
-              <option value="3">Web Development</option>
-            </select>
-          </div>
-          <div class="col-md-3">
-            <label class="form-label small fw-semibold">Status</label>
-            <select v-model="filters.status" class="form-select">
-              <option value="">All Status</option>
-              <option value="active">Active</option>
-              <option value="closed">Closed</option>
-              <option value="draft">Draft</option>
-            </select>
+          <div class="col-md-4">
+            <SelectInput v-model="filters.subject" :options="subjectOptions" placeholder="All Subjects"
+              :no-margin="true" />
           </div>
         </template>
       </SearchFilter>
     </template>
 
-    <DataTable
-      :columns="columns"
-      :data="filteredAssignments"
-      :loading="loading"
-      empty-title="No Assignments Found"
-      empty-subtitle="Create your first assignment to get started"
-    >
+    <!-- Main Content -->
+    <DataTable :columns="tableColumns" :data="filteredData" :loading="loading" loading-text="Loading assignments..."
+      empty-icon="bi bi-file-earmark-text" empty-title="No assignments found">
       <template #cell-title="{ row }">
-        <div>
-          <div class="fw-semibold">{{ row.title }}</div>
-          <small class="text-muted">{{ row.class_name }}</small>
+        <div class="d-flex align-items-center">
+          <div class="avatar-circle-teacher sm me-2">
+            <i class="bi bi-file-earmark-text"></i>
+          </div>
+          <div>
+            <div class="fw-bold text-dark">{{ row.title }}</div>
+            <div class="small text-muted">
+              <i class="bi bi-book me-1"></i>
+              {{ row.subject_name }} ({{ row.subject_code }})
+            </div>
+          </div>
         </div>
       </template>
 
       <template #cell-due_date="{ row }">
-        <div>
-          <div>{{ formatDate(row.due_date) }}</div>
-          <small :class="getDueDateClass(row.due_date)">
-            {{ getDueDateLabel(row.due_date) }}
-          </small>
+        <div :class="getDueDateClass(row.due_date)">
+          <i class="bi bi-calendar-event me-1"></i>
+          {{ formatDate(row.due_date) }}
         </div>
       </template>
 
       <template #cell-submissions="{ row }">
         <div class="text-center">
-          <div class="fw-semibold">{{ row.submitted }}/{{ row.total_students }}</div>
-          <div class="progress mt-1" style="height: 4px;">
-            <div 
-              class="progress-bar bg-teacher" 
-              :style="{ width: `${(row.submitted / row.total_students) * 100}%` }"
-            ></div>
+          <div class="fw-bold text-teacher">{{ row.submission_count }} / {{ row.total_students }}</div>
+          <div class="progress progress-mini">
+            <div class="progress-bar bg-teacher"
+              :style="{ width: (row.total_students ? (row.submission_count / row.total_students * 100) : 0) + '%' }">
+            </div>
           </div>
         </div>
       </template>
 
-      <template #cell-status="{ row }">
-        <span :class="['badge', getStatusClass(row.status)]">
-          {{ row.status }}
-        </span>
-      </template>
-
-      <template #actions="{ row }">
-        <button @click="viewAssignment(row)" class="btn btn-sm btn-outline-info" title="View">
-          <i class="bi bi-eye"></i>
-        </button>
-        <button @click="viewSubmissions(row)" class="btn btn-sm btn-outline-success" title="Submissions">
-          <i class="bi bi-file-earmark-check"></i>
-        </button>
-        <button @click="editAssignment(row)" class="btn btn-sm btn-outline-primary" title="Edit">
-          <i class="bi bi-pencil"></i>
-        </button>
+      <template #cell-actions="{ row }">
+        <div class="d-flex gap-2 justify-content-center">
+          <button @click="router.push(`${TEACHER_ROUTES.SUBMISSIONS.path}?id=${row.id}`)"
+            class="btn btn-sm btn-outline-primary btn-action" title="View Submissions"><i
+              class="bi bi-people"></i></button>
+          <button @click="router.push(`${TEACHER_ROUTES.ASSIGNMENT_EDIT.path}/${row.id}`)"
+            class="btn btn-sm btn-outline-primary btn-action" title="Edit"><i class="bi bi-pencil"></i></button>
+          <button @click="confirmDelete(row)" class="btn btn-sm btn-outline-danger btn-action" title="Delete"><i
+              class="bi bi-trash"></i></button>
+        </div>
       </template>
     </DataTable>
   </TeacherPageTemplate>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import TeacherPageTemplate from '@/components/navbar/TeacherPageTemplate.vue'
-import SearchFilter from '@/components/common/SearchFilter.vue'
-import DataTable from '@/components/common/DataTable.vue'
+import { TeacherPageTemplate } from '@/components/shared/panels'
+import { StatCard, DataTable, SearchFilter, ConfirmDialog, AlertMessage, SelectInput } from '@/components/shared/common'
+import teacherPanelService from '@/services/teacher/teacherPanelService'
+import { useEntityList, useAlert, useAsyncState } from '@/composables/shared'
+import { generateBreadcrumbs } from '@/utils/navigation'
+import { formatDate } from '@/utils/formatters'
+import { TEACHER_ROUTES } from '@/utils/constants/routes'
 
 const router = useRouter()
-
-const breadcrumbs = [
-  { name: 'Dashboard', href: '/teacher-dashboard' },
-  { name: 'Assignments' }
-]
-
-const actions = [
-  { label: 'Create Assignment', icon: 'bi bi-plus-circle', variant: 'btn-teacher-primary', onClick: () => router.push('/teacher-dashboard/assignments/create') }
-]
-
-const columns = [
-  { key: 'title', label: 'Assignment', type: 'custom' },
-  { key: 'due_date', label: 'Due Date', type: 'custom' },
-  { key: 'submissions', label: 'Submissions', type: 'custom', center: true },
-  { key: 'total_marks', label: 'Marks', center: true },
-  { key: 'status', label: 'Status', type: 'custom', center: true },
-  { key: 'actions', label: 'Actions', type: 'actions', center: true }
-]
-
-const loading = ref(false)
-const searchQuery = ref('')
-const filters = ref({ class: '', status: '' })
-
-const assignments = ref([
-  { id: 1, title: 'Binary Search Trees', class_name: 'Data Structures', due_date: '2025-12-25', submitted: 35, total_students: 45, total_marks: 100, status: 'active' },
-  { id: 2, title: 'SQL Queries Practice', class_name: 'Database Systems', due_date: '2025-12-20', submitted: 28, total_students: 38, total_marks: 50, status: 'active' },
-  { id: 3, title: 'React Components', class_name: 'Web Development', due_date: '2025-12-15', submitted: 42, total_students: 42, total_marks: 75, status: 'closed' },
-  { id: 4, title: 'Process Scheduling', class_name: 'Operating Systems', due_date: '2025-12-30', submitted: 0, total_students: 35, total_marks: 100, status: 'draft' }
-])
-
-const pendingReviews = computed(() => assignments.value.reduce((sum, a) => sum + (a.total_students - a.submitted), 0))
-const gradedCount = computed(() => assignments.value.filter(a => a.status === 'closed').length)
-const upcomingDeadlines = computed(() => assignments.value.filter(a => {
-  const dueDate = new Date(a.due_date)
-  const today = new Date()
-  const weekFromNow = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000)
-  return dueDate >= today && dueDate <= weekFromNow
-}).length)
-
-const filteredAssignments = computed(() => {
-  let result = assignments.value
-
-  if (searchQuery.value) {
-    result = result.filter(a =>
-      a.title.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-      a.class_name.toLowerCase().includes(searchQuery.value.toLowerCase())
-    )
+const { alert, showSuccess, showError, clearAlert } = useAlert()
+const { loading, data: assignments, filteredData, filters, loadData, resetFilters, refresh, applyFilters } = useEntityList({
+  cacheKey: 'teacher_assignments_list',
+  searchFields: ['title', 'subject_name', 'subject_code', 'description'],
+  defaultFilters: { subject: '' },
+  customFilter: (items, filters) => {
+    if (!filters.subject) return items
+    return items.filter(a => (a.subject_id || a.subject) == filters.subject)
   }
-
-  if (filters.value.status) {
-    result = result.filter(a => a.status === filters.value.status)
-  }
-
-  return result
 })
 
-const formatDate = (dateString) => {
-  return new Date(dateString).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+const { data: subjects, loading: loadingSubjects, execute: fetchSubjects } = useAsyncState({ initialLoading: true })
+const showDeleteModal = ref(false)
+const selectedAssignment = ref(null)
+const deleting = ref(false)
+
+const breadcrumbs = generateBreadcrumbs('teacher', 'Assignments')
+
+const actions = [
+  { label: 'Create Assignment', icon: 'bi bi-plus-lg', variant: 'btn-teacher-outline', onClick: () => router.push(TEACHER_ROUTES.ASSIGNMENT_CREATE.path) }
+]
+
+const tableColumns = [
+  { key: 'title', label: 'Assignment Details' },
+  { key: 'due_date', label: 'Due Date' },
+  { key: 'submissions', label: 'Submissions' },
+  { key: 'total_marks', label: 'Marks', center: true },
+  { key: 'actions', label: 'Actions', center: true }
+]
+
+// Computed
+const subjectOptions = computed(() => (subjects.value?.results || []).map(s => ({
+  value: s.subject_id || s.id,
+  label: `${s.subject_name} (${s.subject_code})`
+})))
+
+const statsCards = computed(() => {
+  const now = new Date()
+  const weekOut = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
+
+  return [
+    { title: 'Total Assignments', value: assignments.value.length, icon: 'bi bi-file-earmark-text', bgColor: 'bg-admin-light', iconColor: 'text-teacher' },
+    {
+      title: 'Due This Week', value: assignments.value.filter(a => {
+        const due = new Date(a.due_date); return due > now && due < weekOut
+      }).length, icon: 'bi bi-calendar-week', bgColor: 'bg-warning-light', iconColor: 'text-warning'
+    },
+    { title: 'Total Submissions', value: assignments.value.reduce((sum, a) => sum + (a.submission_count || 0), 0), icon: 'bi bi-upload', bgColor: 'bg-success-light', iconColor: 'text-success' },
+    {
+      title: 'Pending Review', value: assignments.value.filter(a => {
+        const due = new Date(a.due_date); return due < now && (a.submission_count || 0) < (a.total_students || 0)
+      }).length, icon: 'bi bi-clock-history', bgColor: 'bg-danger-light', iconColor: 'text-danger'
+    }
+  ]
+})
+
+// Methods
+const loadAssignments = () => loadData(() => teacherPanelService.getMyAssignments())
+const refreshAssignments = () => refresh(() => teacherPanelService.getMyAssignments())
+
+const loadSubjects = () => fetchSubjects(() => teacherPanelService.getMyClasses())
+
+const confirmDelete = (assignment) => {
+  selectedAssignment.value = assignment
+  showDeleteModal.value = true
 }
 
-const getDueDateLabel = (dateString) => {
-  const dueDate = new Date(dateString)
-  const today = new Date()
-  const diffTime = dueDate - today
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-  
-  if (diffDays < 0) return 'Overdue'
-  if (diffDays === 0) return 'Due Today'
-  if (diffDays === 1) return 'Due Tomorrow'
-  if (diffDays <= 7) return `${diffDays} days left`
-  return ''
+const handleDelete = async () => {
+  if (!selectedAssignment.value) return
+  deleting.value = true
+  try {
+    await teacherPanelService.deleteAssignment(selectedAssignment.value.id)
+    showDeleteModal.value = false
+    showSuccess('Assignment deleted successfully!')
+    refreshAssignments()
+  } catch (error) {
+    showError('Failed to delete assignment.')
+  } finally {
+    deleting.value = false
+  }
 }
 
 const getDueDateClass = (dateString) => {
-  const dueDate = new Date(dateString)
-  const today = new Date()
-  const diffDays = Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24))
-  
-  if (diffDays < 0) return 'text-danger'
-  if (diffDays <= 3) return 'text-warning'
-  return 'text-success'
+  const due = new Date(dateString)
+  const now = new Date()
+  if (due < now) return 'text-danger fw-semibold'
+  return (due.getTime() - now.getTime() < 86400000) ? 'text-warning fw-semibold' : 'text-muted'
 }
 
-const getStatusClass = (status) => {
-  const classes = {
-    active: 'bg-success',
-    closed: 'bg-secondary',
-    draft: 'bg-warning text-dark'
-  }
-  return classes[status] || 'bg-light text-dark'
-}
-
-const loadAssignments = () => {
-  loading.value = true
-  setTimeout(() => loading.value = false, 500)
-}
-
-const resetFilters = () => {
-  searchQuery.value = ''
-  filters.value = { class: '', status: '' }
-}
-
-const viewAssignment = (assignment) => {
-  router.push(`/teacher-dashboard/assignments/${assignment.id}`)
-}
-
-const viewSubmissions = (assignment) => {
-  router.push(`/teacher-dashboard/assignments/${assignment.id}/submissions`)
-}
-
-const editAssignment = (assignment) => {
-  router.push(`/teacher-dashboard/assignments/edit/${assignment.id}`)
-}
+watch(() => filters.value.subject, () => {
+  applyFilters()
+})
 
 onMounted(() => {
+  loadSubjects()
   loadAssignments()
 })
 </script>

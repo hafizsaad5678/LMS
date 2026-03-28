@@ -17,6 +17,16 @@
       @close="alert.show = false"
     />
 
+    <ConfirmDialog
+      v-model="showConfirmDialog"
+      title="Discard Changes"
+      message="Are you sure? All unsaved changes will be lost."
+      type="warning"
+      theme="admin"
+      confirm-text="Discard"
+      @confirm="confirmCancel"
+    />
+
     <div class="row justify-content-center">
       <div class="col-lg-8">
         <div class="card border-0 shadow-sm">
@@ -132,29 +142,28 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import AdminPageTemplate from '@/components/navbar/AdminPageTemplate.vue'
-import BaseInput from '@/components/common/BaseInput.vue'
-import AlertMessage from '@/components/common/AlertMessage.vue'
-import { assignmentService } from '@/services/assignmentService'
-import { subjectService } from '@/services/subjectService'
-import { teacherService } from '@/services/teacherService'
+import { AdminPageTemplate } from '@/components/shared/panels'
+import { BaseInput, AlertMessage, ConfirmDialog } from '@/components/shared/common'
+import { assignmentService, subjectService, teacherService, cacheService } from '@/services/shared'
+import { ADMIN_ROUTES } from '@/utils/constants/routes'
 
 const router = useRouter()
 
 const breadcrumbs = [
-  { name: 'Dashboard', href: '/admin-dashboard' },
-  { name: 'Assignments', href: '/admin-dashboard/assignments' },
+  { name: 'Dashboard', href: ADMIN_ROUTES.DASHBOARD.path },
+  { name: 'Assignments', href: ADMIN_ROUTES.ASSIGNMENTS.path },
   { name: 'Create Assignment' }
 ]
 
 const actions = [
-  { label: 'Back to List', icon: 'bi bi-arrow-left', variant: 'btn-admin-outline', onClick: () => router.push('/admin-dashboard/assignments') }
+  { label: 'Back to List', icon: 'bi bi-arrow-left', variant: 'btn-admin-outline', onClick: () => router.push(ADMIN_ROUTES.ASSIGNMENTS.path) }
 ]
 
 const alert = ref({ show: false, type: 'success', title: '', message: '' })
 const submitting = ref(false)
 const subjects = ref([])
 const teachers = ref([])
+const showConfirmDialog = ref(false)
 
 const form = ref({
   title: '',
@@ -174,7 +183,7 @@ const loadSubjects = async () => {
     const response = await subjectService.getAllSubjects()
     subjects.value = Array.isArray(response) ? response : (response.results || [])
   } catch (error) {
-    console.error('Error loading subjects:', error)
+    // Silent fail - subjects dropdown will be empty
   }
 }
 
@@ -183,7 +192,7 @@ const loadTeachers = async () => {
     const response = await teacherService.getAllTeachers()
     teachers.value = Array.isArray(response) ? response : (response.results || [])
   } catch (error) {
-    console.error('Error loading teachers:', error)
+    // Silent fail - teachers dropdown will be empty
   }
 }
 
@@ -195,10 +204,14 @@ const handleSubmit = async () => {
     if (!data.created_by) delete data.created_by
     
     await assignmentService.createAssignment(data)
+    
+    // Clear caches to update list view
+    cacheService.clear('assignments_list')
+    cacheService.clearPattern('assignment')
+    
     showAlert('success', 'Assignment created successfully!', 'Success!')
-    setTimeout(() => router.push('/admin-dashboard/assignments'), 1500)
+    setTimeout(() => router.push(ADMIN_ROUTES.ASSIGNMENTS.path), 1500)
   } catch (error) {
-    console.error('Error creating assignment:', error)
     const msg = error.response?.data?.detail || 'Failed to create assignment.'
     showAlert('error', msg, 'Error!')
   } finally {
@@ -209,12 +222,15 @@ const handleSubmit = async () => {
 const handleCancel = () => {
   const hasData = form.value.title || form.value.description
   if (hasData) {
-    if (confirm('Are you sure? All unsaved changes will be lost.')) {
-      router.push('/admin-dashboard/assignments')
-    }
+    showConfirmDialog.value = true
   } else {
-    router.push('/admin-dashboard/assignments')
+    router.push(ADMIN_ROUTES.ASSIGNMENTS.path)
   }
+}
+
+const confirmCancel = () => {
+  showConfirmDialog.value = false
+  router.push(ADMIN_ROUTES.ASSIGNMENTS.path)
 }
 
 onMounted(() => {
@@ -222,5 +238,7 @@ onMounted(() => {
   loadTeachers()
 })
 </script>
+
+
 
 

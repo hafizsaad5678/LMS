@@ -14,7 +14,7 @@
 <script setup>
 import { useAuth } from '@/store/auth.js'
 import DashboardLayout from '@/layouts/DashboardLayout.vue'
-import { sidebarSections, mainNav } from '@/pannel/teacher.js'
+import { sidebarSections, mainNav } from '@/panels/teacher.js'
 
 const authStore = useAuth()
 </script>

@@ -7,147 +7,38 @@
     :actions="actions"
     :show-content-card="false"
   >
-    <!-- No ID provided -->
-    <div v-if="!courseId" class="text-center py-5">
-      <i class="bi bi-mortarboard display-1 text-muted"></i>
-      <h4 class="text-muted mt-3">Please Select a Course</h4>
-      <p class="text-muted">Choose a course from the list to view its details.</p>
-      <button @click="router.push('/admin-dashboard/courses')" class="btn btn-admin-primary mt-3">
-        <i class="bi bi-list-ul me-2"></i>Go to Course List
-      </button>
-    </div>
+    <EmptyState v-if="!entityId" icon="bi bi-mortarboard" title="Please Select a Course"
+      subtitle="Choose a course from the list to view its details."
+      button-text="Go to Course List" button-icon="bi bi-list-ul"
+      @action="router.push(ADMIN_ROUTES.COURSE_LIST.path)" />
 
-    <div v-else-if="loading" class="text-center py-5">
-      <div class="spinner-border text-danger" role="status">
-        <span class="visually-hidden">Loading...</span>
-      </div>
-      <p class="text-muted mt-3">Loading course details...</p>
-    </div>
+    <LoadingSpinner v-else-if="loading" text="Loading course details..." theme="admin" />
 
-    <div v-else-if="!course.id" class="text-center py-5">
-      <i class="bi bi-x-circle display-1 text-muted"></i>
-      <h4 class="text-muted mt-3">Course Not Found</h4>
-      <button @click="router.push('/admin-dashboard/courses')" class="btn btn-admin-primary mt-3">
-        <i class="bi bi-arrow-left me-2"></i>Back to Courses
-      </button>
-    </div>
+    <EmptyState v-else-if="!entity.id" icon="bi bi-x-circle" title="Course Not Found"
+      button-text="Back to Courses" button-icon="bi bi-arrow-left"
+      @action="router.push(ADMIN_ROUTES.COURSE_LIST.path)" />
 
     <div v-else>
-      <!-- Course Header -->
-      <div class="card border-0 shadow-sm mb-4">
-        <div class="card-body p-4">
-          <div class="row align-items-center">
-            <div class="col-auto">
-              <div class="profile-avatar rounded profile-avatar-course">
-                <i class="bi bi-mortarboard"></i>
-              </div>
-            </div>
-            <div class="col">
-              <h3 class="mb-1 fw-bold">{{ course.name }}</h3>
-              <p class="text-muted mb-2">
-                <i class="bi bi-hash me-1"></i>{{ course.code }}
-              </p>
-              <div class="d-flex flex-wrap gap-2">
-                <span class="badge bg-admin">{{ course.duration_years }} Years</span>
-                <span class="badge bg-info" v-if="course.department_name">
-                  {{ course.department_name }}
-                </span>
-              </div>
-            </div>
-            <div class="col-auto">
-              <button @click="router.push(`/admin-dashboard/courses/edit/${course.id}`)" class="btn btn-admin-primary">
-                <i class="bi bi-pencil me-2"></i>Edit Course
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
+      <ProfileHeader
+        :name="entity.name"
+        :identifier="entity.code"
+        :badges="profileBadges"
+        theme="admin"
+        @edit="router.push({ name: ADMIN_ROUTES.COURSE_EDIT.name, params: { id: entity.id } })"
+      />
 
       <div class="row g-4">
-        <!-- Course Information -->
         <div class="col-lg-6">
-          <div class="card border-0 shadow-sm h-100">
-            <div class="card-header bg-white border-bottom">
-              <h6 class="mb-0 fw-semibold"><i class="bi bi-info-circle me-2 text-admin"></i>Course Information</h6>
-            </div>
-            <div class="card-body">
-              <div class="info-row">
-                <span class="info-label">Name</span>
-                <span class="info-value">{{ course.name }}</span>
-              </div>
-              <div class="info-row">
-                <span class="info-label">Code</span>
-                <span class="info-value"><span class="badge bg-dark">{{ course.code }}</span></span>
-              </div>
-              <div class="info-row">
-                <span class="info-label">Department</span>
-                <span class="info-value">{{ course.department_name || 'Not Assigned' }}</span>
-              </div>
-              <div class="info-row">
-                <span class="info-label">Duration</span>
-                <span class="info-value">{{ course.duration_years }} Years</span>
-              </div>
-              <div class="info-row">
-                <span class="info-label">Created</span>
-                <span class="info-value">{{ formatDate(course.created_at) }}</span>
-              </div>
-            </div>
-          </div>
+          <InfoCard title="Course Information" icon="bi bi-info-circle" icon-color="admin" :items="courseInfoItems" />
         </div>
 
-        <!-- Description -->
         <div class="col-lg-6">
-          <div class="card border-0 shadow-sm h-100">
-            <div class="card-header bg-white border-bottom">
-              <h6 class="mb-0 fw-semibold"><i class="bi bi-text-paragraph me-2 text-success"></i>Description</h6>
-            </div>
-            <div class="card-body">
-              <p v-if="course.description" class="text-muted">{{ course.description }}</p>
-              <p v-else class="text-muted fst-italic">No description available</p>
-            </div>
-          </div>
+          <InfoCard title="Description" icon="bi bi-text-paragraph" icon-color="success"
+            :items="[{ label: 'Description', value: entity.description || 'No description available' }]" />
         </div>
 
-        <!-- Stats Cards -->
         <div class="col-12">
-          <div class="row g-4">
-            <div class="col-md-3">
-              <div class="stat-card bg-admin-light">
-                <i class="bi bi-calendar3 stat-icon text-admin"></i>
-                <div class="stat-content">
-                  <h3>{{ semesters.length }}</h3>
-                  <p>Semesters</p>
-                </div>
-              </div>
-            </div>
-            <div class="col-md-3">
-              <div class="stat-card bg-success-light">
-                <i class="bi bi-book stat-icon text-success"></i>
-                <div class="stat-content">
-                  <h3>{{ stats.totalSubjects }}</h3>
-                  <p>Total Subjects</p>
-                </div>
-              </div>
-            </div>
-            <div class="col-md-3">
-              <div class="stat-card bg-info-light">
-                <i class="bi bi-people stat-icon text-info"></i>
-                <div class="stat-content">
-                  <h3>{{ students.length }}</h3>
-                  <p>Enrolled Students</p>
-                </div>
-              </div>
-            </div>
-            <div class="col-md-3">
-              <div class="stat-card bg-warning-light">
-                <i class="bi bi-clock stat-icon text-warning"></i>
-                <div class="stat-content">
-                  <h3>{{ stats.totalCredits }}</h3>
-                  <p>Total Credit Hours</p>
-                </div>
-              </div>
-            </div>
-          </div>
+          <StatsGrid :stats="statsData" :columns="4" />
         </div>
 
         <!-- Semesters -->
@@ -155,15 +46,10 @@
           <div class="card border-0 shadow-sm">
             <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center">
               <h6 class="mb-0 fw-semibold"><i class="bi bi-calendar3 me-2 text-admin"></i>Semesters</h6>
-              <div>
-                <span class="badge bg-admin me-2">{{ semesters.length }} Semesters</span>
-              </div>
+              <span class="badge bg-admin">{{ semesters.length }} Semesters</span>
             </div>
             <div class="card-body p-0">
-              <div v-if="semesters.length === 0" class="text-center py-4 text-muted">
-                <i class="bi bi-inbox display-6"></i>
-                <p class="mt-2">No semesters defined yet</p>
-              </div>
+              <EmptyState v-if="semesters.length === 0" icon="bi bi-inbox" title="No semesters defined yet" />
               <div v-else class="table-responsive">
                 <table class="table table-hover mb-0">
                   <thead class="table-light">
@@ -184,7 +70,7 @@
                       <td>{{ formatDate(sem.start_date) }}</td>
                       <td>{{ formatDate(sem.end_date) }}</td>
                       <td>
-                        <button @click="router.push({ name: 'SemesterProfile', params: { id: sem.id } })" class="btn btn-sm btn-outline-primary" title="View Semester">
+                        <button @click="router.push({ name: ADMIN_ROUTES.SEMESTER_PROFILE.name, params: { id: sem.id } })" class="btn btn-sm btn-outline-primary" title="View Semester">
                           <i class="bi bi-eye"></i>
                         </button>
                       </td>
@@ -204,10 +90,7 @@
               <span class="badge bg-info">{{ students.length }} Students</span>
             </div>
             <div class="card-body p-0">
-              <div v-if="students.length === 0" class="text-center py-4 text-muted">
-                <i class="bi bi-inbox display-6"></i>
-                <p class="mt-2">No students enrolled in this course</p>
-              </div>
+              <EmptyState v-if="students.length === 0" icon="bi bi-inbox" title="No students enrolled in this course" />
               <div v-else class="table-responsive">
                 <table class="table table-hover mb-0">
                   <thead class="table-light">
@@ -227,12 +110,12 @@
                       <td>{{ s.email }}</td>
                       <td>{{ s.current_semester_name || 'N/A' }}</td>
                       <td>
-                        <span :class="['badge', s.is_active ? 'bg-success' : 'bg-warning']">
-                          {{ s.is_active ? 'Active' : 'Inactive' }}
+                        <span :class="['badge', getActiveBadgeClass(s.is_active)]">
+                          {{ getActiveStatusText(s.is_active) }}
                         </span>
                       </td>
                       <td>
-                        <button @click="router.push(`/admin-dashboard/students/${s.id}`)" class="btn btn-sm btn-outline-primary">
+                        <button @click="router.push({ name: ADMIN_ROUTES.STUDENT_PROFILE.name, params: { id: s.id } })" class="btn btn-sm btn-outline-primary">
                           <i class="bi bi-eye"></i>
                         </button>
                       </td>
@@ -252,70 +135,63 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
-import AdminPageTemplate from '@/components/navbar/AdminPageTemplate.vue'
-import { programService } from '@/services/programService'
+import { computed } from 'vue'
+import { useRouter } from 'vue-router'
+import { AdminPageTemplate } from '@/components/shared/panels'
+import { ProfileHeader, InfoCard, StatsGrid } from '@/components/shared/profile'
+import { LoadingSpinner, EmptyState } from '@/components/shared/common'
+import { useProfileLoader } from '@/composables/shared'
+import { programService } from '@/services/shared'
+import { formatDate } from '@/utils/formatters'
+import { ADMIN_ROUTES } from '@/utils/constants/routes'
+import { getActiveBadgeClass, getActiveStatusText } from '@/utils/badgeHelpers'
 
 const router = useRouter()
-const route = useRoute()
-const courseId = route.params.id
 
 const breadcrumbs = [
-  { name: 'Dashboard', href: '/admin-dashboard' },
-  { name: 'Courses', href: '/admin-dashboard/courses' },
+  { name: 'Dashboard', href: ADMIN_ROUTES.DASHBOARD.path },
+  { name: 'Courses', href: ADMIN_ROUTES.COURSE_LIST.path },
   { name: 'Profile' }
 ]
 
 const actions = [
-  { label: 'Back to List', icon: 'bi bi-arrow-left', variant: 'btn-admin-outline', onClick: () => router.push('/admin-dashboard/courses') }
+  { label: 'Back to List', icon: 'bi bi-arrow-left', variant: 'btn-admin-outline', onClick: () => router.push(ADMIN_ROUTES.COURSE_LIST.path) }
 ]
 
-const loading = ref(true)
-const course = ref({})
-const semesters = ref([])
-const students = ref([])
+const { entityId, loading, entity, subData } = useProfileLoader({
+  fetchMain: (id) => programService.getProgramById(id),
+  subResources: [
+    { key: 'semesters', fetch: (id) => programService.getProgramSemesters(id) },
+    { key: 'students', fetch: (id) => programService.getProgramStudents(id) }
+  ]
+})
 
-const stats = computed(() => ({
-  totalSubjects: semesters.value.reduce((sum, s) => sum + (s.subject_count || 0), 0),
-  totalCredits: course.value.total_credits || semesters.value.reduce((sum, s) => sum + (s.credit_hours || 0), 0)
-}))
+const semesters = computed(() => subData.value.semesters)
+const students = computed(() => subData.value.students)
 
-const formatDate = (dateString) => {
-  if (!dateString) return 'N/A'
-  return new Date(dateString).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
-}
+const profileBadges = computed(() => {
+  const badges = [{ text: `${entity.value.duration_years} Years`, class: 'bg-admin' }]
+  if (entity.value.department_name) badges.push({ text: entity.value.department_name, class: 'bg-info' })
+  return badges
+})
 
-const loadCourse = async () => {
-  loading.value = true
-  try {
-    course.value = await programService.getProgramById(courseId)
-    
-    // Load semesters
-    try {
-      const semData = await programService.getProgramSemesters(courseId)
-      semesters.value = Array.isArray(semData) ? semData : (semData.results || [])
-    } catch (e) { console.log('Could not load semesters:', e) }
-    
-    // Load students
-    try {
-      const studentData = await programService.getProgramStudents(courseId)
-      students.value = Array.isArray(studentData) ? studentData : (studentData.results || [])
-    } catch (e) { console.log('Could not load students:', e) }
-  } catch (error) {
-    console.error('Error loading course:', error)
-  } finally {
-    loading.value = false
-  }
-}
+const courseInfoItems = computed(() => [
+  { label: 'Name', value: entity.value.name },
+  { label: 'Code', value: entity.value.code },
+  { label: 'Department', value: entity.value.department_name || 'Not Assigned' },
+  { label: 'Duration', value: `${entity.value.duration_years} Years` },
+  { label: 'Created', value: formatDate(entity.value.created_at) }
+])
 
-onMounted(() => {
-  if (courseId && courseId !== 'profile') {
-    loadCourse()
-  } else {
-    loading.value = false
-  }
+const statsData = computed(() => {
+  const totalSubjects = semesters.value.reduce((sum, s) => sum + (s.subject_count || 0), 0)
+  const totalCredits = entity.value.total_credits || semesters.value.reduce((sum, s) => sum + (s.credit_hours || 0), 0)
+  return [
+    { value: semesters.value.length, label: 'Semesters', icon: 'bi bi-calendar3', bgClass: 'bg-admin-light', iconColor: 'text-admin' },
+    { value: totalSubjects, label: 'Total Subjects', icon: 'bi bi-book', bgClass: 'bg-success-light', iconColor: 'text-success' },
+    { value: students.value.length, label: 'Enrolled Students', icon: 'bi bi-people', bgClass: 'bg-info-light', iconColor: 'text-info' },
+    { value: totalCredits, label: 'Total Credit Hours', icon: 'bi bi-clock', bgClass: 'bg-warning-light', iconColor: 'text-warning' }
+  ]
 })
 </script>
-
 

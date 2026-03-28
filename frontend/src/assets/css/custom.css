@@ -1,33 +1,237 @@
 /**
- * LMS Theme & Utilities
- * Theme colors, utility classes, buttons, and layout styles
+ * LMS Custom Styles - Consolidated
+ * All SCSS converted to CSS for better performance
+ * No build step required
  */
 
-/* ==================== THEME COLORS ==================== */
+/* ==================== VARIABLES (CSS Custom Properties) ==================== */
 :root {
+    /* Role Colors */
     --admin-primary: #dc3545;
     --admin-primary-dark: #c82333;
     --admin-primary-light: rgba(220, 53, 69, 0.1);
 
-    --teacher-primary: #0d6efd;
-    --teacher-primary-dark: #0a58ca;
-    --teacher-primary-light: rgba(13, 110, 253, 0.1);
+    --teacher-primary: #4a90e2;
+    --teacher-primary-dark: #0f4983;
+    --teacher-primary-light: rgba(0, 119, 245, 0.1);
 
     --student-primary: #198754;
     --student-primary-dark: #146c43;
     --student-primary-light: rgba(25, 135, 84, 0.1);
 
+    /* Status Colors */
     --success-light: rgba(25, 135, 84, 0.1);
     --warning-light: rgba(255, 193, 7, 0.1);
     --danger-light: rgba(220, 53, 69, 0.1);
     --info-light: rgba(13, 202, 240, 0.1);
     --primary-light: rgba(13, 110, 253, 0.1);
 
+    /* Layout */
     --sidebar-width: 280px;
     --navbar-height: 56px;
+
+    /* Border Radius */
+    --border-radius-sm: 8px;
+    --border-radius-md: 10px;
+    --border-radius-lg: 12px;
+    --border-radius-xl: 14px;
+
+    /* Shadows */
+    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.1);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.15);
+    --shadow-lg: 0 8px 25px rgba(0, 0, 0, 0.1);
+
+    /* Transitions */
+    --transition-fast: 0.2s ease;
+    --transition-normal: 0.3s ease;
 }
 
-/* ==================== BACKGROUND UTILITIES ==================== */
+/* ==================== GLOBAL RESET & LAYOUT ==================== */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #f8f9fa;
+    padding-top: var(--navbar-height);
+}
+
+.navbar.fixed-top {
+    z-index: 1030;
+    box-shadow: var(--shadow-sm);
+}
+
+.main-content {
+    margin-left: var(--sidebar-width);
+    margin-top: var(--navbar-height);
+    padding: 32px;
+    min-height: calc(100vh - var(--navbar-height));
+    transition: margin-left var(--transition-normal);
+}
+
+.card {
+    border-radius: var(--border-radius-lg);
+}
+
+/* ==================== PAGE HEADER ==================== */
+.page-header {
+    padding-bottom: 1rem;
+    border-bottom: 2px solid #f8f9fa;
+}
+
+.header-content {
+    flex: 1;
+}
+
+.page-icon {
+    width: 56px;
+    height: 56px;
+    border-radius: var(--border-radius-xl);
+    background: linear-gradient(135deg, var(--teacher-primary) 0%, var(--teacher-primary-dark) 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 28px;
+    box-shadow: 0 4px 16px rgba(13, 110, 253, 0.3);
+    transition: all var(--transition-normal);
+}
+
+.page-icon:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(13, 110, 253, 0.4);
+}
+
+.page-title {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #1a1a1a;
+    margin: 0;
+    line-height: 1.2;
+}
+
+.page-subtitle {
+    font-size: 1rem;
+    color: #6c757d;
+    font-weight: 400;
+}
+
+/* ==================== BUTTONS ==================== */
+.btn-admin-primary,
+.btn-teacher-primary,
+.btn-student-primary {
+    border: none;
+    font-weight: 600;
+    padding: 0.625rem 1.5rem;
+    border-radius: var(--border-radius-md);
+    transition: all var(--transition-normal);
+    color: white;
+}
+
+.btn-admin-primary {
+    background: linear-gradient(135deg, var(--admin-primary) 0%, var(--admin-primary-dark) 100%);
+    box-shadow: 0 2px 8px rgba(220, 53, 69, 0.2);
+}
+
+.btn-admin-primary:hover {
+    background: linear-gradient(135deg, var(--admin-primary-dark) 0%, #bd2130 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(220, 53, 69, 0.3);
+    color: white;
+}
+
+.btn-teacher-primary {
+    background: linear-gradient(135deg, var(--teacher-primary) 0%, var(--teacher-primary-dark) 100%);
+    box-shadow: 0 2px 8px rgba(13, 110, 253, 0.2);
+}
+
+.btn-teacher-primary:hover {
+    background: linear-gradient(135deg, var(--teacher-primary-dark) 0%, #084298 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(13, 110, 253, 0.3);
+    color: white;
+}
+
+.btn-student-primary,
+.btn-student {
+    background: linear-gradient(135deg, var(--student-primary) 0%, var(--student-primary-dark) 100%);
+    box-shadow: 0 2px 8px rgba(25, 135, 84, 0.2);
+    color: white !important;
+}
+
+.btn-student-primary:hover,
+.btn-student:hover {
+    background: linear-gradient(135deg, var(--student-primary-dark) 0%, #0f5132 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(25, 135, 84, 0.3);
+    color: white !important;
+}
+
+/* Outline Buttons */
+.btn-admin-outline,
+.btn-admin-secondary,
+.btn-outline-admin {
+    background: transparent;
+    border: 2px solid var(--admin-primary);
+    color: var(--admin-primary);
+    font-weight: 600;
+    padding: 0.625rem 1.5rem;
+    border-radius: var(--border-radius-md);
+    transition: all var(--transition-normal);
+}
+
+.btn-admin-outline:hover,
+.btn-admin-secondary:hover,
+.btn-outline-admin:hover {
+    background: var(--admin-primary);
+    color: white;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(220, 53, 69, 0.2);
+}
+
+.btn-teacher-outline,
+.btn-teacher-secondary {
+    background: transparent;
+    border: 2px solid var(--teacher-primary);
+    color: var(--teacher-primary);
+    font-weight: 600;
+    padding: 0.625rem 1.5rem;
+    border-radius: var(--border-radius-md);
+    transition: all var(--transition-normal);
+}
+
+.btn-teacher-outline:hover,
+.btn-teacher-secondary:hover {
+    background: var(--teacher-primary);
+    color: white;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(74, 144, 226, 0.2);
+}
+
+.btn-student-outline,
+.btn-student-secondary {
+    background: transparent;
+    border: 2px solid var(--student-primary);
+    color: var(--student-primary);
+    font-weight: 600;
+    padding: 0.625rem 1.5rem;
+    border-radius: var(--border-radius-md);
+    transition: all var(--transition-normal);
+}
+
+.btn-student-outline:hover,
+.btn-student-secondary:hover {
+    background: var(--student-primary);
+    color: white;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(25, 135, 84, 0.2);
+}
+
+/* ==================== UTILITY CLASSES ==================== */
+/* Background Utilities */
 .bg-admin-light {
     background-color: var(--admin-primary-light) !important;
 }
@@ -64,7 +268,11 @@
     background-color: rgba(111, 66, 193, 0.1) !important;
 }
 
-/* ==================== BACKGROUND GRADIENTS ==================== */
+.bg-purple {
+    background-color: #9b59b6;
+}
+
+/* Gradient Backgrounds */
 .bg-admin,
 .bg-danger {
     background: linear-gradient(135deg, var(--admin-primary) 0%, var(--admin-primary-dark) 100%) !important;
@@ -80,11 +288,6 @@
     background: linear-gradient(135deg, var(--student-primary) 0%, var(--student-primary-dark) 100%) !important;
 }
 
-.bg-purple {
-    background-color: #9b59b6;
-}
-
-/* Dashboard stat card gradients */
 .bg-gradient-primary {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
 }
@@ -98,91 +301,126 @@
 }
 
 .bg-gradient-secondary {
-    background: linear-gradient(135deg, #4e54c8 0%, #8f94fb 100%);
+    background: linear-gradient(135deg, #a1c4fd 0%, #c2e9fb 100%);
+}
+
+/* Glass Variants for Stat Cards - Vibrant Jelly Transparent */
+.bg-admin-glass {
+    background: linear-gradient(135deg, rgba(255, 65, 108, 0.25) 0%, rgba(255, 75, 43, 0.15) 100%) !important;
+    border: 1px solid rgba(255, 65, 108, 0.3);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    box-shadow: 0 4px 16px rgba(255, 65, 108, 0.15);
+}
+
+.bg-admin-glass .stat-card-icon {
+    background: rgba(255, 255, 255, 0.9) !important;
+    color: #dc3545 !important;
+    box-shadow: 0 2px 8px rgba(255, 65, 108, 0.2);
+}
+
+.bg-admin-glass .stat-card-title {
+    color: #1a1a1a !important;
+    opacity: 0.7;
+}
+
+.bg-admin-glass h3 {
+    color: #1a1a1a !important;
+    font-weight: 700 !important;
+}
+
+.bg-teacher-glass {
+    background: linear-gradient(135deg, rgba(74, 144, 226, 0.25) 0%, rgba(53, 122, 189, 0.15) 100%) !important;
+    border: 1px solid rgba(74, 144, 226, 0.3);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    box-shadow: 0 4px 16px rgba(74, 144, 226, 0.15);
+}
+
+.bg-teacher-glass .stat-card-icon {
+    background: rgba(255, 255, 255, 0.9) !important;
+    color: #4a90e2 !important;
+    box-shadow: 0 2px 8px rgba(74, 144, 226, 0.2);
+}
+
+.bg-teacher-glass .stat-card-title {
+    color: #1a1a1a !important;
+    opacity: 0.7;
+}
+
+.bg-teacher-glass h3 {
+    color: #1a1a1a !important;
+    font-weight: 700 !important;
+}
+
+.bg-student-glass {
+    background: linear-gradient(135deg, rgba(25, 135, 84, 0.25) 0%, rgba(20, 108, 67, 0.15) 100%) !important;
+    border: 1px solid rgba(25, 135, 84, 0.3);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    box-shadow: 0 4px 16px rgba(25, 135, 84, 0.15);
+}
+
+.bg-student-glass .stat-card-icon {
+    background: rgba(255, 255, 255, 0.9) !important;
+    color: #198754 !important;
+    box-shadow: 0 2px 8px rgba(25, 135, 84, 0.2);
+}
+
+.bg-student-glass .stat-card-title {
+    color: #1a1a1a !important;
+    opacity: 0.7;
+}
+
+.bg-student-glass h3 {
+    color: #1a1a1a !important;
+    font-weight: 700 !important;
+}
+
+/* Additional Glass Variants for new Types */
+.bg-info-glass {
+    background: linear-gradient(135deg, rgba(13, 202, 240, 0.25) 0%, rgba(13, 168, 240, 0.15) 100%) !important;
+    border: 1px solid rgba(13, 202, 240, 0.3);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    box-shadow: 0 4px 16px rgba(13, 202, 240, 0.15);
+}
+
+.bg-info-glass .stat-card-icon {
+    background: rgba(255, 255, 255, 0.9) !important;
+    color: #0dcaf0 !important;
+    box-shadow: 0 2px 8px rgba(13, 202, 240, 0.2);
+}
+
+.bg-info-glass .stat-card-title,
+.bg-info-glass h3 {
+    color: #1a1a1a !important;
+}
+
+.bg-warning-glass {
+    background: linear-gradient(135deg, rgba(255, 193, 7, 0.25) 0%, rgba(230, 175, 5, 0.15) 100%) !important;
+    border: 1px solid rgba(255, 193, 7, 0.3);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    box-shadow: 0 4px 16px rgba(255, 193, 7, 0.15);
+}
+
+.bg-warning-glass .stat-card-icon {
+    background: rgba(255, 255, 255, 0.9) !important;
+    color: #ffc107 !important;
+    box-shadow: 0 2px 8px rgba(255, 193, 7, 0.2);
+}
+
+.bg-warning-glass .stat-card-title,
+.bg-warning-glass h3 {
+    color: #1a1a1a !important;
 }
 
 .bg-gradient-info {
     background: linear-gradient(135deg, #0dcaf0 0%, #0d6efd 100%);
 }
 
-.bg-gradient-red {
-    background: linear-gradient(135deg, rgba(255, 65, 108, 0.15) 0%, rgba(255, 75, 43, 0.05) 100%);
-    color: #c0392b;
-    border-color: rgba(255, 65, 108, 0.2);
-}
-
-.bg-gradient-red .stat-icon {
-    background: rgba(255, 255, 255, 0.8);
-    color: #ff4b2b;
-}
-
-.bg-gradient-rose {
-    background: linear-gradient(135deg, rgba(236, 0, 140, 0.15) 0%, rgba(252, 103, 103, 0.05) 100%);
-    color: #d81b60;
-    border-color: rgba(236, 0, 140, 0.2);
-}
-
-.bg-gradient-rose .stat-icon {
-    background: rgba(255, 255, 255, 0.8);
-    color: #ec008c;
-}
-
-.bg-gradient-sunset {
-    background: linear-gradient(135deg, rgba(255, 81, 47, 0.15) 0%, rgba(221, 36, 118, 0.05) 100%);
-    color: #e65100;
-    border-color: rgba(255, 81, 47, 0.2);
-}
-
-.bg-gradient-sunset .stat-icon {
-    background: rgba(255, 255, 255, 0.8);
-    color: #ff512f;
-}
-
-.bg-gradient-dark-red {
-    background: linear-gradient(135deg, rgba(135, 0, 0, 0.15) 0%, rgba(25, 10, 5, 0.05) 100%);
-    color: #880e4f;
-    border-color: rgba(135, 0, 0, 0.2);
-}
-
-.bg-gradient-dark-red .stat-icon {
-    background: rgba(255, 255, 255, 0.8);
-    color: #870000;
-}
-
-.bg-gradient-ruby {
-    background: linear-gradient(135deg, rgba(203, 45, 62, 0.15) 0%, rgba(239, 71, 58, 0.05) 100%);
-    color: #b71c1c;
-    border-color: rgba(203, 45, 62, 0.2);
-}
-
-.bg-gradient-ruby .stat-icon {
-    background: rgba(255, 255, 255, 0.8);
-    color: #cb2d3e;
-}
-
-.bg-gradient-tomato {
-    background: linear-gradient(135deg, rgba(255, 75, 31, 0.15) 0%, rgba(255, 144, 104, 0.05) 100%);
-    color: #bf360c;
-    border-color: rgba(255, 75, 31, 0.2);
-}
-
-.bg-gradient-tomato .stat-icon {
-    background: rgba(255, 255, 255, 0.8);
-    color: #ff4b1f;
-}
-
-.bg-gradient-crimson {
-    background: linear-gradient(135deg, rgba(220, 36, 36, 0.15) 0%, rgba(74, 86, 157, 0.05) 100%);
-    color: #b71c1c;
-    border-color: rgba(220, 36, 36, 0.2);
-}
-
-.bg-gradient-crimson .stat-icon {
-    background: rgba(255, 255, 255, 0.8);
-    color: #dc2424;
-}
-
-/* ==================== TEXT UTILITIES ==================== */
+/* Text Utilities */
 .text-admin {
     color: var(--admin-primary) !important;
 }
@@ -199,7 +437,7 @@
     color: #6f42c1 !important;
 }
 
-/* ==================== BORDER UTILITIES ==================== */
+/* Border Utilities */
 .border-admin {
     border-color: var(--admin-primary) !important;
 }
@@ -212,137 +450,189 @@
     border-color: var(--student-primary) !important;
 }
 
-/* ==================== ADMIN BUTTONS ==================== */
-.btn-admin-primary {
-    background: linear-gradient(135deg, var(--admin-primary) 0%, var(--admin-primary-dark) 100%);
-    border: none;
+.border-start-student-thick {
+    border-left: 4px solid var(--student-primary) !important;
+}
+
+/* Hover Utilities */
+.hover-link {
+    transition: color var(--transition-fast);
+    cursor: pointer;
+}
+
+.hover-link:hover {
+    color: var(--teacher-primary) !important;
+    text-decoration: underline;
+}
+
+.hover-card,
+.hover-lift {
+    transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.hover-card:hover,
+.hover-lift:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1) !important;
+}
+
+.hover-shadow:hover {
+    box-shadow: 0 .5rem 1rem rgba(0, 0, 0, .15) !important;
+}
+
+.hover-bg-light:hover {
+    background-color: #f8f9fa;
+    transition: background-color var(--transition-fast);
+}
+
+.transition-all {
+    transition: all var(--transition-normal);
+}
+
+.cursor-pointer {
+    cursor: pointer;
+}
+
+/* Badge Soft Variants */
+.badge-soft-success {
+    background-color: rgba(25, 135, 84, 0.1) !important;
+    color: #198754 !important;
+}
+
+.badge-soft-warning {
+    background-color: rgba(255, 193, 7, 0.1) !important;
+    color: #ffc107 !important;
+}
+
+.badge-soft-danger {
+    background-color: rgba(220, 53, 69, 0.1) !important;
+    color: #dc3545 !important;
+}
+
+.badge-soft-info {
+    background-color: rgba(13, 202, 240, 0.1) !important;
+    color: #0dcaf0 !important;
+}
+
+.badge-soft-primary {
+    background-color: rgba(13, 110, 253, 0.1) !important;
+    color: #0d6efd !important;
+}
+
+.badge-soft-secondary {
+    background-color: rgba(108, 117, 125, 0.1) !important;
+    color: #6c757d !important;
+}
+
+/* ==================== COMPONENTS ==================== */
+/* Profile Avatar */
+.profile-avatar {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    font-weight: bold;
     color: white;
-    font-weight: 600;
-    padding: 0.625rem 1.5rem;
-    border-radius: 10px;
-    transition: all 0.3s ease;
-    box-shadow: 0 2px 8px rgba(220, 53, 69, 0.2);
 }
 
-.btn-admin-primary:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(220, 53, 69, 0.3);
-    background: linear-gradient(135deg, var(--admin-primary-dark) 0%, #bd2130 100%);
-    color: white;
+.profile-avatar.lg {
+    width: 80px;
+    height: 80px;
+    font-size: 2rem;
 }
 
-.btn-admin-primary:active {
-    transform: translateY(0);
-}
-
-.btn-admin-primary:disabled {
-    background: #e4606d;
-    transform: none;
-    box-shadow: none;
-}
-
-.btn-admin-secondary {
-    background: white;
-    border: 2px solid var(--admin-primary);
-    color: var(--admin-primary);
-    font-weight: 600;
-    padding: 0.625rem 1.5rem;
-    border-radius: 10px;
-    transition: all 0.3s ease;
-}
-
-.btn-admin-secondary:hover {
-    background: var(--admin-primary);
-    color: white;
-}
-
-.btn-admin-outline,
-.btn-outline-admin {
-    background: transparent;
-    border: 2px solid var(--admin-primary);
-    color: var(--admin-primary);
-    font-weight: 600;
-    padding: 0.625rem 1.5rem;
-    border-radius: 10px;
-    transition: all 0.3s ease;
-}
-
-.btn-admin-outline:hover,
-.btn-outline-admin:hover {
-    background: var(--admin-primary);
-    color: white;
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(220, 53, 69, 0.2);
-}
-
-/* ==================== TEACHER BUTTONS ==================== */
-.btn-teacher-primary {
+.profile-avatar-teacher,
+.profile-avatar-subject {
     background: linear-gradient(135deg, var(--teacher-primary) 0%, var(--teacher-primary-dark) 100%);
-    border: none;
-    color: white;
-    font-weight: 600;
-    padding: 0.625rem 1.5rem;
-    border-radius: 10px;
-    transition: all 0.3s ease;
-    box-shadow: 0 2px 8px rgba(13, 110, 253, 0.2);
 }
 
-.btn-teacher-primary:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(13, 110, 253, 0.3);
-    background: linear-gradient(135deg, var(--teacher-primary-dark) 0%, #084298 100%);
-    color: white;
+.profile-avatar-admin {
+    background: linear-gradient(135deg, var(--admin-primary) 0%, var(--admin-primary-dark) 100%);
 }
 
-.btn-teacher-primary:active {
-    transform: none;
-    box-shadow: none;
+.profile-avatar-course,
+.profile-avatar-department {
+    background: linear-gradient(135deg, #6f42c1 0%, #5a32a3 100%);
 }
 
-.btn-teacher-secondary {
-    background: white;
-    border: 2px solid var(--teacher-primary);
-    color: var(--teacher-primary);
-    font-weight: 600;
-    padding: 0.625rem 1.5rem;
-    border-radius: 10px;
-    transition: all 0.3s ease;
+/* Stat Card styles moved to components.css to avoid conflicts */
+
+/* Stat Card Styles */
+.stat-card {
+    display: flex;
+    align-items: center;
+    padding: 1.5rem;
+    border-radius: 12px;
+    gap: 1rem;
+    min-width: 200px;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
-.btn-teacher-secondary:hover {
-    background: var(--teacher-primary);
-    color: white;
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(13, 110, 253, 0.2);
+.stat-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
 }
 
-.btn-teacher-outline {
-    background: transparent;
-    border: 2px solid var(--teacher-primary);
-    color: var(--teacher-primary);
-    font-weight: 600;
-    padding: 0.625rem 1.5rem;
-    border-radius: 10px;
-    transition: all 0.3s ease;
+.stat-card-icon {
+    width: 52px;
+    height: 52px;
 }
 
-.btn-teacher-outline:hover {
-    background: var(--teacher-primary);
-    color: white;
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(13, 110, 253, 0.2);
+.stat-card-title {
+    font-size: 0.75rem;
 }
 
-/* ==================== LAYOUT - RESPONSIVE ==================== */
-.main-content {
-    margin-left: var(--sidebar-width);
-    margin-top: var(--navbar-height);
-    padding: 32px;
-    min-height: calc(100vh - var(--navbar-height));
-    transition: margin-left 0.3s ease;
+/* ==================== SCHEDULE & TIMETABLE ==================== */
+.schedule-table {
+    font-size: 0.875rem;
 }
 
-/* Tablet */
+.schedule-cell {
+    height: 60px;
+    vertical-align: middle;
+    padding: 4px;
+    cursor: pointer;
+    position: relative;
+}
+
+.schedule-item {
+    padding: 8px;
+    border-radius: 6px;
+    background: #f8f9fa;
+    border-left: 3px solid #0d6efd;
+    font-size: 0.75rem;
+    height: 100%;
+    transition: all var(--transition-fast);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    text-align: center;
+}
+
+.schedule-item:hover {
+    background: #e9ecef;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.add-slot {
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.3;
+    transition: all var(--transition-fast);
+}
+
+.add-slot:hover {
+    opacity: 1;
+    background: #f8f9fa;
+}
+
+/* ==================== RESPONSIVE ==================== */
 @media (max-width: 992px) {
     .main-content {
         margin-left: 0;
@@ -351,7 +641,7 @@
 
     .sidebar {
         transform: translateX(-100%);
-        transition: transform 0.3s ease;
+        transition: transform var(--transition-normal);
     }
 
     .sidebar.show {
@@ -374,7 +664,6 @@
     }
 }
 
-/* Mobile */
 @media (max-width: 768px) {
     .main-content {
         padding: 16px 12px;
@@ -395,22 +684,15 @@
     .btn-admin-outline,
     .btn-teacher-primary,
     .btn-teacher-secondary,
-    .btn-teacher-outline {
+    .btn-teacher-outline,
+    .btn-student-primary,
+    .btn-student-secondary,
+    .btn-student-outline {
         padding: 0.5rem 1rem;
         font-size: 0.875rem;
     }
-
-    .header-actions {
-        width: 100%;
-    }
-
-    .header-actions .btn {
-        flex: 1;
-        min-width: auto;
-    }
 }
 
-/* Small Mobile */
 @media (max-width: 576px) {
     .main-content {
         padding: 12px 8px;
@@ -425,35 +707,901 @@
     }
 }
 
-/* ==================== ANIMATIONS ==================== */
-@keyframes fadeIn {
-    from {
-        opacity: 0;
-        transform: translateY(10px);
-    }
-
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
+/* ==================== STUDENT VIEW UTILITIES ==================== */
+.page-link.bg-success {
+    background-color: var(--student-primary) !important;
+    color: white !important;
 }
 
-@keyframes slideUp {
-    from {
-        opacity: 0;
-        transform: translateY(20px);
-    }
-
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
+.border-start.border-danger {
+    border-left-width: 4px !important;
 }
 
-.fade-in {
-    animation: fadeIn 0.3s ease-in;
+/* ==================== ADDITIONAL UTILITIES ==================== */
+.min-height-60vh {
+    min-height: 60vh;
 }
 
-.slide-up {
-    animation: slideUp 0.4s ease-out;
+.min-h-40 {
+    min-height: 40px;
+}
+
+.d-flex-center {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.col-width-60 {
+    width: 60px;
+}
+
+.col-width-100 {
+    width: 100px;
+}
+
+.table-scroll-400 {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.progress-xs {
+    height: 6px;
+}
+
+.last-mb-0:last-child {
+    margin-bottom: 0 !important;
+}
+
+/* Glass Effect Cards */
+.card-glass-warning {
+    background: linear-gradient(135deg, rgba(255, 193, 7, 0.15) 0%, rgba(255, 235, 59, 0.1) 100%) !important;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 193, 7, 0.2) !important;
+}
+
+.card-glass-success {
+    background: linear-gradient(135deg, rgba(25, 135, 84, 0.15) 0%, rgba(40, 167, 69, 0.1) 100%) !important;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(25, 135, 84, 0.2) !important;
+}
+
+.text-warning-dark {
+    color: #d39e00 !important;
+}
+
+.text-success-dark {
+    color: #0f5132 !important;
+}
+
+/* Icon Circle Sizes */
+.icon-circle-28 {
+    width: 28px;
+    height: 28px;
+}
+
+.icon-circle-40 {
+    width: 40px;
+    height: 40px;
+}
+
+.icon-circle-48 {
+    width: 48px;
+    height: 48px;
+}
+
+.icon-circle-50 {
+    width: 50px;
+    height: 50px;
+}
+
+.icon-circle-70 {
+    width: 70px;
+    height: 70px;
+}
+
+.icon-circle-80 {
+    width: 80px;
+    height: 80px;
+}
+
+.icon-circle-90 {
+    width: 90px;
+    height: 90px;
+}
+
+/* Text Sizes */
+.text-xs {
+    font-size: 0.75rem;
+}
+
+/* Description Box */
+.description-box {
+    min-height: 60px;
+    line-height: 1.6;
+}
+
+/* Progress Bar Custom */
+.progress-14 {
+    height: 14px;
+    border-radius: 10px;
+}
+
+/* Border Left Thick */
+.border-left-success-thick {
+    border-left: 4px solid var(--success-primary) !important;
+}
+
+.border-left-warning-thick {
+    border-left: 4px solid var(--warning-primary) !important;
+}
+
+.border-left-danger-thick {
+    border-left: 4px solid var(--danger-primary) !important;
+}
+
+/* ==================== GRADIENTS (MOVED FROM components.css) ==================== */
+.bg-gradient-blue {
+    background: linear-gradient(135deg, #4e54c8 0%, #8f94fb 100%) !important;
+}
+
+.bg-gradient-red {
+    background: linear-gradient(135deg, #ff416c 0%, #ff4b2b 100%) !important;
+}
+
+.bg-gradient-rose {
+    background: linear-gradient(135deg, #e91e63 0%, #f06292 100%) !important;
+}
+
+.bg-gradient-sunset {
+    background: linear-gradient(135deg, #ff5f6d 0%, #ffc371 100%) !important;
+}
+
+.bg-gradient-dark-red {
+    background: linear-gradient(135deg, #870000 0%, #190a05 100%) !important;
+}
+
+.bg-gradient-ruby {
+    background: linear-gradient(135deg, #9b111e 0%, #e0115f 100%) !important;
+}
+
+.bg-gradient-tomato {
+    background: linear-gradient(135deg, #ff6347 0%, #ff4500 100%) !important;
+}
+
+.bg-gradient-crimson {
+    background: linear-gradient(135deg, #dc143c 0%, #900c3f 100%) !important;
+}
+
+
+/* ==================== TEACHER PANEL SPECIFIC STYLES ==================== */
+
+/* Badge Font Sizes */
+.badge-sm {
+    font-size: 0.875rem;
+}
+
+.badge-xs {
+    font-size: 0.7rem;
+}
+
+/* Avatar Circles */
+.avatar-circle {
+    width: 48px;
+    height: 48px;
+    background: rgba(74, 144, 226, 0.15);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.avatar-circle-sm {
+    width: 40px;
+    height: 40px;
+}
+
+.avatar-circle-teacher {
+    background: rgba(74, 144, 226, 0.15);
+}
+
+/* Icon Boxes */
+.icon-box-48 {
+    width: 48px;
+    height: 48px;
+    background: rgba(74, 144, 226, 0.15);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Progress Bars */
+.progress-mini {
+    height: 4px;
+    width: 60px;
+    margin: 4px auto 0;
+}
+
+.progress-sm {
+    height: 6px;
+}
+
+.progress-md {
+    height: 8px;
+    width: 60px;
+}
+
+.progress-lg {
+    height: 12px;
+}
+
+/* Table Column Widths */
+.col-w-100 {
+    width: 100px;
+}
+
+.col-w-150 {
+    width: 150px;
+}
+
+/* Text Truncate with Max Width */
+.text-truncate-300 {
+    max-width: 300px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Modal Styles */
+.modal-backdrop-custom {
+    display: block;
+    background: rgba(0, 0, 0, 0.5);
+}
+
+/* Icon Sizes */
+.icon-2rem {
+    font-size: 2rem;
+}
+
+.icon-3rem {
+    font-size: 3rem;
+}
+
+/* Sticky Positioning */
+.sticky-top-80 {
+    position: sticky;
+    top: 80px;
+}
+
+/* Cursor Styles */
+.cursor-pointer {
+    cursor: pointer;
+}
+
+/* Semester Badge */
+.badge-semester {
+    background: rgba(74, 144, 226, 0.15);
+    color: var(--teacher-primary);
+}
+
+/* ==================== GRADE STUDENTS COMPONENT ==================== */
+.assessment-item {
+    cursor: pointer;
+    background: #fff;
+    border-color: #f1f3f5 !important;
+}
+
+.assessment-item:hover {
+    background: #f8f9fa;
+    transform: translateY(-2px);
+    border-color: #dee2e6 !important;
+}
+
+.active-assessment {
+    background: #f0f7ff !important;
+    border-color: #0d6efd !important;
+    z-index: 1;
+}
+
+.btn-teacher-light {
+    background-color: #e7f1ff;
+    color: #0d6efd;
+    border: none;
+}
+
+.btn-teacher-light:hover {
+    background-color: #0d6efd;
+    color: #fff;
+}
+
+/* Custom Table Styles */
+.custom-grading-table thead th {
+    padding-bottom: 1rem;
+    letter-spacing: 0.05rem;
+}
+
+.avatar-cell {
+    width: 38px;
+    height: 38px;
+    background: #e9ecef;
+    color: #495057;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 0.9rem;
+}
+
+.form-control-marks {
+    width: 80px;
+    text-align: center;
+    font-weight: 700;
+    border-radius: 10px;
+    border: 2px solid #edeff2;
+    transition: all 0.2s;
+}
+
+.form-control-marks:focus {
+    border-color: #0d6efd;
+    box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.15);
+}
+
+.form-control-remarks {
+    border: none;
+    background: transparent;
+    font-size: 0.9rem;
+    color: #495057;
+}
+
+.form-control-remarks:focus {
+    box-shadow: none;
+    border-bottom: 2px solid #0d6efd;
+    border-radius: 0;
+}
+
+.lock-btn {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.btn-soft-success {
+    background-color: #e6f6ec;
+    color: #0d9648;
+}
+
+.btn-soft-danger {
+    background-color: #fbe9ea;
+    color: #d63031;
+}
+
+.row-dirty {
+    background-color: rgba(13, 110, 253, 0.02);
+}
+
+.grade-badge-bg-success {
+    background-color: #e6f6ec;
+    color: #0d9648;
+}
+
+.grade-badge-bg-warning {
+    background-color: #fff8e6;
+    color: #b7791f;
+}
+
+.grade-badge-bg-danger {
+    background-color: #fbe9ea;
+    color: #d63031;
+}
+
+.mw-300 {
+    max-width: 300px;
+}
+
+.remarks-input-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.icon-hint {
+    position: absolute;
+    right: 0;
+    opacity: 0.3;
+    font-size: 0.8rem;
+}
+
+
+/* ==================== COMMON INLINE STYLES MOVED TO CSS ==================== */
+
+/* Badge Sizes */
+.badge-font-xs {
+    font-size: 0.7rem;
+}
+
+/* Table Column Widths */
+.table-col-w-100 {
+    width: 100px;
+}
+
+.table-col-w-140 {
+    width: 140px;
+}
+
+.table-col-w-80 {
+    width: 80px;
+}
+
+/* Progress Bar Heights */
+.progress-h-4 {
+    height: 4px;
+}
+
+.progress-h-6 {
+    height: 6px;
+}
+
+.progress-h-8 {
+    height: 8px;
+}
+
+.progress-h-12 {
+    height: 12px;
+}
+
+/* Max Heights */
+.max-h-70vh {
+    max-height: 70vh;
+}
+
+.max-h-400 {
+    max-height: 400px;
+}
+
+.max-h-450 {
+    max-height: 450px;
+}
+
+/* Max Widths */
+.max-w-450 {
+    max-width: 450px;
+}
+
+/* Avatar Sizes */
+.avatar-40 {
+    width: 40px;
+    height: 40px;
+}
+
+.avatar-48 {
+    width: 48px;
+    height: 48px;
+}
+
+.avatar-32 {
+    width: 32px;
+    height: 32px;
+}
+
+/* Icon Sizes */
+.icon-size-80 {
+    width: 80px;
+    height: 80px;
+}
+
+/* Feature Icon Backgrounds */
+.feature-icon-primary {
+    background: rgba(13, 110, 253, 0.15);
+}
+
+.feature-icon-success {
+    background: rgba(25, 135, 84, 0.15);
+}
+
+.feature-icon-warning {
+    background: rgba(255, 193, 7, 0.15);
+}
+
+.feature-icon-info {
+    background: rgba(23, 162, 184, 0.15);
+}
+
+.feature-icon-danger {
+    background: rgba(220, 53, 69, 0.15);
+}
+
+.feature-icon-purple {
+    background: rgba(111, 66, 193, 0.15);
+}
+
+/* Image Heights */
+.img-h-200 {
+    height: 200px;
+    width: 100%;
+    object-fit: cover;
+}
+
+.img-h-450 {
+    max-height: 450px;
+    object-fit: cover;
+}
+
+/* Hero Section */
+.hero-gradient {
+    background: linear-gradient(135deg, #0d6efd 0%, #0dcaf0 100%);
+}
+
+/* Profile Badge */
+.profile-badge-bg {
+    background-color: rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+}
+
+/* Sticky Positioning */
+.sticky-top-80 {
+    position: sticky;
+    top: 80px;
+}
+
+/* Modal Backdrop */
+.modal-backdrop-show {
+    display: block;
+    background: rgba(0, 0, 0, 0.5);
+}
+
+/* Icon Font Sizes */
+.fs-icon-2rem {
+    font-size: 2rem;
+}
+
+/* Avatar Circle with Background */
+.avatar-circle-teacher-bg {
+    width: 40px;
+    height: 40px;
+    background: rgba(74, 144, 226, 0.15);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Progress Width */
+.progress-w-60 {
+    width: 60px;
+}
+
+
+/* ==================== COMMON INLINE STYLES MOVED TO CSS ==================== */
+
+/* Badge Sizes */
+.badge-font-xs {
+    font-size: 0.7rem;
+}
+
+/* Table Column Widths */
+.table-col-w-100 {
+    width: 100px;
+}
+
+.table-col-w-140 {
+    width: 140px;
+}
+
+.table-col-w-80 {
+    width: 80px;
+}
+
+/* Progress Bar Heights */
+.progress-h-4 {
+    height: 4px;
+}
+
+.progress-h-6 {
+    height: 6px;
+}
+
+.progress-h-8 {
+    height: 8px;
+}
+
+.progress-h-12 {
+    height: 12px;
+}
+
+/* Progress Bar Widths */
+.progress-w-60 {
+    width: 60px;
+}
+
+/* Max Heights */
+.max-h-70vh {
+    max-height: 70vh;
+}
+
+.max-h-400 {
+    max-height: 400px;
+}
+
+/* Max Widths */
+.max-w-450 {
+    max-width: 450px;
+}
+
+/* Sticky Positioning */
+.sticky-top-80 {
+    position: sticky;
+    top: 80px;
+}
+
+/* Avatar Sizes */
+.avatar-32 {
+    width: 32px;
+    height: 32px;
+}
+
+.avatar-40 {
+    width: 40px;
+    height: 40px;
+}
+
+.avatar-48 {
+    width: 48px;
+    height: 48px;
+}
+
+/* Icon Sizes */
+.icon-size-2rem {
+    font-size: 2rem;
+}
+
+/* Feature Icon Box */
+.feature-icon-box {
+    width: 80px;
+    height: 80px;
+}
+
+.feature-icon-box-primary {
+    background: rgba(13, 110, 253, 0.15);
+}
+
+.feature-icon-box-success {
+    background: rgba(25, 135, 84, 0.15);
+}
+
+.feature-icon-box-warning {
+    background: rgba(255, 193, 7, 0.15);
+}
+
+.feature-icon-box-info {
+    background: rgba(23, 162, 184, 0.15);
+}
+
+.feature-icon-box-danger {
+    background: rgba(220, 53, 69, 0.15);
+}
+
+.feature-icon-box-purple {
+    background: rgba(111, 66, 193, 0.15);
+}
+
+/* Image Heights */
+.img-h-200 {
+    height: 200px;
+    width: 100%;
+    object-fit: cover;
+}
+
+.img-h-450 {
+    max-height: 450px;
+    object-fit: cover;
+}
+
+/* Modal Backdrop */
+.modal-backdrop-show {
+    display: block;
+    background: rgba(0, 0, 0, 0.5);
+}
+
+/* Hero Section Background */
+.hero-gradient-bg {
+    background: linear-gradient(135deg, #0d6efd 0%, #0dcaf0 100%);
+}
+
+/* Profile Badge Background */
+.profile-badge-bg {
+    background-color: rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+}
+
+/* Avatar Circle with Teacher Color */
+.avatar-circle-teacher-bg {
+    background: rgba(74, 144, 226, 0.15);
+}
+
+/* Overflow Auto with Padding */
+.overflow-auto-p-2 {
+    overflow: auto;
+    padding: 0.5rem;
+}
+
+/* ==================== INLINE STYLES MOVED TO CSS ==================== */
+
+/* Spinner Sizes */
+.spinner-lg {
+    width: 3rem;
+    height: 3rem;
+}
+
+/* Badge Icon Sizes */
+.badge-icon-xs {
+    font-size: 0.4rem;
+}
+
+/* Avatar Circle Sizes */
+.avatar-circle-50 {
+    width: 50px;
+    height: 50px;
+}
+
+/* Max Width Utilities */
+.max-w-900 {
+    max-width: 900px;
+}
+
+.max-w-1000 {
+    max-width: 1000px;
+}
+
+.max-w-1200 {
+    max-width: 1200px;
+}
+
+.max-w-600 {
+    max-width: 600px;
+}
+
+/* Min Width Utilities */
+.min-w-80 {
+    min-width: 80px;
+}
+
+/* Min Height Utilities */
+.min-h-500 {
+    min-height: 500px;
+}
+
+/* Height Utilities */
+.h-80vh {
+    height: 80vh;
+}
+
+.h-6px {
+    height: 6px;
+}
+
+.h-20px {
+    height: 20px;
+}
+
+/* Width Utilities */
+.w-100px {
+    width: 100px;
+}
+
+/* Border None */
+.border-none {
+    border: none;
+}
+
+/* Hero Gradient Background */
+.hero-gradient {
+    background: linear-gradient(135deg, #0d6efd 0%, #0dcaf0 100%);
+}
+
+/* Feature Icon */
+.feature-icon {
+    width: 80px;
+    height: 80px;
+}
+
+/* Modal Backdrop */
+.modal-backdrop-custom {
+    background: rgba(0, 0, 0, 0.5);
+}
+
+/* Cursor Pointer */
+.cursor-pointer {
+    cursor: pointer;
+}
+
+/* Min Height Utilities */
+.min-h-60vh {
+    min-height: 60vh;
+}
+
+/* Max Height with Overflow */
+.max-h-400-scroll {
+    max-height: 400px;
+    overflow-y: auto;
+    overflow-x: visible;
+}
+
+/* Table Column Widths */
+.col-w-60 {
+    width: 60px;
+}
+
+.col-w-100 {
+    width: 100px;
+}
+
+/* Modal Overlay */
+.modal-overlay {
+    background: rgba(0, 0, 0, 0.5);
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1050;
+    overflow-y: auto;
+}
+
+/* ==================== QUIZ & TAKING QUIZ STYLES ==================== */
+.clickable {
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.clickable:hover {
+    background: #f8f9fa;
+    transform: translateX(5px);
+}
+
+.quiz-option-active {
+    background: rgba(25, 135, 84, 0.08) !important;
+    border-color: #198754 !important;
+    box-shadow: 0 4px 12px rgba(25, 135, 84, 0.1);
+}
+
+.option-check {
+    width: 20px;
+    height: 20px;
+    border: 2px solid #dee2e6;
+    border-radius: 50%;
+    position: relative;
+    transition: all 0.2s ease;
+}
+
+.option-check.checked {
+    border-color: #198754;
+    background-color: #198754;
+}
+
+.option-check.checked::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 8px;
+    height: 8px;
+    background: white;
+    border-radius: 50%;
+}
+
+.transition-all {
+    transition: all 0.2s ease;
+}
+
+.rounded-4 {
+    border-radius: 1rem !important;
 }

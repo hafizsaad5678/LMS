@@ -40,7 +40,7 @@
     <!-- Quick Navigation -->
     <div class="row g-4 mb-4">
       <div class="col-md-6">
-        <div class="card border-0 shadow-sm hover-card" @click="$router.push('/admin-dashboard/library/books')" style="cursor: pointer;">
+        <div class="card border-0 shadow-sm hover-card cursor-pointer" @click="router.push({ name: ADMIN_ROUTES.LIBRARY_BOOKS.name })">
           <div class="card-body p-4 text-center">
             <div class="display-4 text-admin mb-3"><i class="bi bi-journal-album"></i></div>
             <h4 class="fw-bold">Manage Books</h4>
@@ -50,7 +50,7 @@
         </div>
       </div>
       <div class="col-md-6">
-        <div class="card border-0 shadow-sm hover-card" @click="$router.push('/admin-dashboard/library/borrowings')" style="cursor: pointer;">
+        <div class="card border-0 shadow-sm hover-card cursor-pointer" @click="router.push({ name: ADMIN_ROUTES.LIBRARY_BORROWING.name })">
           <div class="card-body p-4 text-center">
             <div class="display-4 text-warning mb-3"><i class="bi bi-arrow-left-right"></i></div>
             <h4 class="fw-bold">Manage Circulation</h4>
@@ -66,10 +66,13 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import AdminPageTemplate from '@/components/navbar/AdminPageTemplate.vue'
-import { libraryBookService, bookBorrowingService } from '@/services/managementService'
+import { useRouter } from 'vue-router'
+import { AdminPageTemplate } from '@/components/shared/panels'
+import { libraryBookService, bookBorrowingService } from '@/services/admin/managementService'
+import { ADMIN_ROUTES } from '@/utils/constants/routes'
 
-const breadcrumbs = [{ name: 'Dashboard', href: '/admin-dashboard' }, { name: 'Library' }]
+const router = useRouter()
+const breadcrumbs = [{ name: 'Dashboard', href: ADMIN_ROUTES.DASHBOARD.path }, { name: 'Library' }]
 const stats = ref({
   totalBooks: 0,
   availableBooks: 0,

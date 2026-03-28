@@ -6,16 +6,16 @@
     <template #stats>
       <div class="row g-3 g-lg-4">
         <div class="col-6 col-xl-3">
-          <StatCard title="Collected" :value="'PKR ' + totalCollected.toLocaleString()" icon="bi bi-cash-stack" bg-color="bg-success-light" icon-color="text-success" />
+          <StatCard title="Collected" :value="CURRENCY + ' ' + totalCollected.toLocaleString()" icon="bi bi-cash-stack" bg-color="bg-success-light" icon-color="text-success" />
         </div>
         <div class="col-6 col-xl-3">
-          <StatCard title="Pending" :value="'PKR ' + totalPending.toLocaleString()" icon="bi bi-hourglass-split" bg-color="bg-warning-light" icon-color="text-warning" />
+          <StatCard title="Pending" :value="CURRENCY + ' ' + totalPending.toLocaleString()" icon="bi bi-hourglass-split" bg-color="bg-warning-light" icon-color="text-warning" />
         </div>
         <div class="col-6 col-xl-3">
           <StatCard title="Overdue" :value="overdueCount" icon="bi bi-exclamation-triangle" bg-color="bg-danger-light" icon-color="text-danger" />
         </div>
         <div class="col-6 col-xl-3">
-          <StatCard title="Total Records" :value="fees.length" icon="bi bi-people" bg-color="bg-info-light" icon-color="text-info" />
+          <StatCard title="Total Records" :value="data.length" icon="bi bi-people" bg-color="bg-info-light" icon-color="text-info" />
         </div>
       </div>
     </template>
@@ -23,19 +23,16 @@
     <!-- Filters Section -->
     <template #filters>
       <SearchFilter
-        v-model="searchQuery"
+        v-model="filters.search"
         search-placeholder="Search student..."
         :show-status-filter="false"
-        search-col-size="col-md-4 col-12"
-        actions-col-size="col-md-2 col-6"
         :loading="loading"
-        @refresh="loadFees"
+        @refresh="() => loadData(fetchFees, false)"
         @reset="resetFilters"
       >
         <template #filters>
           <div class="col-md-3 col-6">
-            <label class="form-label small fw-semibold text-dark">Status</label>
-            <select v-model="statusFilter" class="form-select" @change="loadFees">
+            <select v-model="filters.statusType" class="form-select">
               <option value="">All Status</option>
               <option value="paid">Paid</option>
               <option value="pending">Pending</option>
@@ -43,8 +40,7 @@
             </select>
           </div>
           <div class="col-md-3 col-6">
-            <label class="form-label small fw-semibold text-dark">Semester</label>
-            <select v-model="semesterFilter" class="form-select" @change="loadFees">
+            <select v-model="filters.semester" class="form-select">
               <option value="">All Semesters</option>
               <option value="1">Semester 1</option>
               <option value="2">Semester 2</option>
@@ -55,7 +51,7 @@
     </template>
 
     <!-- Main Content -->
-    <DataTable :columns="tableColumns" :data="filteredFees" :loading="loading" loading-text="Loading fee records..." empty-icon="bi bi-cash-coin" empty-title="No fee records found" empty-subtitle="Fee records will appear here">
+    <DataTable :columns="tableColumns" :data="filteredData" :loading="loading" loading-text="Loading fee records..." empty-icon="bi bi-cash-coin" empty-title="No fee records found" empty-subtitle="Fee records will appear here">
       <template #cell-student_name="{ row }">
         <div class="d-flex align-items-center">
           <div class="avatar-circle avatar-fee me-2"><i class="bi bi-person"></i></div>
@@ -67,7 +63,7 @@
       </template>
 
       <template #cell-amount="{ row }">
-        <div class="fw-bold text-success">PKR {{ parseFloat(row.amount || 0).toLocaleString() }}</div>
+        <div class="fw-bold text-success">{{ CURRENCY }} {{ parseFloat(row.amount || 0).toLocaleString() }}</div>
         <small class="text-muted">{{ row.semester_name || row.fee_type }}</small>
       </template>
 
@@ -87,20 +83,26 @@
 
     <template #footer>
       <div class="d-flex justify-content-between flex-wrap gap-2">
-        <p class="text-muted small mb-0">Total: {{ filteredFees.length }} records</p>
-        <p class="text-muted small mb-0">Collected: PKR {{ totalCollected.toLocaleString() }}</p>
+        <p class="text-muted small mb-0">Total: {{ filteredData.length }} records</p>
+        <p class="text-muted small mb-0">Collected: {{ CURRENCY }} {{ totalCollected.toLocaleString() }}</p>
       </div>
     </template>
   </AdminPageTemplate>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
-import AdminPageTemplate from '@/components/navbar/AdminPageTemplate.vue'
-import { StatCard, DataTable, SearchFilter, AlertMessage } from '@/components/common'
-import { feeService } from '@/services/managementService'
+import { computed, onMounted } from 'vue'
+import { AdminPageTemplate } from '@/components/shared/panels'
+import { StatCard, DataTable, SearchFilter, AlertMessage } from '@/components/shared/common'
+import { useEntityList, useAlert } from '@/composables/shared'
+import { feeService } from '@/services/admin/managementService'
+import { formatDate as formatDateUtil } from '@/utils/formatters'
+import { ADMIN_ROUTES } from '@/utils/constants/routes'
+import { getStatusBadgeClass } from '@/utils/badgeHelpers'
+import { CURRENCY } from '@/utils/constants/config'
+import { generateBreadcrumbs } from '@/utils/navigation'
 
-const breadcrumbs = [{ name: 'Dashboard', href: '/admin-dashboard' }, { name: 'Fees Collection' }]
+const breadcrumbs = generateBreadcrumbs('admin', 'Fees Collection')
 const actions = [{ label: 'Generate Report', icon: 'bi bi-file-earmark-pdf', variant: 'btn-admin-primary', onClick: () => {} }]
 
 const tableColumns = [
@@ -111,69 +113,42 @@ const tableColumns = [
   { key: 'actions', label: 'Actions', center: true }
 ]
 
-const alert = ref({ show: false, type: 'success', title: '', message: '' })
-const fees = ref([])
-const searchQuery = ref('')
-const statusFilter = ref('')
-const semesterFilter = ref('')
-const loading = ref(false)
+const { alert, showSuccess, showError } = useAlert()
 
-const totalCollected = computed(() => fees.value.filter(f => f.status === 'paid').reduce((sum, f) => sum + parseFloat(f.paid_amount || 0), 0))
-const totalPending = computed(() => fees.value.filter(f => f.status === 'pending').reduce((sum, f) => sum + parseFloat(f.amount || 0), 0))
-const overdueCount = computed(() => fees.value.filter(f => f.status === 'overdue').length)
+const fetchFees = async () => {
+  const res = await feeService.getAll()
+  return res.data?.results || res.data || []
+}
 
-const filteredFees = computed(() => {
-  let list = fees.value
-  if (searchQuery.value) {
-    const q = searchQuery.value.toLowerCase()
-    list = list.filter(f => f.student_name?.toLowerCase().includes(q) || f.student_enrollment?.toLowerCase().includes(q))
+const { loading, data, filteredData, filters, loadData, resetFilters } = useEntityList({
+  searchFields: ['student_name', 'student_enrollment', 'semester_name'],
+  defaultFilters: { statusType: '', semester: '' },
+  customFilter: (list, f) => {
+    if (f.statusType) list = list.filter(fee => fee.status === f.statusType)
+    if (f.semester) list = list.filter(fee => fee.semester_name === f.semester)
+    return list
   }
-  if (statusFilter.value) list = list.filter(f => f.status === statusFilter.value)
-  if (semesterFilter.value) list = list.filter(f => f.semester_name?.includes(semesterFilter.value))
-  return list
 })
 
-const formatDate = (date) => new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-const getStatusBadge = (status) => status === 'paid' ? 'bg-success' : status === 'pending' ? 'bg-warning' : 'bg-danger'
+const formatDate = (date) => formatDateUtil(date)
+const getStatusBadge = (status) => getStatusBadgeClass(status)
 
-const loadFees = async () => {
-  loading.value = true
-  try {
-    const response = await feeService.getAll()
-    fees.value = response.data.results || response.data
-  } catch (error) {
-    console.error('Error loading fees:', error)
-    alert.value = { show: true, type: 'danger', title: 'Error', message: 'Failed to load fees' }
-  } finally {
-    loading.value = false
-  }
-}
-
-const resetFilters = () => {
-  searchQuery.value = ''
-  statusFilter.value = ''
-  semesterFilter.value = ''
-}
+const totalCollected = computed(() => data.value.filter(f => f.status === 'paid').reduce((sum, f) => sum + parseFloat(f.paid_amount || 0), 0))
+const totalPending = computed(() => data.value.filter(f => f.status === 'pending').reduce((sum, f) => sum + parseFloat(f.amount || 0), 0))
+const overdueCount = computed(() => data.value.filter(f => f.status === 'overdue').length)
 
 const markPaid = async (fee) => {
   try {
     await feeService.markPaid(fee.id)
     fee.status = 'paid'
     fee.paid_amount = fee.amount
-    alert.value = { show: true, type: 'success', title: 'Success', message: `Payment marked as paid for ${fee.student_name}` }
-  } catch (error) {
-    console.error('Error marking fee as paid:', error)
-    alert.value = { show: true, type: 'danger', title: 'Error', message: 'Failed to mark fee as paid' }
+    showSuccess(`Payment marked as paid for ${fee.student_name}`)
+  } catch (err) {
+    showError('Failed to mark fee as paid')
   }
 }
 
-let searchTimeout
-watch(searchQuery, () => {
-  clearTimeout(searchTimeout)
-  searchTimeout = setTimeout(loadFees, 300)
-})
-
-onMounted(loadFees)
+onMounted(() => loadData(fetchFees))
 </script>
 
 

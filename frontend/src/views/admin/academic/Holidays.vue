@@ -2,6 +2,16 @@
   <AdminPageTemplate title="Holidays Management" subtitle="Manage academic and public holidays" icon="bi bi-calendar-x" :breadcrumbs="breadcrumbs" :actions="actions" content-title="Holiday List">
     <AlertMessage v-if="alert.show" :type="alert.type" :message="alert.message" :title="alert.title" :auto-close="true" :auto-close-duration="3000" @close="alert.show = false" />
 
+    <ConfirmDialog
+      v-model="showConfirmDialog"
+      title="Delete Holiday"
+      :message="holidayToDelete ? `Delete holiday '${holidayToDelete.name}'?` : 'Delete this holiday?'"
+      type="danger"
+      theme="admin"
+      confirm-text="Delete"
+      @confirm="confirmDeleteHoliday"
+    />
+
     <!-- Stats Section -->
     <template #stats>
       <div class="row g-3 g-lg-4">
@@ -52,7 +62,7 @@
       </template>
 
       <template #cell-holiday_type="{ value }">
-        <span :class="['badge', getTypeBadge(value)]">{{ value }}</span>
+        <span :class="['badge', getHolidayBadgeClass(value)]">{{ getHolidayLabel(value) }}</span>
       </template>
 
       <template #cell-duration="{ row }">
@@ -66,55 +76,47 @@
 
   </AdminPageTemplate>
 
-  <!-- Modals teleported to body for proper overlay -->
-  <Teleport to="body">
-    <!-- Add/Edit Modal -->
-    <div v-if="showModal" class="modal show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5); position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 1050;">
-      <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title">{{ editingHoliday ? 'Edit Holiday' : 'Add New Holiday' }}</h5>
-            <button type="button" class="btn-close" @click="closeModal"></button>
-          </div>
-          <div class="modal-body">
-            <form @submit.prevent="saveHoliday">
-              <div class="mb-3">
-                <label class="form-label">Holiday Name <span class="text-danger">*</span></label>
-                <input v-model="holidayForm.name" type="text" class="form-control" required>
-              </div>
-              <div class="mb-3">
-                <label class="form-label">Description</label>
-                <textarea v-model="holidayForm.description" class="form-control" rows="2"></textarea>
-              </div>
-              <div class="row">
-                <div class="col-md-6 mb-3">
-                  <BaseInput v-model="holidayForm.start_date" label="Start Date" type="date" :required="true" />
-                </div>
-                <div class="col-md-6 mb-3">
-                  <BaseInput v-model="holidayForm.end_date" label="End Date" type="date" />
-                </div>
-              </div>
-              <div class="mb-3">
-                <label class="form-label">Type <span class="text-danger">*</span></label>
-                <select v-model="holidayForm.holiday_type" class="form-select" required>
-                  <option value="public">Public Holiday</option>
-                  <option value="academic">Academic Break</option>
-                  <option value="religious">Religious</option>
-                  <option value="national">National</option>
-                </select>
-              </div>
-              <div class="d-flex gap-2 justify-content-end">
-                <button type="button" @click="closeModal" class="btn btn-secondary">Cancel</button>
-                <button type="submit" class="btn btn-admin-primary">{{ editingHoliday ? 'Update' : 'Add' }} Holiday</button>
-              </div>
-            </form>
-          </div>
+  <!-- Modals -->
+  <EntityFormModal
+    v-model="showModal"
+    :title="editingHoliday ? 'Edit Holiday' : 'Add New Holiday'"
+    icon="bi bi-calendar-x"
+    :loading="saving"
+    :confirm-text="editingHoliday ? 'Update Holiday' : 'Add Holiday'"
+    @confirm="saveHoliday"
+    @close="closeModal"
+  >
+    <form @submit.prevent="saveHoliday">
+      <div class="mb-3">
+        <label class="form-label">Holiday Name <span class="text-danger">*</span></label>
+        <input v-model="holidayForm.name" type="text" class="form-control" required>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Description</label>
+        <textarea v-model="holidayForm.description" class="form-control" rows="2"></textarea>
+      </div>
+      <div class="row">
+        <div class="col-md-6 mb-3">
+          <BaseInput v-model="holidayForm.start_date" label="Start Date" type="date" :required="true" />
+        </div>
+        <div class="col-md-6 mb-3">
+          <BaseInput v-model="holidayForm.end_date" label="End Date" type="date" />
         </div>
       </div>
-    </div>
+      <div class="mb-3">
+        <label class="form-label">Type <span class="text-danger">*</span></label>
+        <select v-model="holidayForm.holiday_type" class="form-select" required>
+          <option v-for="type in HOLIDAY_TYPE_OPTIONS" :key="type.value" :value="type.value">
+            {{ type.label }}
+          </option>
+        </select>
+      </div>
+    </form>
+  </EntityFormModal>
 
-    <!-- Calendar View Modal -->
-    <div v-if="showCalendarModal" class="modal show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5); position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 1050; overflow-y: auto;">
+  <!-- Calendar View Modal (keeping as is - special layout) -->
+  <Teleport to="body">
+    <div v-if="showCalendarModal" class="modal show d-block modal-overlay" tabindex="-1">
       <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
           <div class="modal-header bg-admin text-white">
@@ -148,7 +150,7 @@
                       <div class="fw-semibold">{{ holiday.name }}</div>
                       <small class="text-muted">{{ formatDate(holiday.start_date) }}</small>
                     </div>
-                    <span :class="['badge', 'badge-sm', getTypeBadge(holiday.holiday_type)]">{{ holiday.holiday_type }}</span>
+                    <span :class="['badge', 'badge-sm', getHolidayBadgeClass(holiday.holiday_type)]">{{ getHolidayLabel(holiday.holiday_type) }}</span>
                   </div>
                   <div v-if="getMonthHolidays(month).length === 0" class="text-muted small text-center py-3">No holidays</div>
                 </div>
@@ -166,11 +168,16 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import AdminPageTemplate from '@/components/navbar/AdminPageTemplate.vue'
-import { StatCard, DataTable, ActionButtons, AlertMessage, BaseInput } from '@/components/common'
-import { holidayService } from '@/services/managementService'
+import { AdminPageTemplate } from '@/components/shared/panels'
+import { StatCard, DataTable, ActionButtons, AlertMessage, BaseInput, ConfirmDialog, EntityFormModal } from '@/components/shared/common'
+import { useAlert } from '@/composables/shared'
+import { holidayService } from '@/services/admin/managementService'
+import { formatDate as formatDateUtil, truncateText } from '@/utils/formatters'
+import { ADMIN_ROUTES } from '@/utils/constants/routes'
+import { HOLIDAY_TYPE_OPTIONS, getOptionLabel } from '@/utils/constants/options'
+import { getHolidayBadgeClass } from '@/utils/badgeHelpers'
 
-const breadcrumbs = [{ name: 'Dashboard', href: '/admin-dashboard' }, { name: 'Holidays' }]
+const breadcrumbs = [{ name: 'Dashboard', href: ADMIN_ROUTES.DASHBOARD.path }, { name: 'Holidays' }]
 const actions = []
 
 const tableColumns = [
@@ -181,14 +188,18 @@ const tableColumns = [
   { key: 'actions', label: 'Actions', center: true }
 ]
 
-const alert = ref({ show: false, type: 'success', title: '', message: '' })
+// Use shared alert composable
+const { alert, showAlert } = useAlert()
 const loading = ref(false)
+const saving = ref(false)
 const holidays = ref([])
 const showModal = ref(false)
 const showCalendarModal = ref(false)
 const editingHoliday = ref(null)
 const holidayForm = ref({ name: '', description: '', start_date: '', end_date: '', holiday_type: 'public' })
 const selectedYear = ref(new Date().getFullYear())
+const showConfirmDialog = ref(false)
+const holidayToDelete = ref(null)
 
 // Generate year options (current year - 2 to current year + 5)
 const yearOptions = computed(() => {
@@ -204,10 +215,14 @@ const upcomingHolidays = computed(() => holidays.value.filter(h => new Date(h.st
 const totalDays = computed(() => holidays.value.reduce((sum, h) => sum + (h.duration_days || getDuration(h.start_date, h.end_date)), 0))
 const sortedHolidays = computed(() => [...holidays.value].sort((a, b) => new Date(a.start_date) - new Date(b.start_date)))
 
-const formatDate = (date) => new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-const truncate = (text, length) => text && text.length > length ? text.substring(0, length) + '...' : text || ''
+// Use shared formatDate utility
+const formatDate = (date) => formatDateUtil(date)
+
+// Use shared truncateText utility
+const truncate = (text, length) => truncateText(text, length)
+
 const getDuration = (start, end) => (!end || end === start) ? 1 : Math.ceil((new Date(end) - new Date(start)) / (1000 * 60 * 60 * 24)) + 1
-const getTypeBadge = (type) => ({ public: 'bg-admin', academic: 'bg-info', religious: 'bg-success', national: 'bg-warning' })[type?.toLowerCase()] || 'bg-secondary'
+const getHolidayLabel = (type) => getOptionLabel(HOLIDAY_TYPE_OPTIONS, type)
 const getMonthName = (month) => new Date(selectedYear.value, month - 1).toLocaleDateString('en-US', { month: 'long' })
 const getMonthHolidays = (month) => {
   return holidays.value.filter(h => {
@@ -223,7 +238,7 @@ const loadHolidays = async () => {
     holidays.value = response.data.results || response.data
   } catch (error) {
     console.error('Error loading holidays:', error)
-    alert.value = { show: true, type: 'danger', title: 'Error', message: 'Failed to load holidays' }
+    showAlert('error', 'Failed to load holidays', 'Error')
   } finally {
     loading.value = false
   }
@@ -235,33 +250,42 @@ const editHoliday = (holiday) => {
   showModal.value = true
 }
 
-const deleteHoliday = async (holiday) => {
-  if (confirm(`Delete holiday "${holiday.name}"?`)) {
-    try {
-      await holidayService.delete(holiday.id)
-      holidays.value = holidays.value.filter(h => h.id !== holiday.id)
-      alert.value = { show: true, type: 'success', title: 'Success', message: 'Holiday deleted successfully' }
-    } catch (error) {
-      console.error('Error deleting holiday:', error)
-      alert.value = { show: true, type: 'danger', title: 'Error', message: 'Failed to delete holiday' }
-    }
+const deleteHoliday = (holiday) => {
+  holidayToDelete.value = holiday
+  showConfirmDialog.value = true
+}
+
+const confirmDeleteHoliday = async () => {
+  try {
+    await holidayService.delete(holidayToDelete.value.id)
+    holidays.value = holidays.value.filter(h => h.id !== holidayToDelete.value.id)
+    showAlert('success', 'Holiday deleted successfully', 'Success')
+  } catch (error) {
+    console.error('Error deleting holiday:', error)
+    showAlert('error', 'Failed to delete holiday', 'Error')
+  } finally {
+    showConfirmDialog.value = false
+    holidayToDelete.value = null
   }
 }
 
 const saveHoliday = async () => {
+  saving.value = true
   try {
     if (editingHoliday.value) {
       await holidayService.update(editingHoliday.value.id, holidayForm.value)
-      alert.value = { show: true, type: 'success', title: 'Success', message: 'Holiday updated successfully' }
+      showAlert('success', 'Holiday updated successfully', 'Success')
     } else {
       await holidayService.create(holidayForm.value)
-      alert.value = { show: true, type: 'success', title: 'Success', message: 'Holiday added successfully' }
+      showAlert('success', 'Holiday added successfully', 'Success')
     }
     closeModal()
     loadHolidays()
   } catch (error) {
     console.error('Error saving holiday:', error)
-    alert.value = { show: true, type: 'danger', title: 'Error', message: 'Failed to save holiday' }
+    showAlert('error', 'Failed to save holiday', 'Error')
+  } finally {
+    saving.value = false
   }
 }
 

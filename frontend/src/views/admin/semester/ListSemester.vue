@@ -7,6 +7,27 @@
     :actions="actions"
     content-title="Semester List"
   >
+    <!-- Alert Message -->
+    <AlertMessage
+      v-if="alert.show"
+      :type="alert.type"
+      :message="alert.message"
+      :title="alert.title"
+      :auto-close="true"
+      :auto-close-duration="3000"
+      @close="alert.show = false"
+    />
+
+    <ConfirmDialog
+      v-model="showConfirmDialog"
+      title="Delete Semester"
+      :message="semesterToDelete ? `Delete semester '${semesterToDelete.name}'?` : 'Delete this semester?'"
+      type="danger"
+      theme="admin"
+      confirm-text="Delete"
+      @confirm="confirmDeleteSemester"
+    />
+
     <!-- Stats Section -->
     <template #stats>
       <div class="row g-3 g-lg-4">
@@ -95,8 +116,8 @@
         <ActionButtons
           :item="row"
           :show-toggle="false"
-          @view="router.push({ name: 'SemesterProfile', params: { id: row.id } })"
-          @edit="router.push({ name: 'EditSemester', params: { id: row.id } })"
+          @view="router.push({ name: ADMIN_ROUTES.SEMESTER_PROFILE.name, params: { id: row.id } })"
+          @edit="router.push({ name: ADMIN_ROUTES.SEMESTER_EDIT.name, params: { id: row.id } })"
           @delete="deleteSemester(row)"
         />
       </template>
@@ -111,21 +132,24 @@
 <script setup>
 import { ref, onMounted, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import AdminPageTemplate from '@/components/navbar/AdminPageTemplate.vue'
-import { StatCard, DataTable, SearchFilter, ActionButtons } from '@/components/common'
-import { semesterService } from '@/services/semesterService'
-import { programService } from '@/services/programService'
-import cacheService from '@/services/cacheService'
+import { AdminPageTemplate } from '@/components/shared/panels'
+import { StatCard, DataTable, SearchFilter, ActionButtons, ConfirmDialog, AlertMessage } from '@/components/shared/common'
+import { useEntityList, useAlert } from '@/composables/shared'
+import { semesterService } from '@/services/shared'
+import { programService } from '@/services/shared'
+import { cacheService } from '@/services/shared'
+import { formatDate as formatDateUtil } from '@/utils/formatters'
+import { ADMIN_ROUTES } from '@/utils/constants/routes'
 
 const router = useRouter()
 
 const breadcrumbs = [
-  { name: 'Dashboard', href: '/admin-dashboard' },
+  { name: 'Dashboard', href: ADMIN_ROUTES.DASHBOARD.path },
   { name: 'Semesters' }
 ]
 
 const actions = [
-  { label: 'Add Semester', icon: 'bi bi-plus-circle', variant: 'btn-admin-primary', onClick: () => router.push({ name: 'AddSemester' }) }
+  { label: 'Add Semester', icon: 'bi bi-plus-circle', variant: 'btn-admin-primary', onClick: () => router.push({ name: ADMIN_ROUTES.SEMESTER_ADD.name }) }
 ]
 
 const tableColumns = [
@@ -138,11 +162,32 @@ const tableColumns = [
   { key: 'actions', label: 'Actions', center: true }
 ]
 
-const loading = ref(false)
-const semesters = ref([])
 const programs = ref([])
-const filters = ref({ search: '', program: '' })
+const showConfirmDialog = ref(false)
+const semesterToDelete = ref(null)
+const { alert, showAlert } = useAlert()
 
+// Use composable for list logic
+const {
+  loading,
+  filteredData: semesters,
+  filters,
+  loadData,
+  applyFilters,
+  resetFilters: baseResetFilters
+} = useEntityList({
+  cacheKey: 'semesters_list',
+  searchFields: ['name'],
+  defaultFilters: { program: '' },
+  customFilter: (data, filterValues) => {
+    if (filterValues.program) {
+      return data.filter(s => String(s.program) === String(filterValues.program))
+    }
+    return data
+  }
+})
+
+// Custom stats
 const stats = computed(() => ({
   total: semesters.value.length,
   active: semesters.value.filter(s => s.status === 'active').length,
@@ -150,80 +195,35 @@ const stats = computed(() => ({
   programs: new Set(semesters.value.map(s => s.program)).size
 }))
 
-// Cache keys
-const CACHE_KEYS = {
-  SEMESTERS: 'semesters_list',
-  PROGRAMS: 'programs_list'
-}
-
-const loadSemesters = async (useCache = true) => {
-  loading.value = true
-  try {
-    // Check cache for both semesters and programs
-    let semList, progList
-    
-    if (useCache) {
-      const cachedSem = cacheService.get(CACHE_KEYS.SEMESTERS)
-      const cachedProg = cacheService.get(CACHE_KEYS.PROGRAMS)
-      
-      if (cachedSem && cachedProg) {
-        semList = cachedSem
-        progList = cachedProg
-        programs.value = progList
-        applyFilters(semList)
-        loading.value = false
-        return
-      }
+const loadSemesters = async () => {
+  // Load programs first
+  const cachedProg = cacheService.get('programs_list')
+  if (cachedProg) {
+    programs.value = cachedProg
+  } else {
+    try {
+      const progRes = await programService.getAllPrograms()
+      const progList = progRes.results || progRes.data || progRes
+      cacheService.set('programs_list', progList)
+      programs.value = progList
+    } catch (e) {
+      console.error('Error loading programs:', e)
     }
-    
-    // Fetch from API if not cached
-    const [semRes, progRes] = await Promise.all([
-      semesterService.getAll(),
-      programService.getAllPrograms()
-    ])
-    
-    semList = semRes.results || semRes.data || semRes
-    progList = progRes.results || progRes.data || progRes
-    
-    // Store in cache
-    cacheService.set(CACHE_KEYS.SEMESTERS, semList)
-    cacheService.set(CACHE_KEYS.PROGRAMS, progList)
-    
-    programs.value = progList
-    applyFilters(semList)
-  } catch (error) {
-    console.error('Error loading data:', error)
-  } finally {
-    loading.value = false
-  }
-}
-
-const applyFilters = (sourceData = null) => {
-  // Use provided data or get from cache
-  const cachedData = sourceData || cacheService.get(CACHE_KEYS.SEMESTERS) || []
-  let list = [...cachedData]
-  
-  if (filters.value.program) {
-    list = list.filter(s => String(s.program) === String(filters.value.program))
   }
   
-  if (filters.value.search) {
-    const q = filters.value.search.toLowerCase()
-    list = list.filter(s => s.name?.toLowerCase().includes(q))
-  }
-  
-  semesters.value = list
+  // Load semesters using composable
+  await loadData(() => semesterService.getAll())
 }
 
 const getProgramName = (programId) => {
   const semester = semesters.value.find(s => s.program === programId)
   if (semester?.program_name) return semester.program_name
-  
   const p = programs.value.find(x => String(x.id) === String(programId))
   return p ? p.name : 'N/A'
 }
 
-const formatDate = (d) => d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '-'
+// Use shared formatDate utility
+const formatDate = (d) => formatDateUtil(d)
 
 const getStatusBadgeClass = (status) => {
   const map = { draft: 'bg-secondary', active: 'bg-success', completed: 'bg-info', archived: 'bg-dark' }
@@ -235,37 +235,33 @@ const getStatusLabel = (status) => {
   return map[status] || status
 }
 
-const deleteSemester = async (sem) => {
-  if (confirm(`Delete semester "${sem.name}"?`)) {
-    try {
-      await semesterService.delete(sem.id)
-      cacheService.clear(CACHE_KEYS.SEMESTERS) // Invalidate cache
-      loadSemesters(false)
-    } catch (e) {
-      console.error(e)
-      alert('Failed to delete')
-    }
+const deleteSemester = (sem) => {
+  semesterToDelete.value = sem
+  showConfirmDialog.value = true
+}
+
+const confirmDeleteSemester = async () => {
+  try {
+    await semesterService.delete(semesterToDelete.value.id)
+    cacheService.clear('semesters_list')
+    showAlert('success', 'Semester deleted successfully')
+    loadSemesters()
+  } catch (e) {
+    console.error(e)
+    showAlert('error', 'Failed to delete semester')
+  } finally {
+    showConfirmDialog.value = false
+    semesterToDelete.value = null
   }
 }
 
 const resetFilters = () => {
-  filters.value = { search: '', program: '' }
-  applyFilters()
+  filters.value.program = ''
+  baseResetFilters()
 }
 
-// Debounce search filter
-let searchTimeout = null
-watch(() => filters.value.search, () => {
-  clearTimeout(searchTimeout)
-  searchTimeout = setTimeout(() => {
-    applyFilters()
-  }, 300)
-})
-
-// Watch program filter without debounce
-watch(() => filters.value.program, () => {
-  applyFilters()
-})
+// Watch program filter
+watch(() => filters.value.program, () => applyFilters())
 
 onMounted(loadSemesters)
 </script>

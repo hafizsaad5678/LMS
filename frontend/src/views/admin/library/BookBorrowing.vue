@@ -2,6 +2,16 @@
   <AdminPageTemplate title="Book Borrowings" subtitle="Manage book circulation" icon="bi bi-arrow-left-right" :breadcrumbs="breadcrumbs" :actions="actions" content-title="Borrowing Records">
     <AlertMessage v-if="alert.show" :type="alert.type" :message="alert.message" :title="alert.title" :auto-close="true" :auto-close-duration="3000" @close="alert.show = false" />
     
+    <ConfirmDialog
+      v-model="showReturnDialog"
+      title="Return Book"
+      :message="itemToReturn ? `Mark book '${itemToReturn.book_title}' as returned?` : 'Return this book?'"
+      type="info"
+      theme="admin"
+      confirm-text="Return"
+      @confirm="confirmReturnBook"
+    />
+    
     <!-- Stats Section -->
     <template #stats>
       <div class="row g-3 g-lg-4">
@@ -20,19 +30,19 @@
     <!-- Filters Section -->
     <template #filters>
       <SearchFilter
-        v-model="searchQuery"
+        v-model="filters.search"
         search-placeholder="Search by book, student, or teacher..."
         :show-status-filter="false"
         search-col-size="col-md-5 col-12"
         actions-col-size="col-md-3 col-6"
         :loading="loading"
-        @refresh="loadBorrowings"
+        @refresh="() => refresh(fetchBorrowings)"
         @reset="resetFilters"
       >
         <template #filters>
           <div class="col-md-4 col-6">
             <label class="form-label small fw-semibold text-dark">Status</label>
-            <select v-model="statusFilter" class="form-select">
+            <select v-model="filters.statusType" class="form-select">
               <option value="">All Statuses</option>
               <option value="borrowed">Borrowed</option>
               <option value="returned">Returned</option>
@@ -44,7 +54,7 @@
     </template>
 
     <!-- Main Content -->
-    <DataTable :columns="tableColumns" :data="filteredBorrowings" :loading="loading" loading-text="Loading borrowings..." empty-icon="bi bi-arrow-left-right" empty-title="No borrowings found" empty-subtitle="Borrowing records will appear here">
+    <DataTable :columns="tableColumns" :data="filteredData" :loading="loading" loading-text="Loading borrowings..." empty-icon="bi bi-arrow-left-right" empty-title="No borrowings found" empty-subtitle="Borrowing records will appear here">
       <template #cell-book_title="{ row }">
         <div class="d-flex align-items-center">
           <div class="avatar-circle avatar-book me-2"><i class="bi bi-book"></i></div>
@@ -78,11 +88,14 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import AdminPageTemplate from '@/components/navbar/AdminPageTemplate.vue'
-import { StatCard, DataTable, SearchFilter, AlertMessage } from '@/components/common'
-import { bookBorrowingService } from '@/services/managementService'
+import { AdminPageTemplate } from '@/components/shared/panels'
+import { StatCard, DataTable, SearchFilter, AlertMessage, ConfirmDialog } from '@/components/shared/common'
+import { useEntityList, useAlert } from '@/composables/shared'
+import { bookBorrowingService } from '@/services/admin/managementService'
+import { formatDate as formatDateUtil } from '@/utils/formatters'
+import { ADMIN_ROUTES } from '@/utils/constants/routes'
 
-const breadcrumbs = [{ name: 'Dashboard', href: '/admin-dashboard' }, { name: 'Library', href: '/admin-dashboard/library/books' }, { name: 'Borrowings' }]
+const breadcrumbs = [{ name: 'Dashboard', href: ADMIN_ROUTES.DASHBOARD.path }, { name: 'Library', href: `${ADMIN_ROUTES.LIBRARY.path}/books` }, { name: 'Borrowings' }]
 const actions = []
 
 const tableColumns = [
@@ -94,93 +107,56 @@ const tableColumns = [
   { key: 'actions', label: 'Actions', center: true }
 ]
 
-const alert = ref({ show: false, type: 'success', title: '', message: '' })
-const loading = ref(false)
-const borrowings = ref([])
-const searchQuery = ref('')
-const statusFilter = ref('')
+const { alert, showSuccess, showError } = useAlert()
 
-const activeCount = computed(() => borrowings.value.filter(b => b.status === 'borrowed').length)
-const returnedCount = computed(() => borrowings.value.filter(b => b.status === 'returned').length)
-const overdueCount = computed(() => borrowings.value.filter(b => isOverdue(b.due_date) && b.status === 'borrowed').length)
-
-const filteredBorrowings = computed(() => {
-  let list = borrowings.value
-  
-  if (searchQuery.value) {
-    const q = searchQuery.value.toLowerCase()
-    list = list.filter(b => 
-      (b.book_title && b.book_title.toLowerCase().includes(q)) || 
-      (b.student_name && b.student_name.toLowerCase().includes(q)) || 
-      (b.teacher_name && b.teacher_name.toLowerCase().includes(q))
-    )
-  }
-  
-  if (statusFilter.value) {
-    if (statusFilter.value === 'overdue') {
-      list = list.filter(b => isOverdue(b.due_date) && b.status === 'borrowed')
-    } else {
-      list = list.filter(b => b.status === statusFilter.value)
-    }
-  }
-  
-  return list.sort((a, b) => new Date(b.borrowed_date) - new Date(a.borrowed_date))
-})
-
-const resetFilters = () => {
-  searchQuery.value = ''
-  statusFilter.value = ''
-}
-
-const formatDate = (date) => {
-  if (!date) return '-'
-  return new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-}
-
-const isOverdue = (date) => {
-  if (!date) return false
-  return new Date(date) < new Date()
-}
-
+const isOverdue = (date) => date ? new Date(date) < new Date() : false
+const formatDate = (date) => formatDateUtil(date)
 const formatStatus = (borrow) => {
   if (borrow.status === 'returned') return 'Returned'
   if (isOverdue(borrow.due_date)) return 'Overdue'
   return 'Borrowed'
 }
 
-const loadBorrowings = async () => {
-  loading.value = true
+const fetchBorrowings = async () => {
+  const res = await bookBorrowingService.getAll()
+  return res.data?.results || res.data || []
+}
+
+const { loading, data, filteredData, filters, loadData, resetFilters, refresh } = useEntityList({
+  searchFields: ['book_title', 'student_name', 'teacher_name'],
+  defaultFilters: { statusType: '' },
+  customFilter: (list, f) => {
+    if (f.statusType === 'overdue') list = list.filter(b => isOverdue(b.due_date) && b.status === 'borrowed')
+    else if (f.statusType) list = list.filter(b => b.status === f.statusType)
+    return list.sort((a, b) => new Date(b.borrowed_date) - new Date(a.borrowed_date))
+  }
+})
+
+const activeCount = computed(() => data.value.filter(b => b.status === 'borrowed').length)
+const returnedCount = computed(() => data.value.filter(b => b.status === 'returned').length)
+const overdueCount = computed(() => data.value.filter(b => isOverdue(b.due_date) && b.status === 'borrowed').length)
+
+const showReturnDialog = ref(false)
+const itemToReturn = ref(null)
+
+const returnBook = (borrow) => {
+  itemToReturn.value = borrow
+  showReturnDialog.value = true
+}
+
+const confirmReturnBook = async () => {
   try {
-    const response = await bookBorrowingService.getAll()
-    borrowings.value = response.data.results || response.data
-  } catch (error) {
-    console.error('Error loading borrowings:', error)
-    alert.value = { show: true, type: 'danger', title: 'Error', message: 'Failed to load borrowing history' }
+    await bookBorrowingService.returnBook(itemToReturn.value.id)
+    itemToReturn.value.status = 'returned'
+    itemToReturn.value.returned_date = new Date().toISOString().split('T')[0]
+    showSuccess('Book returned successfully')
+  } catch (err) {
+    showError('Failed to return book')
   } finally {
-    loading.value = false
+    showReturnDialog.value = false
+    itemToReturn.value = null
   }
 }
 
-const returnBook = async (borrow) => {
-  if (!confirm(`Mark book "${borrow.book_title}" as returned?`)) return
-  
-  try {
-    await bookBorrowingService.returnBook(borrow.id)
-    borrow.status = 'returned'
-    borrow.returned_date = new Date().toISOString().split('T')[0] // Optimistic update
-    alert.value = { show: true, type: 'success', title: 'Success', message: 'Book returned successfully' }
-    // Refresh to ensure exact state?
-    // loadBorrowings() 
-  } catch (error) {
-    console.error('Error returning book:', error)
-    alert.value = { show: true, type: 'danger', title: 'Error', message: 'Failed to return book' }
-  }
-}
-
-onMounted(loadBorrowings)
+onMounted(() => loadData(fetchBorrowings))
 </script>
-
-<style scoped>
-.avatar-circle { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.875rem; flex-shrink: 0; }
-.avatar-book { background: linear-gradient(135deg, #6f42c1 0%, #5a32a3 100%); color: white; }
-</style>

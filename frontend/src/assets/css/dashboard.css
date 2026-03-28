@@ -1,0 +1,74 @@
+/**
+ * Dashboard Specific Styles
+ * Custom styles for dashboard components that extend Bootstrap
+ */
+
+/* ==================== SEARCH CONTAINER ==================== */
+.search-container {
+    min-width: 300px;
+}
+
+.search-progress {
+    height: 2px;
+}
+
+/* ==================== LOADING PLACEHOLDERS ==================== */
+.skeleton-stat-value {
+    width: 60px;
+    height: 28px;
+}
+
+.skeleton-stat-label {
+    width: 100px;
+    height: 14px;
+}
+
+.skeleton-activity-dot {
+    width: 8px;
+    height: 8px;
+    margin-top: 6px;
+}
+
+.skeleton-activity-text {
+    height: 16px;
+}
+
+.skeleton-activity-text-sm {
+    width: 60px;
+    height: 12px;
+}
+
+/* ==================== ACTIVITY FEED ==================== */
+.activity-icon-wrapper {
+    width: 32px;
+    height: 32px;
+}
+
+.activity-dot {
+    width: 8px;
+    height: 8px;
+    margin-top: 6px;
+}
+
+.empty-state-icon {
+    font-size: 2rem;
+}
+
+/* ==================== STAT CARD ICON ==================== */
+.stat-card-icon {
+    width: 56px;
+    height: 56px;
+}
+
+/* ==================== QUICK ACTION CARD ICON ==================== */
+.quick-action-icon {
+    width: 48px;
+    height: 48px;
+}
+
+/* ==================== RESPONSIVE ==================== */
+@media (max-width: 768px) {
+    .search-container {
+        min-width: 100%;
+    }
+}

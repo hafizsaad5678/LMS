@@ -7,17 +7,28 @@
     :actions="actions"
     content-title="Teacher List"
   >
+    <!-- Alert Message -->
+    <AlertMessage
+      v-if="alert.show"
+      :type="alert.type"
+      :message="alert.message"
+      :title="alert.title"
+      :auto-close="true"
+      :auto-close-duration="3000"
+      @close="alert.show = false"
+    />
+
     <!-- Stats Section -->
     <template #stats>
       <div class="row g-3 g-lg-4">
-        <div class="col-6 col-xl-3">
-          <StatCard title="Total Teachers" :value="stats.total" icon="bi bi-person-workspace" bg-color="bg-primary-light" icon-color="text-primary" />
+        <div class="col-6 col-xl-4">
+          <StatCard title="Total Teachers" :value="totalTeachers" icon="bi bi-person-workspace" type="teacher" />
         </div>
-        <div class="col-6 col-xl-3">
-          <StatCard title="Active Teachers" :value="stats.active" icon="bi bi-check-circle" bg-color="bg-success-light" icon-color="text-success" />
+        <div class="col-6 col-xl-4">
+          <StatCard title="Active Teachers" :value="activeTeachers" icon="bi bi-check-circle" type="student" />
         </div>
-        <div class="col-6 col-xl-3">
-          <StatCard title="Inactive" :value="stats.inactive" icon="bi bi-x-circle" bg-color="bg-warning-light" icon-color="text-warning" :is-positive="false" />
+        <div class="col-6 col-xl-4">
+          <StatCard title="Inactive Teachers" :value="inactiveTeachers" icon="bi bi-x-circle" type="finance" :is-positive="false" />
         </div>
       </div>
     </template>
@@ -31,13 +42,13 @@
         search-col-size="col-md-4 col-12"
         actions-col-size="col-md-2 col-6"
         :loading="loading"
-        @refresh="loadTeachers"
-        @reset="resetFilters"
+        @refresh="handleRefresh"
+        @reset="handleReset"
       >
         <template #filters>
           <div class="col-md-3 col-6">
             <label class="form-label small fw-semibold text-dark">Department</label>
-            <select v-model="filters.department" class="form-select" @change="loadTeachers">
+            <select v-model="filters.department" class="form-select" @change="applyFilters">
               <option value="">All Departments</option>
               <option v-for="dept in departments" :key="dept.id" :value="dept.name">{{ dept.name }}</option>
             </select>
@@ -46,10 +57,10 @@
       </SearchFilter>
     </template>
 
-    <!-- Main Content - Using DataTable -->
+    <!-- Main Content -->
     <DataTable
       :columns="tableColumns"
-      :data="teachers"
+      :data="filteredData"
       :loading="loading"
       loading-text="Loading teachers..."
       empty-icon="bi bi-inbox"
@@ -75,8 +86,8 @@
       </template>
 
       <template #cell-is_active="{ row }">
-        <span :class="['badge', row.is_active ? 'bg-success' : 'bg-warning']">
-          {{ row.is_active ? 'Active' : 'Inactive' }}
+        <span :class="['badge', getActiveBadgeClass(row.is_active)]">
+          {{ getActiveStatusText(row.is_active) }}
         </span>
       </template>
 
@@ -88,41 +99,48 @@
         <ActionButtons
           :item="row"
           :show-toggle="true"
-          @view="router.push(`/admin-dashboard/teachers/${row.id}`)"
-          @edit="router.push(`/admin-dashboard/teachers/edit/${row.id}`)"
-          @delete="router.push(`/admin-dashboard/teachers/delete/${row.id}`)"
-          @toggle="toggleStatus(row)"
+          @view="router.push({ name: ADMIN_ROUTES.TEACHER_PROFILE.name, params: { id: row.id } })"
+          @edit="router.push({ name: ADMIN_ROUTES.TEACHER_EDIT.name, params: { id: row.id } })"
+          @delete="router.push({ name: ADMIN_ROUTES.TEACHER_DELETE.name, params: { id: row.id } })"
+          @toggle="handleToggle(row)"
         />
       </template>
     </DataTable>
 
     <template #footer>
       <div class="d-flex justify-content-end">
-        <p class="text-muted small mb-0">Total Records: {{ teachers.length }}</p>
+        <p class="text-muted small mb-0">Total Records: {{ filteredData.length }}</p>
       </div>
     </template>
   </AdminPageTemplate>
 </template>
 
 <script setup>
-import { ref, onMounted, computed, watch } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import AdminPageTemplate from '@/components/navbar/AdminPageTemplate.vue'
-import { StatCard, DataTable, SearchFilter, ActionButtons } from '@/components/common'
-import { teacherService } from '@/services/teacherService'
-import api from '@/services/api'
-import cacheService from '@/services/cacheService'
+import { AdminPageTemplate } from '@/components/shared/panels'
+import { StatCard, DataTable, SearchFilter, ActionButtons, AlertMessage } from '@/components/shared/common'
+import { useEntityList, useAlert } from '@/composables/shared'
+import { teacherService } from '@/services/shared'
+import { api } from '@/services/shared'
+import { cacheService } from '@/services/shared'
+import { ADMIN_ROUTES } from '@/utils/constants/routes'
+import { getActiveBadgeClass, getActiveStatusText } from '@/utils/badgeHelpers'
+import adminPanelService from '@/services/admin/adminPanelService'
 
 const router = useRouter()
 
+// Use shared alert composable
+const { alert, showAlert } = useAlert()
+
 // Config
 const breadcrumbs = [
-  { name: 'Dashboard', href: '/admin-dashboard' },
+  { name: 'Dashboard', href: ADMIN_ROUTES.DASHBOARD.path },
   { name: 'Teachers' }
 ]
 
 const actions = [
-  { label: 'Add Teacher', icon: 'bi bi-plus-circle', variant: 'btn-admin-primary', onClick: () => router.push('/admin-dashboard/teachers/add') }
+  { label: 'Add Teacher', icon: 'bi bi-plus-circle', variant: 'btn-admin-primary', onClick: () => router.push({ name: ADMIN_ROUTES.TEACHER_ADD.name }) }
 ]
 
 const tableColumns = [
@@ -136,129 +154,88 @@ const tableColumns = [
   { key: 'actions', label: 'Actions', center: true }
 ]
 
-// State
-const loading = ref(true)
-const teachers = ref([])
+// Departments for filter
 const departments = ref([])
-const filters = ref({ search: '', department: '', status: '' })
 
-const stats = computed(() => {
-  const total = teachers.value.length
-  const active = teachers.value.filter(t => t.is_active).length
-  return { total, active, inactive: total - active }
+// Use composable with custom filter
+const {
+  loading,
+  filteredData,
+  filters,
+  stats,
+  loadData,
+  applyFilters,
+  resetFilters,
+  refresh,
+  toggleStatus
+} = useEntityList({
+  cacheKey: 'teachers_list',
+  searchFields: ['full_name', 'email', 'employee_id', 'department_name', 'qualification'],
+  statusField: 'is_active',
+  defaultFilters: { department: '' },
+  customFilter: (data, filters) => {
+    if (filters.department) {
+      return data.filter(t => t.department_name === filters.department)
+    }
+    return data
+  }
 })
 
-// Cache keys
-const CACHE_KEYS = {
-  TEACHERS: 'teachers_list',
-  DEPARTMENTS: 'departments_list'
+const totalTeachers = ref(0)
+const loadTeacherStats = async () => {
+    try {
+        const dashboardStats = await adminPanelService.getDashboardStats()
+        totalTeachers.value = dashboardStats.teachers || 0
+    } catch (error) {
+        console.error('Failed to load teacher stats:', error)
+    }
 }
+
+const activeTeachers = computed(() => filteredData.value.filter(t => t.is_active).length)
+const inactiveTeachers = computed(() => filteredData.value.filter(t => !t.is_active).length)
+
+// Watch department filter
+watch(() => filters.value.department, () => applyFilters())
 
 // Methods
-const loadTeachers = async (useCache = true) => {
-  // Check cache first
-  if (useCache) {
-    const cached = cacheService.get(CACHE_KEYS.TEACHERS)
-    if (cached) {
-      applyFilters(cached)
-      return
-    }
-  }
-
-  loading.value = true
-  try {
-    const response = await teacherService.getAllTeachers()
-    const data = Array.isArray(response) ? response : (response.results || response.data || [])
-    
-    // Store in cache
-    cacheService.set(CACHE_KEYS.TEACHERS, data)
-    applyFilters(data)
-  } catch (error) {
-    console.error('Error loading teachers:', error)
-  } finally {
-    loading.value = false
-  }
-}
-
-const applyFilters = (sourceData = null) => {
-  // Use provided data or get from cache
-  const cachedData = sourceData || cacheService.get(CACHE_KEYS.TEACHERS) || []
-  let data = [...cachedData]
-  
-  if (filters.value.search) {
-    const q = filters.value.search.toLowerCase()
-    data = data.filter(t => 
-      t.full_name?.toLowerCase().includes(q) || 
-      t.email?.toLowerCase().includes(q) || 
-      t.employee_id?.toLowerCase().includes(q)
-    )
-  }
-  
-  if (filters.value.department) {
-    data = data.filter(t => t.department_name === filters.value.department)
-  }
-
-  if (filters.value.status) {
-    const isActive = filters.value.status === 'active'
-    data = data.filter(t => t.is_active === isActive)
-  }
-  
-  teachers.value = data
-}
+const fetchTeachers = () => teacherService.getAllTeachers()
 
 const loadDepartments = async () => {
-  // Check cache first
-  const cached = cacheService.get(CACHE_KEYS.DEPARTMENTS)
+  const cached = cacheService.get('departments_list')
   if (cached) {
     departments.value = cached
     return
   }
-
   try {
     const response = await api.get('/departments/')
     const data = Array.isArray(response.data) ? response.data : (response.data.results || [])
-    
-    // Store in cache
-    cacheService.set(CACHE_KEYS.DEPARTMENTS, data)
+    cacheService.set('departments_list', data)
     departments.value = data
   } catch (error) {
     console.error('Error loading departments:', error)
   }
 }
 
-const resetFilters = () => {
-  filters.value = { search: '', department: '', status: '' }
-  applyFilters()
+const handleRefresh = () => refresh(fetchTeachers)
+
+const handleReset = () => {
+  filters.value.department = ''
+  resetFilters()
 }
 
-// Debounce search filter
-let searchTimeout = null
-watch(() => filters.value.search, () => {
-  clearTimeout(searchTimeout)
-  searchTimeout = setTimeout(() => {
-    applyFilters()
-  }, 300) // Wait 300ms after user stops typing
-})
-
-// Watch other filters without debounce
-watch(() => [filters.value.department, filters.value.status], () => {
-  applyFilters()
-})
-
-const toggleStatus = async (teacher) => {
+const handleToggle = async (teacher) => {
   try {
-    await teacherService.toggleStatus(teacher.id)
-    teachersCache = [] // Invalidate cache
-    await loadTeachers(false)
-  } catch (error) {
-    console.error('Error toggling status:', error)
-    alert('Failed to update status')
+    await toggleStatus(teacher, teacherService.toggleStatus)
+    showAlert('success', 'Teacher status updated successfully')
+  } catch {
+    showAlert('error', 'Failed to update status')
   }
 }
 
 onMounted(() => {
-  loadTeachers()
+  loadData(fetchTeachers)
   loadDepartments()
+  loadTeacherStats()
 })
 </script>
 
