@@ -1,7 +1,7 @@
 /**
  * Student Service - Refactored with unified API wrapper and caching
  */
-import { apiGet, apiPost, apiPut, apiDelete } from '../core/apiWrapper'
+import { apiGet, apiPost, apiPut, apiPatch, apiDelete } from '../core/apiWrapper'
 import cacheService from '../core/cacheService'
 
 // Cache key helper
@@ -47,6 +47,11 @@ export const studentService = {
     updateStudent: (id, data) => {
         cacheService.clearPattern(`student:${id}:`)
         return apiPut(`/students/${id}/`, data, `updating student ${id}`)
+    },
+
+    patchStudent: (id, data) => {
+        cacheService.clearPattern(`student:${id}:`)
+        return apiPatch(`/students/${id}/`, data, `patching student ${id}`)
     },
 
     deleteStudent: (id) => {

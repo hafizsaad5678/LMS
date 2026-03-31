@@ -1,6 +1,7 @@
 import hashlib
 import json
 import logging
+import math
 import os
 import shutil
 import tempfile
@@ -10,9 +11,6 @@ from typing import Iterable
 from django.conf import settings
 from langchain_core.documents import Document
 from langchain_community.vectorstores import FAISS
-
-import docx
-import pypdf
 
 from ..config import (
     CHAT_CHUNK_OVERLAP,
@@ -60,8 +58,9 @@ def _ensure_faiss_index_dir() -> str:
     return target_dir
 
 
-# Ensure dir exists at import time (keeps old behavior), with safe legacy migration.
-_FAISS_DIR = _ensure_faiss_index_dir()
+@lru_cache(maxsize=1)
+def _get_faiss_dir() -> str:
+    return _ensure_faiss_index_dir()
 
 
 def _index_manifest_path(store_path: str) -> str:
@@ -115,7 +114,7 @@ def _verify_integrity_manifest(store_path: str) -> bool:
 
 def _is_trusted_store_path(store_path: str) -> bool:
     try:
-        base = os.path.abspath(_FAISS_DIR)
+        base = os.path.abspath(_get_faiss_dir())
         target = os.path.abspath(store_path)
         return os.path.commonpath([base, target]) == base
     except Exception:
@@ -131,11 +130,6 @@ def get_embeddings():
     model_kwargs = {"device": CHAT_EMBEDDING_DEVICE}
     encode_kwargs = {"normalize_embeddings": CHAT_EMBEDDING_NORMALIZE}
     return HuggingFaceEmbeddings(model_name=model_name, model_kwargs=model_kwargs, encode_kwargs=encode_kwargs)
-
-
-def get_faiss_cls():
-    """Returns the FAISS class for vector storage."""
-    return FAISS
 
 
 def _get_splitter():
@@ -180,6 +174,8 @@ def _extract_documents_with_langchain(file_obj, filename: str) -> list[Document]
                 return Docx2txtLoader(tmp_path).load()
             except Exception:
                 # Keep resilient fallback if docx2txt isn't available.
+                import docx
+
                 doc = docx.Document(tmp_path)
                 text = "\n".join([p.text for p in doc.paragraphs if p.text]).strip()
                 if not text:
@@ -261,14 +257,12 @@ def invalidate_vector_store(store_path: str) -> None:
 
 
 def invalidate_user_docs_vector_store(user_id: int) -> None:
-    store_path = os.path.join(_FAISS_DIR, f"user_docs_lc_{user_id}")
+    store_path = os.path.join(_get_faiss_dir(), f"user_docs_lc_{user_id}")
     invalidate_vector_store(store_path)
 
 
 def normalize_similarity_score(score):
     """Normalize a FAISS L2 score (lower is better) to a [0, 1] similarity."""
-    import math
-
     try:
         return math.exp(-score)
     except Exception:
@@ -308,6 +302,8 @@ def process_and_index_document(user_id, file_obj, filename):
 
         # Fallback extraction keeps previous behavior if a loader failed silently.
         if not page_texts and lower_name.endswith(".pdf"):
+            import pypdf
+
             reader = pypdf.PdfReader(file_obj)
             for idx, page in enumerate(reader.pages):
                 text = (page.extract_text() or "").strip()
@@ -323,7 +319,7 @@ def process_and_index_document(user_id, file_obj, filename):
         if not chunks:
             return {"status": "error", "message": "Text too short to index."}
 
-        index_dir = os.path.join(_FAISS_DIR, f"user_docs_lc_{user_id}")
+        index_dir = os.path.join(_get_faiss_dir(), f"user_docs_lc_{user_id}")
         vector_store = load_vector_store(index_dir)
 
         if vector_store:

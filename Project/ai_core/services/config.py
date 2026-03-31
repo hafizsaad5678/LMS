@@ -47,9 +47,6 @@ def _env_str(name: str, default: str) -> str:
 	return value if value else default
 
 
-# Evaluation & Metrics
-CHAT_EVAL_ENABLED = _env_bool("CHAT_EVAL_ENABLED", True)
-
 # Shared chat behavior
 CHAT_HISTORY_LIMIT = _env_int("CHAT_HISTORY_LIMIT", 5)
 CHAT_CACHE_TTL_SECONDS = _env_int("CHAT_CACHE_TTL_SECONDS", 300)
@@ -74,7 +71,7 @@ SOURCE_LABEL_LLM_FALLBACK = os.getenv("SOURCE_LABEL_LLM_FALLBACK", "LLM Fallback
 SOURCE_LABEL_DOC_PREFIX = os.getenv("SOURCE_LABEL_DOC_PREFIX", "Document")
 LOW_CONFIDENCE_MESSAGE = os.getenv(
 	"LOW_CONFIDENCE_MESSAGE",
-	"Data me clear answer nahi mila, ye nearest info hai...",
+	"No clear answer was found in the data; this is the closest available information.",
 )
 
 # Retrieval policy
@@ -141,4 +138,10 @@ FAISS_REQUIRE_INTEGRITY_MANIFEST = _env_bool("FAISS_REQUIRE_INTEGRITY_MANIFEST",
 
 # Paths
 FAISS_INDEX_DIR = settings.FAISS_INDEX_DIR
-DOCS_UPLOAD_DIR = os.path.join(settings.MEDIA_ROOT, "uploads")
+
+
+# Document mode settings
+DOC_MODE_CACHE_TTL_SECONDS = _env_int("DOC_MODE_CACHE_TTL_SECONDS", 7 * 24 * 60 * 60)
+UPLOAD_POLL_INTERVAL_PROCESSING_MS = _env_int("UPLOAD_POLL_INTERVAL_PROCESSING_MS", 2500)
+UPLOAD_POLL_INTERVAL_PENDING_MS = _env_int("UPLOAD_POLL_INTERVAL_PENDING_MS", 4500)
+

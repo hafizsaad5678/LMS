@@ -20,5 +20,5 @@ import { useAuth } from '@/store/auth'
 const authStore = useAuth()
 
 // Get username from auth store with fallback
-const userName = computed(() => authStore.userName || authStore.user?.username || 'Admin')
+const userName = computed(() => 'Admin')
 </script>

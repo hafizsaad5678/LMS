@@ -14,6 +14,9 @@ export const teacherRoutes = {
     children: [
         { path: '', name: 'TeacherDashboard', component: () => import('../../views/teacher/dashboard/TeacherDashboard.vue') },
 
+        // Account route
+        { path: 'account', name: 'TeacherMyAccount', component: () => import('../../views/shared/profile/MyAccount.vue') },
+
         // Class routes
         { path: 'classes', name: 'TeacherClassList', component: () => import('../../views/teacher/class/ClassList.vue') },
         { path: 'classes/announcements', name: 'TeacherAnnouncementList', component: () => import('../../views/teacher/class/AnnouncementList.vue') },

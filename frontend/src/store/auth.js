@@ -21,7 +21,11 @@ export const useAuth = defineStore('auth', {
 
   getters: {
     isAuthenticated: (state) => !!state.access_token,
-    getUser: (state) => state.user
+    getUser: (state) => state.user,
+    displayName: (state) => {
+      if (state.userRole === USER_ROLES.ADMIN) return 'Admin'
+      return state.userName || state.user?.full_name || state.user?.username || 'User'
+    }
   },
 
   actions: {
@@ -34,7 +38,7 @@ export const useAuth = defineStore('auth', {
         // Store tokens and user info
         this.access_token = response.data.access
         this.refresh_token = response.data.refresh
-        this.userName = response.data.username || response.data.full_name || 'User'
+        this.userName = response.data.full_name || response.data.username || 'User'
         this.user = response.data.user || response.data
 
         const userRole = response.data.role || 'unknown'
@@ -69,6 +73,11 @@ export const useAuth = defineStore('auth', {
         }
         const redirectPath = dashboardPaths[userRole] || '/'
 
+        // Try to hydrate a role-specific display name from profile records.
+        this.hydrateDisplayName(userRole, userId).catch(() => {
+          // Keep login resilient even if profile fetch fails.
+        })
+
         // Preload dashboard stats in background (don't wait for it)
         this.preloadDashboardStats(userRole, userId).catch(err => {
           console.warn('Failed to preload dashboard stats:', err)
@@ -85,6 +94,36 @@ export const useAuth = defineStore('auth', {
         throw error
       } finally {
         this.isLoading = false
+      }
+    },
+
+    async hydrateDisplayName(userRole = this.userRole, userId = this.userId) {
+      if (userRole === USER_ROLES.ADMIN) {
+        this.userName = 'Admin'
+        safeStorage.set(STORAGE_KEYS.USERNAME, 'Admin')
+        return 'Admin'
+      }
+
+      if (!userRole || !userId) return this.userName
+
+      try {
+        let profile = null
+        if (userRole === USER_ROLES.TEACHER) {
+          const { teacherService } = await import('@/services/shared')
+          profile = await teacherService.getTeacher(userId)
+        } else if (userRole === USER_ROLES.STUDENT) {
+          const { studentService } = await import('@/services/shared')
+          profile = await studentService.getStudent(userId)
+        }
+
+        const resolvedName = profile?.full_name || profile?.name || this.userName
+        if (resolvedName) {
+          this.userName = resolvedName
+          safeStorage.set(STORAGE_KEYS.USERNAME, resolvedName)
+        }
+        return this.userName
+      } catch {
+        return this.userName
       }
     },
 

@@ -14,6 +14,9 @@ export const studentRoutes = {
     children: [
         { path: '', name: 'StudentDashboard', component: () => import('../../views/student/dashboard/StudentDashboard.vue') },
 
+        // Account route
+        { path: 'account', name: 'StudentMyAccount', component: () => import('../../views/shared/profile/MyAccount.vue') },
+
         // Assignment routes
         { path: 'assignments', name: 'StudentViewAssignments', component: () => import('../../views/student/assignment/ViewAssignments.vue') },
         { path: 'assignments/submit', name: 'StudentSubmitAssignment', component: () => import('../../views/student/assignment/SubmitAssignment.vue') },

@@ -13,4 +13,5 @@ urlpatterns = [
     path('chat/sessions/', views.StudentChatSessionsView.as_view(), name='ai_chat_sessions'),
     path('chat/sessions/<uuid:session_id>/', views.StudentChatSessionsView.as_view(), name='ai_chat_session_detail'),
     path('chat/upload/', views.DocumentUploadView.as_view(), name='ai_chat_upload'),
+    path('chat/upload/<uuid:file_id>/status/', views.DocumentUploadStatusView.as_view(), name='ai_chat_upload_status'),
 ]

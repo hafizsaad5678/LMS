@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from ..models.chatbot import ChatSession, ChatMessage, ChatMetric
+from ..models.chatbot import ChatSession, ChatMessage
 
 class ChatMessageSerializer(serializers.ModelSerializer):
     class Meta:
@@ -12,8 +12,3 @@ class ChatSessionSerializer(serializers.ModelSerializer):
     class Meta:
         model = ChatSession
         fields = ['id', 'title', 'messages', 'created_at', 'updated_at']
-
-class ChatMetricSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = ChatMetric
-        fields = ['id', 'message', 'is_grounded', 'user_satisfaction', 'feedback_text']

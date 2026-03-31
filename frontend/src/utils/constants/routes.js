@@ -127,6 +127,7 @@ export const TEACHER_ROUTES = {
     MATERIAL_DOWNLOAD: { name: 'TeacherMaterialDownload', path: '/teacher-dashboard/resources/download' },
 
     // Profiles
+    ACCOUNT: { name: 'TeacherMyAccount', path: '/teacher-dashboard/account' },
     STUDENT_PROFILE: { name: 'TeacherStudentProfile', path: '/teacher-dashboard/profiles/student' },
     SUBJECT_PROFILE: { name: 'TeacherSubjectProfile', path: '/teacher-dashboard/profiles/subject' }
 }
@@ -165,7 +166,10 @@ export const STUDENT_ROUTES = {
     TAKE_QUIZ: { name: 'StudentTakeQuiz', path: '/student-dashboard/quizzes' },
 
     // Communication
-    ANNOUNCEMENTS: { name: 'StudentAnnouncements', path: '/student-dashboard/announcements' }
+    ANNOUNCEMENTS: { name: 'StudentAnnouncements', path: '/student-dashboard/announcements' },
+
+    // Account
+    ACCOUNT: { name: 'StudentMyAccount', path: '/student-dashboard/account' }
 }
 
 // Helper function to get route with params

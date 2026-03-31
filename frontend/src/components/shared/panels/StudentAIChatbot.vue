@@ -1,48 +1,28 @@
 <template>
   <div class="student-ai-chatbot shadow">
-    <!-- Chat Window -->
     <Transition name="slide-up">
-      <div v-if="isOpen" class="chat-window card border-0 shadow-2xl overflow-hidden d-flex flex-row">
-        <!-- ChatGPT-style Sidebar -->
-        <div class="chat-sidebar d-flex flex-column bg-dark text-white border-end border-secondary">
-          <div class="p-3 w-100">
-            <button @click="startNewChat" class="btn btn-outline-light btn-sm w-100 d-flex align-items-center justify-content-center gap-2 py-2 rounded-3 border-secondary">
-              <i class="bi bi-plus-lg"></i> New Chat
-            </button>
-          </div>
-          
-          <div class="flex-grow-1 w-100 overflow-auto p-2 history-container px-3">
-            <h6 class="text-uppercase text-secondary extra-small mb-3 px-1 mt-2">Yesterday</h6>
-            <div v-if="sessions.length === 0" class="text-center py-4 px-2 opacity-25 small italic">No recent chats</div>
-            <div v-for="sess in sessions" :key="sess.id" 
-                 class="history-item px-3 py-2 rounded-3 mb-1 d-flex align-items-center gap-2 transition-all position-relative cursor-pointer"
-                 :class="{ 'active bg-secondary bg-opacity-25': currentSessionId === sess.id }"
-                 @click="loadSession(sess.id)">
-              <i class="bi bi-chat-left-text-fill small opacity-50 flex-shrink-0"></i>
-              <span class="text-truncate small flex-grow-1">{{ sess.title || 'Conversation' }}</span>
-              <button @click.stop="handleDeleteSession(sess.id)" 
-                      class="btn btn-link btn-xs p-0 text-white-50 delete-btn opacity-0 transition-opacity flex-shrink-0"
-                      title="Delete chat">
-                  <i class="bi bi-trash"></i>
-              </button>
-            </div>
-          </div>
+      <div v-if="isOpen" class="chat-window card border-0 shadow-2xl overflow-hidden d-flex flex-row"
+           :class="{ 'fullscreen': isFullScreen, 'chat-dark-theme': isDarkMode }">
+           
+        <ChatSidebar
+          :sessions="sessions"
+          :currentSessionId="currentSessionId"
+          :editingSessionId="editingSessionId"
+          :renamingSessionId="renamingSessionId"
+          v-model:renameDraft="renameDraft"
+          :isDarkMode="isDarkMode"
+          @start-new-chat="startNewChat"
+          @load-session="(id) => loadSession(id, scrollToBottom)"
+          @start-rename="startRenameSession"
+          @submit-rename="submitRenameSession"
+          @cancel-rename="cancelRenameSession"
+          @delete-session="handleDeleteSession"
+          @toggle-dark-mode="toggleDarkMode"
+          @set-rename-ref="renameInputRef = $event"
+        />
 
-          <!-- User Quick Profile in Sidebar -->
-          <div class="mt-auto p-3 border-top border-secondary bg-dark-soft">
-             <div class="d-flex align-items-center gap-2 small opacity-75">
-                <div class="avatar-xs bg-success rounded-circle text-white d-flex align-items-center justify-content-center">
-                   <i class="bi bi-person-fill tiny-text"></i>
-                </div>
-                <span class="text-truncate">Student Workspace</span>
-             </div>
-          </div>
-        </div>
-
-        <!-- Main Chat Area -->
         <div class="chat-main d-flex flex-column flex-grow-1 bg-white">
-          <!-- Header -->
-          <div class="chat-header p-3 d-flex align-items-center justify-content-between">
+          <div class="chat-header p-3 d-flex align-items-center justify-content-between flex-shrink-0">
             <div class="d-flex align-items-center gap-2">
               <div class="avatar-sm assistant-header-avatar text-white rounded-3 shadow-sm d-flex align-items-center justify-content-center">
                 <i class="bi bi-mortarboard-fill fs-6"></i>
@@ -56,28 +36,24 @@
               </div>
             </div>
             <div class="d-flex align-items-center gap-2">
-               <button class="btn btn-link link-secondary p-1"><i class="bi bi-share"></i></button>
-               <button @click="toggleChat" class="btn btn-link link-dark p-1 text-decoration-none"><i class="bi bi-x-lg"></i></button>
+               <button @click="shareChat" class="btn btn-link link-secondary p-1" title="Share Chat"><i class="bi bi-share"></i></button>
+               <button @click="toggleFullScreen" class="btn btn-link link-secondary p-1" :title="isFullScreen ? 'Exit Full Screen' : 'Full Screen'"><i :class="isFullScreen ? 'bi bi-fullscreen-exit' : 'bi bi-arrows-fullscreen'"></i></button>
+               <button @click="toggleChat" class="btn btn-link link-dark p-1 text-decoration-none" title="Close"><i class="bi bi-x-lg"></i></button>
             </div>
           </div>
 
-          <!-- Messages Area -->
-          <div class="chat-body flex-grow-1 p-0 overflow-auto d-flex flex-column" ref="messageBox">
-            <div v-if="messages.length === 0" class="empty-chat text-center my-auto py-5 px-4">
-               <div class="mx-auto bg-light rounded-circle d-flex align-items-center justify-content-center mb-4 shadow-sm assistant-stars-icon">
-                  <i class="bi bi-stars fs-2 text-success"></i>
-               </div>
-               <h5 class="fw-bold text-dark">LMS Intelligence</h5>
-               <p class="text-muted small mx-auto empty-chat-text">
-                  Ask about upcoming assignments, analyze your attendance, or explain complex course topics.
-               </p>
-               <div class="d-flex flex-wrap justify-content-center gap-2 mt-4 px-3">
-                  <button @click="inputQuery = 'What assignments are due?'" class="btn btn-outline-secondary btn-xs rounded-pill px-3">Upcoming Assignments</button>
-                  <button @click="inputQuery = 'Check my attendance'" class="btn btn-outline-secondary btn-xs rounded-pill px-3">Attendance Summary</button>
-               </div>
-            </div>
+          <div class="d-flex flex-column flex-grow-1 min-vh-0 w-100 h-100" :class="{ 'justify-content-center pb-5': messages.length === 0 }">
+             
+            <div class="chat-body p-0 overflow-auto d-flex flex-column w-100" @scroll="handleChatScroll" :class="messages.length === 0 ? 'flex-grow-0 overflow-hidden' : 'flex-grow-1'" ref="messageBox">
+              <div v-if="messages.length === 0" class="empty-chat d-flex flex-column align-items-center justify-content-center w-100 mx-auto py-4 px-4 mb-1 mt-5 pt-5" style="max-width: 880px;">
+                 <h3 class="fw-semibold text-dark mb-4" style="font-size: 2.2rem;">What's on the agenda today?</h3>
+                 <div class="d-flex flex-wrap justify-content-center gap-3 px-3 w-100 mb-4">
+                    <button @click="inputQuery = 'What assignments are due?'" class="btn btn-outline-secondary rounded-pill px-4 py-2 bg-white text-dark fw-medium border-light-subtle shadow-sm hover-shadow-md transition-all">Assignments</button>
+                    <button @click="inputQuery = 'Check my attendance'" class="btn btn-outline-secondary rounded-pill px-4 py-2 bg-white text-dark fw-medium border-light-subtle shadow-sm hover-shadow-md transition-all">Attendance</button>
+                 </div>
+              </div>
 
-            <div v-for="(msg, index) in messages" :key="index" class="message-row w-100 px-4 py-3">
+              <div v-for="(msg, index) in messages" :key="index" :id="`chat-msg-${index}`" class="message-row w-100 px-4 py-3">
               <div class="max-width-chat mx-auto d-flex gap-3 align-items-end"
                    v-if="!(msg.role === 'user' && editSourceIndex === index)"
                    :class="msg.role === 'user' ? 'justify-content-end' : 'justify-content-start'">
@@ -86,6 +62,9 @@
                 </div>
                 <div class="message-content-wrap" :class="msg.role === 'user' ? 'user-content-wrap' : 'assistant-content-wrap'">
                   <div class="message-bubble" :class="msg.role === 'user' ? 'bubble-user' : 'bubble-assistant'">
+                    <div v-if="msg.docName" class="mb-2 d-inline-block bg-success text-white border border-success border-opacity-25 rounded-3 px-2 py-1 extra-tiny">
+                      <i class="bi bi-file-earmark-text me-1"></i> {{ msg.docName }}
+                    </div>
                     <div class="markdown-body small text-dark line-height-relaxed" v-html="formatMessage(msg.content)"></div>
                   </div>
                   <div v-if="msg.role === 'user'" class="message-actions-bottom d-flex align-items-center gap-2">
@@ -121,10 +100,11 @@
                     ref="inlineEditInput"
                     v-model="inlineEditQuery"
                     @keydown.enter.exact.prevent="handleInlineEditSend"
-                    rows="1"
+                    rows="3"
                     class="form-control border-0 shadow-none bg-transparent small inline-edit-input"
                     placeholder="Edit your message"
                     :disabled="loading"
+                    style="min-height: 70px; resize: vertical;"
                   ></textarea>
                   <div class="inline-edit-actions d-flex justify-content-end gap-2">
                     <button
@@ -146,8 +126,7 @@
               </div>
             </div>
 
-            <!-- Thinking Indicator -->
-            <div v-if="loading" class="message-row w-100 px-4 py-3">
+            <div v-if="showThinkingIndicator" class="message-row w-100 px-4 py-3">
                <div class="max-width-chat mx-auto d-flex gap-3 align-items-end justify-content-start">
                   <div class="avatar-msg assistant-avatar rounded-circle shadow-sm d-flex align-items-center justify-content-center flex-shrink-0">
                     <i class="bi bi-mortarboard-fill"></i>
@@ -159,46 +138,38 @@
                   </div>
                </div>
             </div>
+
+            <div style="height: 280px; flex-shrink: 0; width: 100%;"></div>
           </div>
 
-          <!-- Footer / Input Area -->
-          <div class="chat-footer p-4 pt-2">
-            <div class="max-width-chat mx-auto position-relative">
-               <div class="input-container-modern shadow-lg rounded-4 border bg-white overflow-hidden">
-                  <div class="chat-input-shell d-flex align-items-start gap-2 px-3 pt-2">
-                    <i class="bi bi-search chat-input-icon mt-2"></i>
-                    <textarea 
-                      v-model="inputQuery" 
-                      @keydown.enter.prevent="handleSend" 
-                      rows="1"
-                      class="form-control border-0 bg-transparent shadow-none py-2 px-1 resize-none small chat-main-input" 
-                      :placeholder="editSourceIndex !== null ? 'Editing a previous message above...' : 'Search notes or ask your question...'"
-                      :disabled="loading || editSourceIndex !== null"
-                    ></textarea>
-                  </div>
-                  <div class="d-flex justify-content-between align-items-center px-4 py-2 bg-light-soft border-top">
-                     <div class="d-flex gap-2">
-                        <input type="file" ref="fileInput" class="d-none" @change="handleUpload" accept=".pdf,.docx,.txt">
-                        <button @click="$refs.fileInput.click()" class="btn btn-link btn-xs p-0 text-muted" title="Upload Document" :disabled="editSourceIndex !== null"><i class="bi bi-paperclip fs-6"></i></button>
-                        <button class="btn btn-link btn-xs p-0 text-muted" :disabled="editSourceIndex !== null"><i class="bi bi-emoji-smile fs-6"></i></button>
-                     </div>
-                     <button @click="handleSend" class="btn btn-success btn-sm rounded-3 px-3 d-flex align-items-center gap-2" 
-                             :disabled="loading || isUploading || editSourceIndex !== null || !inputQuery.trim()">
-                        <span class="extra-tiny fw-bold">SEND</span>
-                        <i class="bi bi-send-fill tiny-text"></i>
-                      </button>
-                  </div>
-               </div>
-               <div class="text-center mt-2 tiny-text text-muted opacity-75 w-100">
-                 AI can make mistakes — verify important information.
-               </div>
+          <div class="chat-minimap-track" v-if="userMessageIndices.length > 0 && messages.length > 0">
+            <div v-for="(item, idx) in userMessageIndices" :key="item.index"
+                 class="minimap-node"
+                 :class="(activeMessageIndex !== -1 ? activeMessageIndex === item.index : idx === userMessageIndices.length - 1) ? 'minimap-node-active' : ''"
+                 @click="scrollToMessage(item.index)"
+                 title="Jump to message">
             </div>
+          </div>
+
+          <ChatComposer
+            v-model="inputQuery"
+            :isEmptyChat="messages.length === 0"
+            :uploadedDocument="uploadedDocument"
+            :editSourceIndex="editSourceIndex"
+            :loading="loading"
+            :isUploading="isUploading"
+            :hasActiveRequest="!!activeRequestController"
+            @send="handleSend"
+            @stop-response="handleStopResponse"
+            @upload-file="handleUpload"
+            @remove-document="removeDocument"
+          />
+
           </div>
         </div>
       </div>
     </Transition>
 
-    <!-- Confirm Dialog -->
     <ConfirmDialog
       v-model="showDeleteConfirm"
       title="Delete Chat Session"
@@ -215,60 +186,42 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, nextTick } from 'vue'
-import aiChatService from '@/services/shared/aiChatService'
+import { ref, onMounted, onUnmounted, nextTick, computed } from 'vue'
 import ConfirmDialog from '@/components/shared/common/feedback/ConfirmDialog.vue'
+import ChatSidebar from './ChatSidebar.vue'
+import ChatComposer from './ChatComposer.vue'
+
+import { formatMessage } from '@/utils/chatHelpers'
+import { useChatSessionManager } from '@/composables/student/useChatSessionManager'
+import { useDocumentUpload } from '@/composables/student/useDocumentUpload'
+import { useChatStream } from '@/composables/student/useChatStream'
 
 const isOpen = ref(false)
-const loading = ref(false)
-const isUploading = ref(false)
-const inputQuery = ref('')
-const messages = ref([])
-const sessions = ref([])
-const currentSessionId = ref(localStorage.getItem('current_chat_session_id'))
+const isDarkMode = ref(localStorage.getItem('chat_dark_mode') === 'true')
+const isFullScreen = ref(false)
 const messageBox = ref(null)
 const inlineEditInput = ref(null)
+
+const toggleDarkMode = () => {
+  isDarkMode.value = !isDarkMode.value
+  localStorage.setItem('chat_dark_mode', isDarkMode.value)
+}
+
+const toggleFullScreen = () => {
+  isFullScreen.value = !isFullScreen.value
+}
+
+const messages = ref([])
+const inputQuery = ref('')
 const editSourceIndex = ref(null)
 const inlineEditQuery = ref('')
 const copiedMessageIndex = ref(null)
+const activeMessageIndex = ref(-1)
 
-// Delete confirmation state
-const showDeleteConfirm = ref(false)
-const sessionToDelete = ref(null)
-const isDeleting = ref(false)
-
-const toggleChat = () => {
-  isOpen.value = !isOpen.value
-  if (isOpen.value) {
-    loadSessions()
-    // If there's a current session, load its messages
-    if (currentSessionId.value) {
-      loadSession(currentSessionId.value)
-    }
-  }
+const pushAssistantNotice = (content) => {
+  messages.value.push({ role: 'assistant', content, source: 'System' })
+  scrollToBottom()
 }
-
-const onHandleToggle = () => {
-  toggleChat()
-}
-
-onMounted(() => {
-  if (currentSessionId.value) loadSession(currentSessionId.value)
-  
-  window.addEventListener('toggle-ai-chat', (e) => {
-    if (e.detail.action === 'open') {
-      isOpen.value = true
-      loadSessions()
-      const sid = e.detail.sessionId || currentSessionId.value
-      if (sid) loadSession(sid)
-    }
-  })
-})
-
-onUnmounted(() => {
-  window.removeEventListener('toggle-ai-chat', onHandleToggle)
-})
-
 
 const startNewChat = () => {
   currentSessionId.value = null
@@ -278,132 +231,146 @@ const startNewChat = () => {
   inlineEditQuery.value = ''
 }
 
-const loadSession = async (sid) => {
-  // Reset view for loading
-  loading.value = true
-  currentSessionId.value = sid
-  localStorage.setItem('current_chat_session_id', sid)
-  editSourceIndex.value = null
-  inlineEditQuery.value = ''
-  
-  try {
-    const res = await aiChatService.getSessionMessages(sid)
-    const messagesList = res.messages || [] 
-    messages.value = messagesList.map(m => ({
-      role: m.role,
-      content: m.content
-    }))
-    scrollToBottom()
-  } catch (err) {
-    console.error('Session messages load failed', err)
-  } finally {
-    loading.value = false
+const {
+  sessions, currentSessionId, showDeleteConfirm, sessionToDelete,
+  isDeleting, renamingSessionId, editingSessionId, renameDraft,
+  renameInputRef, loadSessions, loadSession, handleDeleteSession,
+  confirmDeleteSession, startRenameSession, cancelRenameSession,
+  submitRenameSession
+} = useChatSessionManager({
+  messages, loading: ref(false), editSourceIndex, inlineEditQuery, startNewChatCallback: startNewChat
+})
+
+const {
+  loading, showThinkingIndicator, activeRequestController,
+  stopNoticeShown, handleStopResponse, submitMessage
+} = useChatStream({
+  messages, currentSessionId, loadSessionsCallback: loadSessions,
+  scrollToBottomCallback: () => scrollToBottom(), onAssistantNotice: pushAssistantNotice
+})
+
+const {
+  isUploading, uploadedDocument, handleUpload, removeDocument
+} = useDocumentUpload({ onAssistantNotice: pushAssistantNotice })
+
+const userMessageIndices = computed(() => {
+  return messages.value.map((msg, index) => ({ msg, index })).filter(item => item.msg.role === 'user')
+})
+
+const handleChatScroll = () => {
+  if (!messageBox.value || userMessageIndices.value.length === 0) return
+  const container = messageBox.value
+  const viewportCenter = container.scrollTop + container.clientHeight / 2
+
+  let closestIndex = userMessageIndices.value[0].index
+  let minDistance = Infinity
+
+  userMessageIndices.value.forEach(item => {
+    const el = document.getElementById(`chat-msg-${item.index}`)
+    if (el) {
+      const distance = Math.abs(el.offsetTop - viewportCenter)
+      if (distance < minDistance) {
+        minDistance = distance
+        closestIndex = item.index
+      }
+    }
+  })
+  activeMessageIndex.value = closestIndex
+}
+
+const scrollToMessage = (index) => {
+  const el = document.getElementById(`chat-msg-${index}`)
+  if (el) {
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    activeMessageIndex.value = index
   }
 }
 
-
-const handleUpload = async (event) => {
-  const file = event.target.files[0]
-  if (!file) return
-
-  isUploading.value = true
-  
-  // Show upload in progress
-  messages.value.push({ 
-    role: 'user', 
-    content: `Uploading document: ${file.name}...` 
-  })
-  scrollToBottom()
-
-  try {
-    const res = await aiChatService.uploadDocument(file)
-    
-    // Show success
-    messages.value.push({
-      role: 'assistant',
-      content: res.message || `Document "${file.name}" processed successfully. You can ask me questions about it!`,
-      source: 'System'
-    })
-
-  } catch (err) {
-    console.error('Upload failed', err)
-    messages.value.push({ 
-      role: 'assistant', 
-      content: "Failed to upload document. Please ensure it's a valid PDF or DOCX file.", 
-      source: 'System' 
-    })
-  } finally {
-    isUploading.value = false
-    event.target.value = '' // Reset input
-    scrollToBottom()
+const scrollToBottom = async () => {
+  await nextTick()
+  if (messageBox.value) {
+    messageBox.value.scrollTop = messageBox.value.scrollHeight
+    handleChatScroll()
   }
 }
 
 const handleSend = async () => {
-  const query = inputQuery.value.trim()
-  if (!query || loading.value) return
+  let query = inputQuery.value.trim()
+  const docReady = uploadedDocument.value && uploadedDocument.value.status === 'ready'
+  const docUploading = uploadedDocument.value && uploadedDocument.value.status === 'uploading'
+  const docError = uploadedDocument.value && uploadedDocument.value.status === 'error'
+  
+  if (!query && !docReady) return
+  if (loading.value) return
+
+  if (docUploading) {
+    pushAssistantNotice('Document is still uploading/indexing. Please wait until the status turns green before asking from the file.')
+    return
+  }
+
+  if (docError) {
+    pushAssistantNotice('File is not uploaded yet. Please upload the file again, then ask your question.')
+    return
+  }
+
+  if (!query && docReady) {
+    query = "Please analyze the uploaded document."
+  }
 
   inputQuery.value = ''
-  await submitMessage(query)
+  
+  let docName = null
+  if (docReady) {
+    docName = uploadedDocument.value.name
+    uploadedDocument.value = null
+  }
+
+  await submitMessage(query, null, docName)
 }
 
 const handleInlineEditSend = async () => {
   const query = inlineEditQuery.value.trim()
   const sourceIndex = editSourceIndex.value
   if (!query || loading.value || sourceIndex === null) return
-  await submitMessage(query, sourceIndex)
+  await submitMessage(query, sourceIndex, null, editSourceIndex, inlineEditQuery)
 }
 
-const submitMessage = async (query, sourceIndex = null) => {
-  // When editing, replace the selected user message and drop trailing turns.
-  if (sourceIndex !== null && messages.value[sourceIndex]?.role === 'user') {
-    messages.value = messages.value.slice(0, sourceIndex + 1)
-    messages.value[sourceIndex] = {
-      ...messages.value[sourceIndex],
-      content: query
-    }
-    editSourceIndex.value = null
-    inlineEditQuery.value = ''
-  } else {
-    // Push user message immediately for normal sends.
-    messages.value.push({ role: 'user', content: query })
+const editAndResend = async (index) => {
+  const msg = messages.value[index]
+  if (!msg || msg.role !== 'user') return
+  inlineEditQuery.value = msg.rawQuery || msg.content || ''
+  editSourceIndex.value = index
+  await nextTick()
+  inlineEditInput.value?.focus?.()
+}
+
+const cancelEditResend = () => {
+  editSourceIndex.value = null
+  inlineEditQuery.value = ''
+}
+
+const shareChat = async () => {
+  if (messages.value.length === 0) {
+    alert("No chat history to share.");
+    return;
   }
-  scrollToBottom()
   
-  loading.value = true
+  let chatText = "Chat Session with Academic Assistant:\n\n";
+  messages.value.forEach(msg => {
+    const role = msg.role === 'user' ? 'You' : 'Assistant';
+    chatText += `[${role}]: ${msg.content}\n\n`;
+  });
+  
   try {
-    const res = await aiChatService.sendMessage(query, currentSessionId.value)
-    
-    // Update session state
-    if (res.session_id) {
-       currentSessionId.value = res.session_id
-       localStorage.setItem('current_chat_session_id', res.session_id)
-       // Refresh history to see new title or updated session
-       await loadSessions()
+    if (navigator.share) {
+      await navigator.share({ title: 'Academic Assistant Chat', text: chatText });
+    } else {
+      await navigator.clipboard.writeText(chatText);
+      alert("Chat copied to clipboard!");
     }
-    
-
-    messages.value.push({
-      role: 'assistant',
-      content: res.message.content || "Empty response received", 
-      source: res.message.source
-    })
   } catch (error) {
-    console.error('Chat error:', error)
-    messages.value.push({ 
-      role: 'assistant', 
-      content: "I'm sorry, I'm having trouble connecting to the knowledge base right now. Please try again in a moment.", 
-      source: 'System' 
-    })
-  } finally {
-    loading.value = false
-    scrollToBottom()
+    console.error("Error sharing chat:", error);
   }
-}
-
-const formatMessage = (text) => {
-  if (!text) return ''
-  return text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>')
 }
 
 const copyMessage = async (text, index) => {
@@ -430,67 +397,39 @@ const copyMessage = async (text, index) => {
   }
 }
 
-const isEditableUserMessage = (index) => {
-  if (messages.value[index]?.role !== 'user') return false
-  for (let i = index + 1; i < messages.value.length; i += 1) {
-    if (messages.value[i]?.role === 'user') return false
-  }
-  return true
-}
-
-const editAndResend = async (index) => {
-  const msg = messages.value[index]
-  if (!msg || msg.role !== 'user') return
-  inlineEditQuery.value = msg.content || ''
-  editSourceIndex.value = index
-  await nextTick()
-  inlineEditInput.value?.focus?.()
-}
-
-const cancelEditResend = () => {
-  editSourceIndex.value = null
-  inlineEditQuery.value = ''
-}
-
-const scrollToBottom = async () => {
-  await nextTick()
-  if (messageBox.value) messageBox.value.scrollTop = messageBox.value.scrollHeight
-}
-
-const loadSessions = async () => {
-  try {
-    const res = await aiChatService.getSessions()
-    // Sort sessions by updated_at descending if available
-    sessions.value = res.sort((a,b) => new Date(b.updated_at) - new Date(a.updated_at))
-  } catch (err) { console.error('History load failed', err) }
-}
-
-const handleDeleteSession = (sid) => {
-  sessionToDelete.value = sid
-  showDeleteConfirm.value = true
-}
-
-const confirmDeleteSession = async () => {
-  if (!sessionToDelete.value) return
-  isDeleting.value = true
-  
-  try {
-    const sid = sessionToDelete.value
-    await aiChatService.deleteSession(sid)
-    sessions.value = sessions.value.filter(s => s.id !== sid)
-    
-    // If we deleted the active session, reset
-    if (currentSessionId.value === sid) {
-       startNewChat()
+const toggleChat = () => {
+  isOpen.value = !isOpen.value
+  if (isOpen.value) {
+    loadSessions()
+    if (currentSessionId.value) {
+      loadSession(currentSessionId.value, scrollToBottom)
     }
-  } catch (err) {
-    console.error('Delete failed', err)
-  } finally {
-    isDeleting.value = false
-    showDeleteConfirm.value = false
-    sessionToDelete.value = null
   }
 }
+
+const onHandleToggle = () => {
+  toggleChat()
+}
+
+onMounted(() => {
+  if (currentSessionId.value) loadSession(currentSessionId.value, scrollToBottom)
+  
+  window.addEventListener('toggle-ai-chat', (e) => {
+    if (e.detail.action === 'open') {
+      isOpen.value = true
+      loadSessions()
+      const sid = e.detail.sessionId || currentSessionId.value
+      if (sid) loadSession(sid, scrollToBottom)
+    }
+  })
+})
+
+onUnmounted(() => {
+  if (activeRequestController.value) {
+    activeRequestController.value.abort('Chat panel closed')
+    activeRequestController.value = null
+  }
+  window.removeEventListener('toggle-ai-chat', onHandleToggle)
+})
 </script>
 
-<style scoped></style>

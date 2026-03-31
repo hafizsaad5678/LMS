@@ -16,6 +16,24 @@ from .prompts import JSON_ENFORCER
 logger = logging.getLogger(__name__)
 
 
+def _coerce_text_content(content: Any) -> str:
+	if content is None:
+		return ""
+	if isinstance(content, str):
+		return content
+	if isinstance(content, list):
+		parts: List[str] = []
+		for item in content:
+			if isinstance(item, str):
+				parts.append(item)
+			elif isinstance(item, dict):
+				text = item.get("text") or item.get("value") or ""
+				if text:
+					parts.append(str(text))
+		return "".join(parts)
+	return str(content)
+
+
 def _canonical_provider_name(provider_name: str) -> str:
 	name = (provider_name or "").lower().strip()
 	for canonical, aliases in AI_PROVIDER_ALIASES.items():
@@ -96,7 +114,12 @@ class OpenAICompatibleProvider(LLMProvider):
 			temperature=temperature,
 			**kwargs,
 		)
-		return response.choices[0].message.content or ""
+		choices = getattr(response, "choices", None) or []
+		if not choices:
+			logger.warning("LLM response returned no choices.")
+			return ""
+		message = getattr(choices[0], "message", None)
+		return _coerce_text_content(getattr(message, "content", ""))
 
 	def stream(self, prompt: str, system_prompt: str, history: List[Dict], **kwargs) -> Generator[str, None, None]:
 		temperature = kwargs.pop("temperature", float(os.getenv("AI_TEMPERATURE", "0.7")))
@@ -108,9 +131,13 @@ class OpenAICompatibleProvider(LLMProvider):
 			**kwargs,
 		)
 		for chunk in stream:
-			delta = chunk.choices[0].delta.content
-			if delta:
-				yield delta
+			choices = getattr(chunk, "choices", None) or []
+			if not choices:
+				continue
+			delta_obj = getattr(choices[0], "delta", None)
+			text = _coerce_text_content(getattr(delta_obj, "content", None))
+			if text:
+				yield text
 
 	def get_langchain_model(self, **kwargs) -> Any:
 		from langchain_openai import ChatOpenAI
@@ -176,8 +203,4 @@ def get_chat_model(**kwargs) -> Any:
 	except Exception as exc:
 		logger.error("get_chat_model failed: %s", exc)
 		raise
-
-
-# Backward compatibility alias.
-call_llm_stream = stream_llm
 

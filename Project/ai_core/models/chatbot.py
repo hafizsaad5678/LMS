@@ -57,19 +57,16 @@ class UploadedFile(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     material = models.ForeignKey('lms_cors.Material', on_delete=models.CASCADE, null=True, blank=True)
     filename = models.CharField(max_length=255)
-    index_status = models.CharField(max_length=20, default='pending') # pending, indexed, failed
+    class IndexStatus(models.TextChoices):
+        PENDING = 'pending', 'Pending'
+        PROCESSING = 'processing', 'Processing'
+        INDEXED = 'indexed', 'Indexed'
+        FAILED = 'failed', 'Failed'
+        ERROR = 'error', 'Error'
+
+    index_status = models.CharField(max_length=20, choices=IndexStatus.choices, default=IndexStatus.PENDING)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         db_table = 'chat_uploaded_files'
 
-class FileChunk(models.Model):
-    """
-    Metadata for searchable chunks if we need DB tracking beyond FAISS meta.
-    """
-    file = models.ForeignKey(UploadedFile, on_delete=models.CASCADE, related_name='chunks')
-    chunk_index = models.IntegerField()
-    content_summary = models.TextField() # For quick preview
-    
-    class Meta:
-        db_table = 'chat_file_chunks'

@@ -160,8 +160,6 @@ def _extract_json(response: str, expect_list: bool = False, fallback_title: str 
         raise ValueError(f"AI returned invalid format. Expected JSON, got text: {data[:200]}...")
 
     if expect_list:
-        if isinstance(data, list):
-            return data
         return []
 
     if not isinstance(data, dict):
@@ -211,6 +209,8 @@ def _try_parse(text: str):
 
 
 def _find_json_in_text(text: str, expect_list: bool = False, fallback_title: str = "Quiz"):
+    # Reverse boundary scanning is quadratic in the worst case but acceptable
+    # here because model outputs are typically small text payloads.
     text = re.sub(r"```json\s*(.*?)\s*```", r"\1", text, flags=re.DOTALL)
     text = re.sub(r"```\s*(.*?)\s*```", r"\1", text, flags=re.DOTALL)
 
@@ -321,13 +321,6 @@ def _parse_mixed_targets(requested_type: str) -> dict:
     return result
 
 
-def _normalize_from_question_payload(question: dict) -> str:
-    q_type = _normalize_question_type(str(question.get("question_type", "")))
-    if q_type != "MCQ":
-        return q_type
-    return "MCQ"
-
-
 def _apply_question_type_shape(question: dict, q_type: str):
     question["question_type"] = q_type
     if q_type == "MCQ":
@@ -347,7 +340,7 @@ def _enforce_mixed_question_types(questions: list, requested_type: str):
         for question in questions:
             if not isinstance(question, dict):
                 continue
-            inferred = _normalize_from_question_payload(question)
+            inferred = _normalize_question_type(str(question.get("question_type", "")))
             _apply_question_type_shape(question, inferred)
         return
 
@@ -380,7 +373,7 @@ def _enforce_mixed_question_types(questions: list, requested_type: str):
             chosen = remaining[rem_idx]
             rem_idx += 1
         else:
-            chosen = _normalize_from_question_payload(question)
+            chosen = _normalize_question_type(str(question.get("question_type", "")))
             if chosen == "MCQ" and not (isinstance(question.get("options"), list) and question.get("options")):
                 chosen = "Short Answer"
 

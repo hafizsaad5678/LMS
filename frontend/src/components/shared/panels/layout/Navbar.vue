@@ -8,7 +8,7 @@
       @close="closeAlert"
       @confirm="logout"
     />
-    <nav :class="['navbar navbar-expand-lg navbar-dark shadow-sm fixed-top', headerColor]">
+    <nav :class="['navbar navbar-expand-lg navbar-dark shadow-sm fixed-top lms-navbar', headerColor]">
       <div class="container-fluid">
         <!-- Mobile Sidebar Toggle -->
         <button 
@@ -43,19 +43,27 @@
             <i class="bi bi-x-lg fs-4"></i>
           </button>
           
-          <ul class="navbar-nav ms-auto d-flex align-items-center gap-2 gap-lg-3">
+          <ul class="navbar-nav ms-auto d-flex align-items-center gap-2 lms-navbar-links">
             <li v-for="link in mainNav" :key="link.name" class="nav-item">
-              <router-link :to="link.href" class="nav-link text-white">{{ link.name }}</router-link>
+              <router-link :to="link.href" class="nav-link text-white lms-nav-link">{{ link.name }}</router-link>
             </li>
             <!-- User info - visible on all screens -->
-            <li v-if="userName" class="nav-item d-flex align-items-center gap-2 px-3 py-2" style="background-color: rgba(255, 255, 255, 0.2); border-radius: 8px;">
+            <li v-if="userName" class="nav-item d-flex align-items-center gap-2 nav-user-chip">
               <div class="rounded-circle bg-white d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
                 <span class="small fw-bold" :class="headerTextColor">{{ userName.charAt(0).toUpperCase() }}</span>
               </div>
-              <span class="text-white fw-medium">{{ userName }}</span>
+              <button
+                type="button"
+                class="btn btn-link p-0 text-white fw-medium text-decoration-none nav-user-name-btn"
+                :class="{ 'disabled pe-none opacity-100': isAdminUser }"
+                @click="goToAccount"
+                :title="isAdminUser ? 'Admin account' : 'Open my account'"
+              >
+                {{ userName }}
+              </button>
             </li>
             <li class="nav-item">
-              <button @click="handleLogoutClick" class="btn btn-outline-light btn-sm d-flex align-items-center gap-2">
+              <button @click="handleLogoutClick" class="btn btn-outline-light btn-sm d-flex align-items-center gap-2 nav-logout-btn">
                 <span>🚪</span>
                 <span>Logout</span>
               </button>
@@ -68,12 +76,13 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuth } from '@/store/auth'
 import { AlertMessage } from '@/components/shared/common'
 import { navigateToLogin, navigateToDashboard, navigateToHome } from '@/utils/navigation'
 import { ADMIN_ROUTES, TEACHER_ROUTES, STUDENT_ROUTES } from '@/utils/constants/routes'
+import { USER_ROLES } from '@/utils/constants/config'
 
 const authStore = useAuth()
 
@@ -97,6 +106,7 @@ defineEmits(['toggle-sidebar'])
 
 const router = useRouter()
 const showAlert = ref(false)
+const isAdminUser = computed(() => authStore.userRole === USER_ROLES.ADMIN)
 
 const goToDashboard = () => {
   const userRole = authStore.user?.role
@@ -109,6 +119,17 @@ const goToDashboard = () => {
 
 const handleLogoutClick = () => {
   showAlert.value = true
+}
+
+const goToAccount = () => {
+  if (isAdminUser.value) return
+  if (authStore.userRole === USER_ROLES.TEACHER) {
+    router.push({ name: TEACHER_ROUTES.ACCOUNT.name })
+    return
+  }
+  if (authStore.userRole === USER_ROLES.STUDENT) {
+    router.push({ name: STUDENT_ROUTES.ACCOUNT.name })
+  }
 }
 
 const closeAlert = () => {

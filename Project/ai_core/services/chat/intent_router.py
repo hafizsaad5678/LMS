@@ -1,7 +1,7 @@
 import json
 import re
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from ..config import (
     INTENT_KEYWORDS_RAG,
@@ -11,24 +11,12 @@ from ..config import (
     INTENT_CONFIDENCE_LLM,
     INTENT_CONFIDENCE_FALLBACK,
 )
+from ..llm.prompts import INTENT_ROUTER_PROMPT
 from ..llm.provider import call_llm
-
-INTENT_ROUTER_PROMPT = """
-Analyze the user query and classify it into one of the following intents:
-
-1. rag - Questions that should be answered from the user's uploaded documents.
-2. general - Everything else.
-
-Return only a JSON object with:
-- \"intent\": \"rag\" or \"general\"
-- \"slots\": {{}} (keep empty for now)
-- \"reason\": A brief 1-sentence reason for this classification.
-
-User Query: \"{query}\"
-"""
 
 
 class IntentResponse(BaseModel):
+    model_config = ConfigDict(extra="ignore")
     intent: str = Field(default="general")
     slots: dict = Field(default_factory=dict)
 

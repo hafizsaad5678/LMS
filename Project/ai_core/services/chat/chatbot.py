@@ -2,6 +2,7 @@ import hashlib
 import json
 import logging
 import os
+import re
 import time
 
 from django.core.cache import cache
@@ -13,7 +14,6 @@ from ..config import (
     CHAT_GREETING_KEYWORDS,
     CHAT_GREETING_RESPONSE,
     CHAT_SERVICE_VERSION,
-    RAG_CONFIDENCE_SWITCH_THRESHOLD,
     RAG_MAX_CONTEXT_CHARS,
     LOW_CONFIDENCE_MESSAGE,
     SOURCE_LABEL_DOC_PREFIX,
@@ -23,38 +23,42 @@ from ..config import (
 from ..llm.provider import call_llm, get_chat_model, stream_llm
 from ..llm.prompts import CHATBOT_SYSTEM_PROMPT, RAG_DOC_ANSWER_PROMPT
 from ..tools.docs import query_documents
-from .intent_router import classify_intent
+from ..utils import compact_text, get_doc_mode_cache_key
 
 logger = logging.getLogger(__name__)
-logger.info("LOADED SAFE CHATBOT SERVICE %s", CHAT_SERVICE_VERSION)
-
-
-def _compact_text(value: str) -> str:
-    import re
-
-    return re.sub(r"\s+", "", (value or "").lower())
+logger.debug("Loaded chatbot service %s", CHAT_SERVICE_VERSION)
 
 
 def _is_greeting(query: str) -> bool:
     cleaned = (query or "").strip().lower()
     if not cleaned:
         return False
-    compact = _compact_text(cleaned)
-    return any(compact == _compact_text(item) for item in CHAT_GREETING_KEYWORDS)
+    compact = compact_text(cleaned)
+    return any(compact == compact_text(item) for item in CHAT_GREETING_KEYWORDS)
 
 
 def _extract_exact_line_answer(question: str, results: list[dict]) -> str:
-    """Prefer exact line matches for symbolic/equation-style queries."""
-    q = _compact_text(question).strip("?")
-    if not q:
+    """Prefer exact line matches for symbolic/equation-style queries ONLY."""
+    # Only apply this extreme bypass for very short mathematical or symbolic expressions
+    is_symbolic = bool(re.search(r"^[a-zA-Z0-9\s=+\-*/^.?]+$", question.strip())) and "=" in question and len(question.strip()) <= 30
+    if not is_symbolic:
         return ""
+
+    q = compact_text(question).strip("?")
+    if not q or len(q) < 2:
+        return ""
+    
     for r in results:
-        for line in (r.get("text") or "").splitlines():
+        text = r.get("text") or ""
+        for line in text.splitlines():
             candidate = line.strip()
             if not candidate:
                 continue
-            if q in _compact_text(candidate):
-                return candidate
+            
+            compact_candidate = compact_text(candidate)
+            if q in compact_candidate:
+                if len(candidate) < 100:
+                    return candidate
     return ""
 
 
@@ -83,62 +87,64 @@ def _stream_rag_answer(context: str, question: str):
     yield from chain.stream({"context": context, "question": question})
 
 
-def doc_rag_tool(user, student_id, query, slots, history=None):
+def _has_user_document_index(user_id: int, session_id: str | None = None) -> bool:
+    from ..config import FAISS_INDEX_DIR
+    from ...models.chatbot import UploadedFile
+
+    # Require explicit doc-mode activation in this runtime to avoid unexpectedly
+    # loading embedding models from old historical uploads.
+    if not cache.get(get_doc_mode_cache_key(user_id)):
+        return False
+
+    # Do not attempt doc-RAG until this user has at least one successfully indexed upload.
+    try:
+        has_indexed_upload = UploadedFile.objects.filter(user_id=user_id, index_status=UploadedFile.IndexStatus.INDEXED).exists()
+    except Exception:
+        return False
+    if not has_indexed_upload:
+        return False
+
+    index_file = os.path.join(str(FAISS_INDEX_DIR), f"user_docs_lc_{user_id}", "index.faiss")
+    return os.path.exists(index_file)
+
+
+def doc_rag_tool(user, query, history=None):
     docs_res = query_documents(user.id, query)
     results = docs_res.get("results") or []
     confidence = docs_res.get("confidence", 0.0)
 
     if not results:
-        llm_ans = call_llm(
-            query,
-            history=history or [],
-            system_prompt=CHATBOT_SYSTEM_PROMPT,
-        )
+        llm_ans = call_llm(query, history=history or [], system_prompt=CHATBOT_SYSTEM_PROMPT)
         return {
             "text": f"{LOW_CONFIDENCE_MESSAGE}\n\n{llm_ans}",
             "source": SOURCE_LABEL_LLM_GENERAL,
             "confidence": confidence,
         }
 
-    # 1) For equation/symbolic questions, try to return the exact matching line from the document.
-    import re
+    # First, test for exact symbolic or short line match
+    exact_line = _extract_exact_line_answer(query, results)
+    if exact_line:
+        unique_files = sorted({r.get("file_name") or "Uploaded File" for r in results})
+        return {
+            "text": exact_line,
+            "source": f"{SOURCE_LABEL_DOC_PREFIX}: {', '.join(unique_files)}",
+            "citation": results,
+            "confidence": confidence,
+        }
 
-    is_symbolic = bool(re.search(r"[=+\-*/^]", query)) and len(query.strip()) <= 30
-    if is_symbolic:
-        exact_line = _extract_exact_line_answer(query, results)
-        if exact_line:
-            unique_files = sorted({r.get("file_name") or "Uploaded File" for r in results})
-            return {
-                "text": exact_line,
-                "source": f"{SOURCE_LABEL_DOC_PREFIX}: {', '.join(unique_files)}",
-                "citation": results,
-                "confidence": confidence,
-            }
-
-    # If retrieval confidence is very low, keep the user informed but still ground
-    # on retrieved context rather than switching to pure general knowledge.
-    low_confidence_note = ""
-    if confidence < RAG_CONFIDENCE_SWITCH_THRESHOLD:
-        low_confidence_note = f"{LOW_CONFIDENCE_MESSAGE}\n\n"
-
+    # Our RAG prompt will automatically handle fallback to general knowledge
+    # if the context lacks the answer.
     context = _build_rag_context(results)
 
     unique_files = sorted({r.get("file_name") or "Uploaded File" for r in results})
     return {
         "text": None, # Signal to use stream
         "stream_generator": lambda: _stream_rag_answer(context=context, question=query),
-        "prefix_text": low_confidence_note,
+        "prefix_text": "",
         "source": f"{SOURCE_LABEL_DOC_PREFIX}: {', '.join(unique_files)}",
         "citation": results,
         "confidence": confidence,
     }
-
-
-TOOLS = {
-    "student": {
-        "rag": doc_rag_tool,
-    }
-}
 
 
 def _get_cache_key(user, intent, query, history):
@@ -148,7 +154,8 @@ def _get_cache_key(user, intent, query, history):
             from ..config import FAISS_INDEX_DIR
             idx_file = os.path.join(str(FAISS_INDEX_DIR), f"user_docs_lc_{user.id}", "index.faiss")
             docs_ver = int(os.path.getmtime(idx_file)) if os.path.exists(idx_file) else 0
-        except: pass
+        except Exception:
+            pass
     h = hashlib.md5(f"{query}{json.dumps(history or [])}{docs_ver}".encode()).hexdigest()
     return f"chat_{user.id}_{intent}_{h}"
 
@@ -166,20 +173,19 @@ def orchestrate_response(user, query, history=None, **kwargs):
             "latency": round(time.time() - start, 2),
         }
 
-    itnt = classify_intent(query)
-    intent, slots, conf = itnt["intent"], itnt.get("slots", {}), itnt.get("confidence", 0.5)
-    
-    if intent == "rag" and conf < RAG_CONFIDENCE_SWITCH_THRESHOLD:
-        intent = "general"
+    has_user_docs = _has_user_document_index(user.id, kwargs.get("session_id"))
+    conf = 1.0 if has_user_docs else 0.5
+    intent = "rag" if has_user_docs else "general"
+    use_doc_retrieval = has_user_docs
     
     ckey = _get_cache_key(user, intent, query, history)
     if not kwargs.get("streaming") and (cached := cache.get(ckey)): return cached
 
     res = {"text": "", "source": SOURCE_LABEL_LLM_GENERAL, "intent": intent, "confidence": conf}
     
-    if intent == "rag":
+    if use_doc_retrieval:
         try:
-            res.update(doc_rag_tool(user, None, query, slots, history=history))
+            res.update(doc_rag_tool(user, query, history=history))
             if kwargs.get("streaming") and res.get("stream_generator") and res.get("prefix_text"):
                 base_gen = res["stream_generator"]
 
@@ -191,6 +197,7 @@ def orchestrate_response(user, query, history=None, **kwargs):
             if not kwargs.get("streaming") and not res.get("text") and res.get("stream_generator"):
                 generated = "".join(list(res["stream_generator"]()))
                 res["text"] = f"{res.get('prefix_text', '')}{generated}"
+                res.pop("stream_generator", None)
         except Exception as e:
             logger.error(f"RAG fail: {e}")
             if kwargs.get("streaming"):
@@ -207,5 +214,10 @@ def orchestrate_response(user, query, history=None, **kwargs):
 
     res["latency"] = round(time.time() - start, 2)
     if not kwargs.get("streaming") and res.get("text"):
-        cache.set(ckey, res, CHAT_CACHE_TTL_SECONDS)
+        res.pop("stream_generator", None)
+        cacheable_res = {k: v for k, v in res.items() if not callable(v)}
+        cache.set(ckey, cacheable_res, CHAT_CACHE_TTL_SECONDS)
     return res
+
+
+

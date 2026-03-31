@@ -1,10 +1,6 @@
-import json
 import logging
-from datetime import timedelta
 
 from openai import APITimeoutError
-from django.core.serializers.json import DjangoJSONEncoder
-from django.utils import timezone
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
@@ -17,18 +13,15 @@ from ai_core.serializers import (
     QuizSaveSerializer,
 )
 from ai_core.services.quiz.generator import QuizGeneratorService
+from ai_core.services.quiz.saver import QuizSaveService
 from ai_core.services.config import (
     QUIZ_DEFAULT_DIFFICULTY,
     QUIZ_DEFAULT_NUM_QUESTIONS,
     QUIZ_DEFAULT_QUESTION_TYPE,
     QUIZ_DEFAULT_TEMPERATURE,
-    QUIZ_DUPLICATE_WINDOW_SECONDS,
-    QUIZ_GRADE_COMPONENT_STATUS,
-    QUIZ_GRADE_COMPONENT_WEIGHTAGE,
 )
 from lms_cors.models.academic import Subject
-from lms_cors.models.grading import GradeComponent, Quiz, QuizOption, QuizQuestion
-from lms_cors.models.people import Student, StudentSubject, Teacher
+from lms_cors.models.people import Teacher
 
 logger = logging.getLogger(__name__)
 
@@ -131,125 +124,13 @@ def quiz_save(request):
     serializer = QuizSaveSerializer(data=request.data)
     if serializer.is_valid():
         try:
-            data = serializer.validated_data
-
-            # Duplicate protection: check if same quiz created in last 10 seconds.
-            recent_time = timezone.now() - timedelta(seconds=QUIZ_DUPLICATE_WINDOW_SECONDS)
-            existing_quiz = Quiz.objects.filter(
-                title=data['title'],
-                subject_id=data['subject_id'],
-                created_by__user=request.user,
-                created_at__gte=recent_time
-            ).first()
-
-            if existing_quiz:
-                return Response({
-                    'message': 'Duplicate quiz submission detected. Returning existing record.',
-                    'quiz_id': str(existing_quiz.id),
-                    'already_exists': True
-                }, status=status.HTTP_200_OK)
-
-            subject = Subject.objects.get(id=data['subject_id'])
-
-            try:
-                teacher = Teacher.objects.get(user=request.user)
-            except Teacher.DoesNotExist:
-                return Response({'error': 'Only teachers can save quizzes.'}, status=status.HTTP_403_FORBIDDEN)
-
-            quiz_json = data['quiz_data']
-
-            # 1. Create grade component.
-            grade_comp = GradeComponent.objects.create(
-                subject=subject,
-                created_by=teacher,
-                name=data['title'],
-                component_type='quiz',
-                max_marks=quiz_json.get('total_marks', 0),
-                weightage=QUIZ_GRADE_COMPONENT_WEIGHTAGE,
-                status=QUIZ_GRADE_COMPONENT_STATUS,
-            )
-
-            # 2. Create quiz.
-            quiz = Quiz.objects.create(
-                title=data['title'],
-                description=data.get('description', ''),
-                subject=subject,
-                created_by=teacher,
-                grade_component=grade_comp,
-                is_published=True
-            )
-
-            # 3. Create questions and options.
-            for q_data in quiz_json.get('questions', []):
-                q_type_map = {
-                    'MCQ': 'mcq',
-                    'Short Answer': 'short_answer',
-                    'Long Answer': 'essay',
-                    'Mixed': 'mcq'
-                }
-
-                question = QuizQuestion.objects.create(
-                    quiz=quiz,
-                    question_text=q_data['question_text'],
-                    question_type=q_type_map.get(q_data.get('question_type', 'MCQ'), 'mcq'),
-                    marks=q_data.get('marks', 1),
-                    correct_answer_text=q_data.get('correct_answer_text', q_data.get('correct_answer', '')),
-                    explanation=q_data.get('explanation', '')
-                )
-
-                if q_data.get('question_type', 'MCQ') == 'MCQ':
-                    for opt_data in q_data.get('options', []):
-                        if isinstance(opt_data, dict):
-                            text = opt_data.get('text', '')
-                            is_correct = opt_data.get('is_correct', False)
-                        else:
-                            text = opt_data
-                            is_correct = (text == q_data.get('correct_answer'))
-
-                        QuizOption.objects.create(
-                            question=question,
-                            option_text=text,
-                            is_correct=is_correct
-                        )
-
-            # 4. Handle assignments (QuizAttempts / StudentMarks).
-            assign_mode = data.get('assign_mode', 'all')
-            target_ids = data.get('target_ids', [])
-
-            assigned_students = []
-            if assign_mode == 'all':
-                student_subjects = StudentSubject.objects.filter(subject=subject)
-                assigned_students = [ss.student for ss in student_subjects]
-            elif assign_mode == 'department':
-                student_subjects = StudentSubject.objects.filter(subject=subject).select_related('student', 'student__program')
-                assigned_students = [
-                    ss.student for ss in student_subjects
-                    if ss.student.program and ss.student.program.department_id and ss.student.program.department_id in target_ids
-                ]
-            elif assign_mode == 'students':
-                assigned_students = list(Student.objects.filter(id__in=target_ids))
-
-            assignment_metadata = {
-                'assign_mode': assign_mode,
-                'target_ids': target_ids,
-                'deadline': data.get('deadline')
-            }
-            quiz.description = json.dumps(assignment_metadata, cls=DjangoJSONEncoder)
-            quiz.save()
-
-            from lms_cors.models.grading import QuizAttempt, StudentMark
-            for student in assigned_students:
-                QuizAttempt.objects.get_or_create(quiz=quiz, student=student)
-                StudentMark.objects.get_or_create(component=grade_comp, student=student)
-
-            return Response({
-                'message': 'Quiz generated and assigned successfully',
-                'quiz_id': str(quiz.id),
-                'assigned_count': len(assigned_students)
-            }, status=status.HTTP_201_CREATED)
+            payload, response_code = QuizSaveService.save_quiz(serializer.validated_data, request.user)
+            return Response(payload, status=response_code)
 
         except Subject.DoesNotExist:
             return Response({'error': 'Subject not found'}, status=status.HTTP_404_NOT_FOUND)
+        except Teacher.DoesNotExist:
+            return Response({'error': 'Only teachers can save quizzes.'}, status=status.HTTP_403_FORBIDDEN)
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 

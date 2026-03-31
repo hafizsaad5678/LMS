@@ -1,3 +1,7 @@
+import logging
+import os
+import re
+
 from ..rag.utils import get_or_load_vector_store, normalize_similarity_score
 from ..config import (
     CHAT_MIN_SIMILARITY_SCORE,
@@ -10,11 +14,12 @@ from ..config import (
     RETRIEVAL_SCORE_ROUND_DIGITS,
     RETRIEVAL_CONFIDENCE_ROUNDED,
 )
-import os
-import logging
 
 
 logger = logging.getLogger(__name__)
+
+
+from ..utils import compact_text
 
 
 def _retrieval_policy(question: str) -> tuple[int, float]:
@@ -47,21 +52,48 @@ def query_documents(user_id, question):
             return {"status": "no_index", "results": []}
         
         k_val, current_threshold = _retrieval_policy(question)
-        
-        # Search with similarity score
-        results = vector_store.similarity_search_with_score(question, k=k_val)
-        
+        compact_question = compact_text(question).strip("?")
+
         filtered_results = []
         confidence_scores = []
-        
+        seen_texts = set()
+
+        # 1. Exact string match across ALL chunks (bypassing embeddings) to handle short equations like 'a+d=' or '2+1='
+        if compact_question and len(compact_question) >= 2:
+            try:
+                if hasattr(vector_store, "docstore") and hasattr(vector_store.docstore, "_dict"):
+                    for doc_id, doc in vector_store.docstore._dict.items():
+                        doc_text = doc.page_content or ""
+                        if compact_question in compact_text(doc_text):
+                            if doc_text not in seen_texts:
+                                seen_texts.add(doc_text)
+                                filtered_results.append({
+                                    "text": doc_text,
+                                    "score": 1.0,
+                                    "file_name": doc.metadata.get("original_filename") or doc.metadata.get("source") or "Uploaded File",
+                                    "page": doc.metadata.get("page_number") if doc.metadata.get("page_number") is not None else "N/A"
+                                })
+                                confidence_scores.append(1.0)
+            except Exception as e:
+                logger.error("Exact match scan failed: %s", e)
+
+        # Search with similarity score
+        results = vector_store.similarity_search_with_score(question, k=k_val)
+
         for doc, score in results:
+            doc_text = doc.page_content or ""
+            if doc_text in seen_texts:
+                continue
+
             # Normalize and check threshold
             norm_score = normalize_similarity_score(score)
-            if norm_score >= current_threshold:
-                confidence_scores.append(norm_score)
+            is_exact_text_match = bool(compact_question and compact_question in compact_text(doc_text))
+            
+            if norm_score >= current_threshold or is_exact_text_match:
+                seen_texts.add(doc_text)
                 # Meta usually contains doc_id and chunk_id for citations
                 filtered_results.append({
-                    "text": doc.page_content,
+                    "text": doc_text,
                     "score": round(norm_score, RETRIEVAL_SCORE_ROUND_DIGITS),
                     "file_name": doc.metadata.get("original_filename") or doc.metadata.get("source") or "Uploaded File",
                     "page": doc.metadata.get("page_number") if doc.metadata.get("page_number") is not None else "N/A"
@@ -82,3 +114,5 @@ def query_documents(user_id, question):
     except Exception as e:
         logger.error("Document search failed: %s", e)
         return {"status": "error", "message": str(e), "results": []}
+
+
