@@ -20,6 +20,7 @@ from .views.materials import (
     MaterialViewSet, AnnouncementViewSet, teacher_materials, teacher_announcements,
     create_material, create_announcement, activity_logs, ping
 )
+from .views.public import public_stats, submit_contact, submit_feedback
 
 router = DefaultRouter()
 
@@ -83,5 +84,11 @@ urlpatterns = [
     path('teacher/announcements/create/', create_announcement, name='create-announcement'),
     path('ping/', ping, name='ping'),
     path('admin/activity-logs/', activity_logs, name='activity-logs'),
+    
+    # Public Stats / Forms
+    path('public/stats/', public_stats, name='public-stats'),
+    path('public/contact/', submit_contact, name='public-contact'),
+    path('public/feedback/', submit_feedback, name='public-feedback'),
+    
     path('', include(router.urls)),
 ]

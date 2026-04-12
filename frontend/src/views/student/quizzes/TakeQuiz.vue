@@ -326,7 +326,14 @@ const setVisitedIfNeeded = () => {
 
 const loadQuiz = async () => {
   try {
-    const state = await studentPanelService.startQuiz(quizId)
+    let state = await studentPanelService.startQuiz(quizId)
+
+    // Defensive sync: if start returns an in-progress attempt with no time left,
+    // refresh authoritative state from server before starting timer.
+    if (state?.id && state?.status === 'in_progress' && Number(state?.time_remaining_seconds || 0) <= 0) {
+      state = await studentPanelService.getQuizAttemptState(state.id)
+    }
+
     setAttemptState(state)
     setTimeRemaining(state.time_remaining_seconds)
 

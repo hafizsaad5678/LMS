@@ -7,7 +7,7 @@ import {
   sleep
 } from '@/utils/chatHelpers'
 
-export function useDocumentUpload({ onAssistantNotice }) {
+export function useDocumentUpload({ onAssistantNotice, currentSessionId, loadSessionsCallback }) {
   const isUploading = ref(false)
   const uploadedDocument = ref(null)
   const uploadPollToken = ref(0)
@@ -70,10 +70,18 @@ export function useDocumentUpload({ onAssistantNotice }) {
     }
 
     try {
-      const res = await aiChatService.uploadDocument(file)
+      const res = await aiChatService.uploadDocument(file, currentSessionId?.value || null)
 
       if (!res?.file_id) {
         throw new Error('Upload response missing file id')
+      }
+
+      if (res?.session_id && currentSessionId?.value !== res.session_id) {
+        currentSessionId.value = res.session_id
+        localStorage.setItem('current_chat_session_id', res.session_id)
+        if (loadSessionsCallback) {
+          await loadSessionsCallback()
+        }
       }
 
       if (currentToken !== uploadPollToken.value || !uploadedDocument.value) {

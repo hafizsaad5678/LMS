@@ -251,7 +251,11 @@ const {
 
 const {
   isUploading, uploadedDocument, handleUpload, removeDocument
-} = useDocumentUpload({ onAssistantNotice: pushAssistantNotice })
+} = useDocumentUpload({
+  onAssistantNotice: pushAssistantNotice,
+  currentSessionId,
+  loadSessionsCallback: loadSessions,
+})
 
 const userMessageIndices = computed(() => {
   return messages.value.map((msg, index) => ({ msg, index })).filter(item => item.msg.role === 'user')

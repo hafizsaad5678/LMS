@@ -17,6 +17,8 @@ import './assets/css/components.css'
 import './assets/css/dashboard.css'
 // Student panel shared styles
 import './assets/css/student-panel.css'
+// Shared homepage styles
+import './assets/css/home-screen.css'
 
 // Ensure reloads always start at the top of the page (avoids browser restoring bottom scroll)
 if ('scrollRestoration' in window.history) {

@@ -137,6 +137,8 @@ Rules for question types:
 - If Question type is "Long Answer": every question_type must be "Long Answer" and must NOT include options.
 - If Question type indicates mixed format: include EXACT requested counts of MCQ, Short Answer, and Long Answer.
 - In mixed format, each question must have a non-empty question_type value set to one of: "MCQ", "Short Answer", "Long Answer".
+- MCQ option text must be content-rich and specific to the question.
+- Never use generic labels like "Option A", "Option B", "Option C", or "Option D" as final option text.
 
 OUTPUT ONLY valid JSON in this exact structure:
 {{
@@ -147,8 +149,10 @@ OUTPUT ONLY valid JSON in this exact structure:
             "question_type": "{question_type}",
             "marks": 1,
             "options": [
-                {{"text": "...", "is_correct": true}},
-                {{"text": "...", "is_correct": false}}
+                {{"text": "First choice answer text", "is_correct": true}},
+                {{"text": "Second choice answer text", "is_correct": false}},
+                {{"text": "Third choice answer text", "is_correct": false}},
+                {{"text": "Fourth choice answer text", "is_correct": false}}
             ],
             "correct_answer_text": "...",
             "explanation": "..."
@@ -175,6 +179,7 @@ Requirements:
 1. Ensure the question fits the difficulty.
 2. Provide correct answers and concise explanations.
 3. If MCQ, provide exactly 4 options.
+4. Option text must be specific to the question and must not be generic labels like "Option A"/"Option B".
 
 Respond ONLY with a JSON object in this format:
 {{
@@ -182,8 +187,10 @@ Respond ONLY with a JSON object in this format:
     "question_type": "{question_type}",
     "marks": {marks},
     "options": [
-        {{"text": "Option A", "is_correct": true}},
-        {{"text": "Option B", "is_correct": false}}
+        {{"text": "First choice answer text", "is_correct": true}},
+        {{"text": "Second choice answer text", "is_correct": false}},
+        {{"text": "Third choice answer text", "is_correct": false}},
+        {{"text": "Fourth choice answer text", "is_correct": false}}
     ],
     "correct_answer_text": "...",
     "explanation": "..."

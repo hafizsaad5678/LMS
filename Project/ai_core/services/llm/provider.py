@@ -42,6 +42,30 @@ def _canonical_provider_name(provider_name: str) -> str:
 	return "openai"
 
 
+def _resolve_model_name(provider_name: str, base_url: str) -> str:
+	configured = (os.getenv("AI_MODEL") or "").strip()
+	if configured:
+		# Guard against common placeholder values that are provider labels, not model IDs.
+		lowered = configured.lower()
+		if lowered in {"openai", "pollinations", "openrouter", "provider"}:
+			if provider_name == "pollinations":
+				return "openai"
+			if "openrouter.ai" in (base_url or "").lower():
+				fallback = os.getenv("OPENROUTER_DEFAULT_MODEL", "openai/gpt-4o-mini")
+				logger.warning("AI_MODEL=%r is a placeholder; using %r instead.", configured, fallback)
+				return fallback
+			fallback = os.getenv("OPENAI_DEFAULT_MODEL", "gpt-4o-mini")
+			logger.warning("AI_MODEL=%r is a placeholder; using %r instead.", configured, fallback)
+			return fallback
+		return configured
+
+	if provider_name == "pollinations":
+		return "openai"
+	if "openrouter.ai" in (base_url or "").lower():
+		return os.getenv("OPENROUTER_DEFAULT_MODEL", "openai/gpt-4o-mini")
+	return os.getenv("OPENAI_DEFAULT_MODEL", "gpt-4o-mini")
+
+
 class LLMProvider(ABC):
 	@abstractmethod
 	def call(self, prompt: str, system_prompt: str, history: List[Dict], **kwargs) -> str:
@@ -61,7 +85,7 @@ class OpenAICompatibleProvider(LLMProvider):
 		self.provider_name = _canonical_provider_name(os.getenv("AI_PROVIDER", "pollinations"))
 		self.api_key = os.getenv("AI_API_KEY") or os.getenv("OPENAI_API_KEY") or os.getenv("POLLINATIONS_API_KEY")
 		self.base_url = self._resolve_base_url()
-		self.model = os.getenv("AI_MODEL", "openai")
+		self.model = _resolve_model_name(provider_name=self.provider_name, base_url=self.base_url)
 		self.timeout = int(os.getenv("AI_TIMEOUT", "30"))
 		self.max_retries = int(os.getenv("AI_MAX_RETRIES", "2"))
 		self.retry_delay = float(os.getenv("AI_RETRY_DELAY_SECONDS", "0.35"))

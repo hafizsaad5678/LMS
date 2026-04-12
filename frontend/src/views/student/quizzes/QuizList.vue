@@ -80,7 +80,7 @@
               </div>
               <div class="meta-item">
                 <i class="bi bi-award text-muted me-1"></i>
-                <span class="small text-muted">{{ quiz.total_marks || 0 }} marks</span>
+                <span class="small text-muted">{{ formatMarks(getDisplayTotalMarks(quiz)) }} marks</span>
               </div>
             </div>
 
@@ -90,7 +90,7 @@
               <div class="d-flex justify-content-between">
                 <span class="small text-muted">Your Score:</span>
                 <span class="small fw-bold text-student">
-                  {{ quiz.last_attempt.score }}/{{ quiz.total_marks }}
+                  {{ formatMarks(quiz.last_attempt.score) }}/{{ formatMarks(getDisplayTotalMarks(quiz)) }}
                 </span>
               </div>
             </div>
@@ -158,6 +158,27 @@ const completedCount = computed(() =>
 const pendingCount = computed(() =>
   availableQuizzes.value.filter(q => !q.last_attempt?.is_completed).length
 )
+
+const getDisplayTotalMarks = (quiz) => {
+  const explicitTotal = Number(quiz?.total_marks || 0)
+  if (explicitTotal > 0) return explicitTotal
+
+  const questions = Array.isArray(quiz?.questions) ? quiz.questions : []
+  const sumFromQuestions = questions.reduce((sum, q) => sum + Number(q?.marks || 0), 0)
+  if (sumFromQuestions > 0) return sumFromQuestions
+
+  const questionCount = Number(quiz?.question_count || questions.length || 0)
+  if (questionCount > 0) return questionCount
+
+  return 0
+}
+
+const formatMarks = (value) => {
+  const num = Number(value || 0)
+  if (!Number.isFinite(num)) return '0'
+  if (Number.isInteger(num)) return String(num)
+  return num.toFixed(2)
+}
 
 
 const getQuizStatusClass = (quiz) => {

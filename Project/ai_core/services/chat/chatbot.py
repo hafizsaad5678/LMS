@@ -14,8 +14,8 @@ from ..config import (
     CHAT_GREETING_KEYWORDS,
     CHAT_GREETING_RESPONSE,
     CHAT_SERVICE_VERSION,
+    RAG_CONFIDENCE_SWITCH_THRESHOLD,
     RAG_MAX_CONTEXT_CHARS,
-    LOW_CONFIDENCE_MESSAGE,
     SOURCE_LABEL_DOC_PREFIX,
     SOURCE_LABEL_LLM_FALLBACK,
     SOURCE_LABEL_LLM_GENERAL,
@@ -81,6 +81,38 @@ def _build_rag_context(results: list[dict]) -> str:
     return "\n".join(context_parts)
 
 
+def _query_terms(question: str) -> set[str]:
+    normalized = re.sub(r"[^a-z0-9\s]", " ", (question or "").lower())
+    return {tok for tok in normalized.split() if len(tok) >= 3}
+
+
+def _has_contextual_overlap(question: str, results: list[dict], min_overlap_ratio: float = 0.2) -> bool:
+    """Guardrail to avoid forcing RAG when retrieved chunks are semantically weak for the query."""
+    terms = _query_terms(question)
+    if not terms:
+        return True
+
+    for item in results:
+        text = item.get("text") or ""
+        normalized_text = re.sub(r"[^a-z0-9\s]", " ", text.lower())
+        text_terms = {tok for tok in normalized_text.split() if len(tok) >= 3}
+        if not text_terms:
+            continue
+        overlap = len(terms & text_terms) / max(1, len(terms))
+        if overlap >= min_overlap_ratio:
+            return True
+    return False
+
+
+def _general_fallback_response(query: str, history=None, confidence: float = 0.0) -> dict:
+    llm_ans = call_llm(query, history=history or [], system_prompt=CHATBOT_SYSTEM_PROMPT)
+    return {
+        "text": llm_ans,
+        "source": SOURCE_LABEL_LLM_GENERAL,
+        "confidence": confidence,
+    }
+
+
 def _stream_rag_answer(context: str, question: str):
     prompt = ChatPromptTemplate.from_template(RAG_DOC_ANSWER_PROMPT)
     chain = prompt | get_chat_model() | StrOutputParser()
@@ -93,7 +125,7 @@ def _has_user_document_index(user_id: int, session_id: str | None = None) -> boo
 
     # Require explicit doc-mode activation in this runtime to avoid unexpectedly
     # loading embedding models from old historical uploads.
-    if not cache.get(get_doc_mode_cache_key(user_id)):
+    if not cache.get(get_doc_mode_cache_key(user_id, session_id)):
         return False
 
     # Do not attempt doc-RAG until this user has at least one successfully indexed upload.
@@ -111,15 +143,20 @@ def _has_user_document_index(user_id: int, session_id: str | None = None) -> boo
 def doc_rag_tool(user, query, history=None):
     docs_res = query_documents(user.id, query)
     results = docs_res.get("results") or []
-    confidence = docs_res.get("confidence", 0.0)
+    confidence = float(docs_res.get("confidence", 0.0) or 0.0)
+
+    # If retrieval confidence is weak, skip doc-grounded prompting and answer
+    # through the general assistant path directly.
+    if confidence < RAG_CONFIDENCE_SWITCH_THRESHOLD:
+        return _general_fallback_response(query, history=history, confidence=confidence)
 
     if not results:
-        llm_ans = call_llm(query, history=history or [], system_prompt=CHATBOT_SYSTEM_PROMPT)
-        return {
-            "text": f"{LOW_CONFIDENCE_MESSAGE}\n\n{llm_ans}",
-            "source": SOURCE_LABEL_LLM_GENERAL,
-            "confidence": confidence,
-        }
+        return _general_fallback_response(query, history=history, confidence=confidence)
+
+    # Even with non-trivial vector scores, if lexical overlap is too weak,
+    # prefer the general model instead of producing potentially off-topic doc answers.
+    if not _has_contextual_overlap(query, results):
+        return _general_fallback_response(query, history=history, confidence=confidence)
 
     # First, test for exact symbolic or short line match
     exact_line = _extract_exact_line_answer(query, results)

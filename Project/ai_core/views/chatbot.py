@@ -255,8 +255,14 @@ class DocumentUploadView(APIView):
 
     def post(self, request):
         file_obj = request.FILES.get('file')
+        session_id = request.data.get('session_id')
         if not file_obj:
             return Response({'error': 'No file provided'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if session_id:
+            session = get_object_or_404(ChatSession, id=session_id, user=request.user)
+        else:
+            session = ChatSession.objects.create(user=request.user, title=file_obj.name[:50] or 'New Chat')
         
         # Save record
         try:
@@ -276,7 +282,7 @@ class DocumentUploadView(APIView):
             uploaded_file.save()
             return Response({'error': f'Failed to read uploaded file: {e}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-        def _run_indexing(user_id: int, uploaded_file_id: str, filename: str, data: bytes):
+        def _run_indexing(user_id: int, session_id_value: str, uploaded_file_id: str, filename: str, data: bytes):
             try:
                 from ..services.rag.utils import process_and_index_document
 
@@ -288,7 +294,7 @@ class DocumentUploadView(APIView):
                     return
                 if result.get('status') == 'success':
                     uf.index_status = UploadedFile.IndexStatus.INDEXED
-                    cache.set(get_doc_mode_cache_key(user_id), True, DOC_MODE_CACHE_TTL_SECONDS)
+                    cache.set(get_doc_mode_cache_key(user_id, session_id_value), True, DOC_MODE_CACHE_TTL_SECONDS)
                 else:
                     uf.index_status = UploadedFile.IndexStatus.FAILED
                 uf.save()
@@ -298,12 +304,12 @@ class DocumentUploadView(APIView):
 
         threading.Thread(
             target=_run_indexing,
-            args=(request.user.id, str(uploaded_file.id), file_obj.name, content_bytes),
+            args=(request.user.id, str(session.id), str(uploaded_file.id), file_obj.name, content_bytes),
             daemon=True,
         ).start()
 
         return Response(
-            {'status': 'pending', 'filename': file_obj.name, 'file_id': str(uploaded_file.id)},
+            {'status': 'pending', 'filename': file_obj.name, 'file_id': str(uploaded_file.id), 'session_id': str(session.id)},
             status=status.HTTP_202_ACCEPTED,
         )
 

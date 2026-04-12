@@ -91,6 +91,7 @@ def query_documents(user_id, question):
             
             if norm_score >= current_threshold or is_exact_text_match:
                 seen_texts.add(doc_text)
+                confidence_scores.append(norm_score)
                 # Meta usually contains doc_id and chunk_id for citations
                 filtered_results.append({
                     "text": doc_text,

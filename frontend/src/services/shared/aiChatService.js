@@ -201,9 +201,10 @@ export default {
   /**
    * Upload a document for RAG indexing
    */
-  async uploadDocument(file) {
+  async uploadDocument(file, sessionId = null) {
     const formData = new FormData()
     formData.append('file', file)
+    if (sessionId) formData.append('session_id', sessionId)
     const response = await api.post('/ai/chat/upload/', formData, {
       headers: {
         'Content-Type': 'multipart/form-data'

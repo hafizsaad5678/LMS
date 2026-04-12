@@ -90,11 +90,12 @@ export function useChatStream({ messages, currentSessionId, loadSessionsCallback
       }
       
       if (res.session_id) {
-         currentSessionId.value = res.session_id
-         localStorage.setItem('current_chat_session_id', res.session_id)
-         if (loadSessionsCallback) {
-           await loadSessionsCallback()
-         }
+        const previousSessionId = currentSessionId.value
+        currentSessionId.value = res.session_id
+        localStorage.setItem('current_chat_session_id', res.session_id)
+        if (loadSessionsCallback && previousSessionId !== res.session_id) {
+          await loadSessionsCallback()
+        }
       }
 
       const finalContent = String(res?.message?.content || '')

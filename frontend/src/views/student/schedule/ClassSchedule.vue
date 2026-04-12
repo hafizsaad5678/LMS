@@ -134,11 +134,11 @@
                       <div class="d-flex flex-column gap-2 mb-2">
                         <div class="d-flex align-items-center small text-muted">
                           <i class="bi bi-person-circle me-2 text-student"></i>
-                          {{ cls.instructor_name || cls.teacher?.full_name || 'Instructor' }}
+                          {{ cls.instructor_name || cls.teacher_name || cls.teacher?.full_name || 'Instructor' }}
                         </div>
                         <div class="d-flex align-items-center small text-muted">
                           <i class="bi bi-geo-alt-fill me-2 text-info"></i>
-                          {{ cls.room_number || cls.location || 'Room TBA' }}
+                          {{ cls.room || cls.room_number || cls.location || 'Room TBA' }}
                         </div>
                       </div>
 
@@ -185,14 +185,14 @@ const {
   loadData
 } = useEntityList({
   cacheKey: `student_schedule_v2`,
-  searchFields: ['subject_name', 'subject.name', 'instructor_name', 'location'],
+  searchFields: ['subject_name', 'subject.name', 'instructor_name', 'teacher_name', 'location', 'room'],
   defaultFilters: {}
 })
 
 const breadcrumbs = [{ name: 'Dashboard', href: STUDENT_ROUTES.DASHBOARD.path }, { name: 'Class Schedule' }]
 
 const availableSubjects = computed(() => [...new Set(schedule.value.map(c => c.subject_name || c.subject?.name).filter(Boolean))].sort())
-const availableInstructors = computed(() => [...new Set(schedule.value.map(c => c.instructor_name || c.teacher?.full_name).filter(Boolean))].sort())
+const availableInstructors = computed(() => [...new Set(schedule.value.map(c => c.instructor_name || c.teacher_name || c.teacher?.full_name).filter(Boolean))].sort())
 
 const weekSchedule = computed(() => {
   const days = []; const start = new Date(currentWeekStart.value); start.setDate(start.getDate() - start.getDay())
@@ -331,7 +331,7 @@ const loadClassSchedule = async () => {
   if (!resolvedStudentId) {
     throw new Error('Student ID not found. Please login again.')
   }
-  await loadData(() => studentPanelService.getClassSchedule(resolvedStudentId))
+  await loadData(() => studentPanelService.getClassSchedule(resolvedStudentId), false)
 }
 
 onMounted(async () => {

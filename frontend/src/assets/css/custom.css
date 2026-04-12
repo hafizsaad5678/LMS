@@ -599,6 +599,269 @@ body {
     position: relative;
 }
 
+/* ==================== ADMIN FLEX TIMETABLE ==================== */
+.admin-tt-view .admin-tt-filter {
+    background: linear-gradient(180deg, #ffffff 0%, #fbfcfd 100%);
+}
+
+.admin-tt-view .admin-tt-board {
+    overflow: visible;
+}
+
+.admin-tt-view .admin-tt-week-label {
+    font-size: 0.74rem;
+    font-weight: 600;
+    color: #6c757d;
+}
+
+.admin-tt-view .admin-tt-calendar-grid {
+    display: grid;
+    grid-template-columns: 68px repeat(6, minmax(0, 1fr));
+    border: 1px solid #e9ecef;
+    border-radius: 10px;
+    overflow: visible;
+    background: #fff;
+}
+
+.admin-tt-view .admin-tt-grid-time-header {
+    font-size: 0.68rem;
+    letter-spacing: 0.04em;
+    font-weight: 700;
+    color: #6c757d;
+    padding: 7px 6px;
+    border-right: 1px solid #e9ecef;
+    border-bottom: 1px solid #e9ecef;
+    background: #f8f9fa;
+}
+
+.admin-tt-view .admin-tt-grid-day-header {
+    padding: 7px 6px;
+    border-right: 1px solid #e9ecef;
+    border-bottom: 1px solid #e9ecef;
+    background: linear-gradient(180deg, #ffffff 0%, #fbfcfd 100%);
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    min-width: 0;
+}
+
+.admin-tt-view .admin-tt-grid-day-header:last-child {
+    border-right: 0;
+}
+
+.admin-tt-view .admin-tt-day-date {
+    font-size: 0.68rem;
+    line-height: 1.1;
+}
+
+.admin-tt-view .admin-tt-today {
+    background: linear-gradient(180deg, rgba(220, 53, 69, 0.08) 0%, rgba(220, 53, 69, 0.02) 100%);
+}
+
+.admin-tt-view .admin-tt-grid-time-cell {
+    padding: 8px 6px;
+    border-right: 1px solid #e9ecef;
+    border-bottom: 1px solid #eef0f2;
+    background: #f8f9fa;
+    font-size: 0.64rem;
+    font-weight: 600;
+    color: #6c757d;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 4px;
+}
+
+.admin-tt-view .admin-tt-time-add {
+    color: #9aa3ad;
+    font-size: 0.72rem;
+    line-height: 1;
+}
+
+.admin-tt-view .admin-tt-time-add:hover {
+    color: #dc3545;
+}
+
+.admin-tt-view .admin-tt-grid-slot {
+    --admin-tt-hour-height: 70px;
+    min-height: var(--admin-tt-hour-height);
+    border-right: 1px solid #eef0f2;
+    border-bottom: 1px solid #eef0f2;
+    padding: 4px;
+    position: relative;
+    overflow: visible;
+    background: #ffffff;
+}
+
+.admin-tt-view .admin-tt-grid-slot:nth-child(7n) {
+    border-right: 0;
+}
+
+.admin-tt-view .admin-tt-drop-target {
+    outline: 2px dashed rgba(13, 110, 253, 0.45);
+    outline-offset: -3px;
+    background: linear-gradient(180deg, rgba(13, 110, 253, 0.08) 0%, rgba(13, 110, 253, 0.03) 100%);
+}
+
+.admin-tt-view .admin-tt-class-card {
+    background: #f9e1e4;
+    border-left-width: 4px;
+    transition: box-shadow 0.2s ease, border-color 0.2s ease;
+    font-size: 0.64rem;
+    min-width: 0;
+    position: relative;
+    z-index: 3;
+    overflow: visible;
+    width: 100%;
+}
+
+.admin-tt-view .admin-tt-summary-block {
+    box-shadow: 0 3px 10px rgba(220, 53, 69, 0.12);
+    min-height: 40px;
+}
+
+.admin-tt-view .admin-tt-hover-detail {
+    position: absolute;
+    left: 50%;
+    bottom: 100%;
+    width: max-content;
+    min-width: 150px;
+    max-width: min(280px, calc(100vw - 24px));
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    z-index: 40;
+    background: #f4cfd5;
+    pointer-events: auto;
+    opacity: 0;
+    visibility: hidden;
+    transform: translate(-50%, 4px);
+    transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+/* First day column: align popup to the left edge */
+.admin-tt-view .admin-tt-grid-slot:nth-child(6n + 1) .admin-tt-hover-detail {
+    left: 0;
+    transform: translate(0, 4px);
+}
+
+/* Last day column: align popup to the right edge */
+.admin-tt-view .admin-tt-grid-slot:nth-child(6n) .admin-tt-hover-detail {
+    left: auto;
+    right: 0;
+    transform: translate(0, 4px);
+}
+
+.admin-tt-view .admin-tt-hover-item {
+    padding: 4px 0;
+    border-bottom: 1px dashed rgba(108, 117, 125, 0.35);
+    cursor: grab;
+}
+
+.admin-tt-view .admin-tt-hover-item:active {
+    cursor: grabbing;
+}
+
+.admin-tt-view .admin-tt-hover-item:last-child {
+    border-bottom: 0;
+    padding-bottom: 0;
+}
+
+.admin-tt-view .admin-tt-summary-block:hover .admin-tt-hover-detail {
+    opacity: 1;
+    visibility: visible;
+    transform: translate(-50%, 0);
+}
+
+.admin-tt-view .admin-tt-hover-detail:hover,
+.admin-tt-view .admin-tt-hover-detail:focus-within {
+    opacity: 1;
+    visibility: visible;
+    transform: translate(-50%, 0);
+}
+
+.admin-tt-view .admin-tt-grid-slot:nth-child(6n + 1) .admin-tt-summary-block:hover .admin-tt-hover-detail,
+.admin-tt-view .admin-tt-grid-slot:nth-child(6n + 1) .admin-tt-hover-detail:hover,
+.admin-tt-view .admin-tt-grid-slot:nth-child(6n + 1) .admin-tt-hover-detail:focus-within,
+.admin-tt-view .admin-tt-grid-slot:nth-child(6n) .admin-tt-summary-block:hover .admin-tt-hover-detail,
+.admin-tt-view .admin-tt-grid-slot:nth-child(6n) .admin-tt-hover-detail:hover,
+.admin-tt-view .admin-tt-grid-slot:nth-child(6n) .admin-tt-hover-detail:focus-within {
+    transform: translate(0, 0);
+}
+
+.admin-tt-view .admin-tt-subject {
+    font-size: 0.64rem;
+    line-height: 1.1;
+    word-break: break-word;
+}
+
+.admin-tt-view .admin-tt-class-card:hover {
+    box-shadow: 0 5px 14px rgba(13, 110, 253, 0.12);
+}
+
+.admin-tt-view .admin-tt-time {
+    font-weight: 600;
+    font-size: 0.58rem;
+    line-height: 1.1;
+}
+
+.admin-tt-view .admin-tt-meta {
+    font-size: 0.56rem;
+    line-height: 1.05;
+    color: #6c757d;
+}
+
+.admin-tt-view .admin-tt-empty-slot {
+    align-self: flex-start;
+    font-size: 0.66rem;
+    line-height: 1;
+    opacity: 0.5;
+}
+
+.admin-tt-view .admin-tt-grid-slot:hover .admin-tt-empty-slot {
+    opacity: 0.95;
+}
+
+.admin-tt-view .admin-tt-icon-btn {
+    padding: 0 3px;
+    font-size: 0.56rem;
+    line-height: 1;
+}
+
+@media (max-width: 992px) {
+    .admin-tt-view .admin-tt-calendar-grid {
+        grid-template-columns: 58px repeat(6, minmax(0, 1fr));
+    }
+
+    .admin-tt-view .admin-tt-grid-slot {
+        --admin-tt-hour-height: 62px;
+        min-height: var(--admin-tt-hour-height);
+        padding: 3px;
+    }
+
+    .admin-tt-view .admin-tt-day-date,
+    .admin-tt-view .admin-tt-time,
+    .admin-tt-view .admin-tt-meta,
+    .admin-tt-view .admin-tt-empty-slot {
+        font-size: 0.62rem;
+    }
+}
+
+@media (max-width: 576px) {
+    .admin-tt-view .admin-tt-calendar-grid {
+        grid-template-columns: 52px repeat(6, minmax(0, 1fr));
+    }
+
+    .admin-tt-view .admin-tt-grid-slot {
+        --admin-tt-hour-height: 56px;
+        min-height: var(--admin-tt-hour-height);
+    }
+
+    .admin-tt-view .admin-tt-subject {
+        font-size: 0.65rem;
+    }
+}
+
 .schedule-item {
     padding: 8px;
     border-radius: 6px;

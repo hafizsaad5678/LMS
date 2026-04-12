@@ -392,6 +392,7 @@ import { useRouter } from 'vue-router'
 import { VueDatePicker } from '@vuepic/vue-datepicker'
 import '@vuepic/vue-datepicker/dist/main.css'
 import { TeacherPageTemplate } from '@/components/shared/panels'
+import { jsPDF } from 'jspdf'
 import { AlertMessage, LoadingSpinner } from '@/components/shared/common'
 import aiService from '@/services/teacher/aiService'
 import teacherService from '@/services/teacher/teacherPanelService'
@@ -422,7 +423,7 @@ const breadcrumbs = [
 ]
 
 // ─── Session persistence helpers ────────────────────────────────────────────
-const STORAGE_KEY = 'ai_quiz_generator_state'
+const STORAGE_KEY = 'ai_quiz_generator_state_v2'
 
 const defaultForm = () => ({
     topic: '',
@@ -456,7 +457,13 @@ const restoreState = () => {
         if (!raw) return false
         const saved = JSON.parse(raw)
         if (saved.step) step.value = saved.step
-        if (saved.quiz) quiz.value = saved.quiz
+        if (saved.quiz) {
+            quiz.value = normalizeQuizPayload(
+                saved.quiz,
+                saved.form?.question_type || form.question_type,
+                (saved.form?.question_type || '').toString() === 'Mixed' ? saved.form?.mixed_counts : null
+            )
+        }
         if (saved.suggestions) suggestions.value = saved.suggestions
         if (saved.selectedIdx != null) selectedIdx.value = saved.selectedIdx
         if (saved.form) Object.assign(form, { ...defaultForm(), ...saved.form })
@@ -646,12 +653,51 @@ const showAlert = (type, message, title = '') => { Object.assign(alert, { show: 
 const totalMarks = computed(() => quiz.value?.questions?.reduce((a, b) => a + (Number(b.marks) || 0), 0) || 0)
 const mixedTotal = computed(() => (Number(form.mixed_counts.mcq) || 0) + (Number(form.mixed_counts.short) || 0) + (Number(form.mixed_counts.long) || 0))
 const isMcqType = (questionType) => (questionType || '').toString().trim().toLowerCase() === 'mcq'
+const createEmptyMcqOptions = () => Array(4).fill().map((_, idx) => ({ text: '', is_correct: idx === 0 }))
 const normalizeTypeLabel = (value) => {
     const text = (value || '').toString().trim().toLowerCase()
     if (text.includes('mcq') || text.includes('multiple')) return 'MCQ'
     if (text.includes('long') || text.includes('essay')) return 'Long Answer'
     if (text.includes('short')) return 'Short Answer'
     return ''
+}
+const isGenericOptionText = (text) => {
+    const normalized = (text || '').toString().trim().toLowerCase()
+    return (
+        !normalized
+        || normalized === '...'
+        || /^option\s+[a-d]$/.test(normalized)
+    )
+}
+const readOptionText = (option) => {
+    if (typeof option === 'string' || typeof option === 'number') {
+        return String(option).trim()
+    }
+    if (!option || typeof option !== 'object') return ''
+    return (
+        option.text
+        ?? option.option_text
+        ?? option.option
+        ?? option.value
+        ?? option.label
+        ?? ''
+    ).toString().trim()
+}
+const readQuestionOptions = (question) => {
+    if (!question || typeof question !== 'object') return []
+
+    if (Array.isArray(question.options)) return question.options
+    if (Array.isArray(question.choices)) return question.choices
+
+    const objectCandidates = [question.options, question.choices]
+    for (const candidate of objectCandidates) {
+        if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) continue
+        const keys = Object.keys(candidate)
+        if (!keys.length) continue
+        return keys.map((k) => ({ text: candidate[k], is_correct: false }))
+    }
+
+    return []
 }
 const normalizeQuestionShape = (question, questionNumber = 1) => {
     if (!question || typeof question !== 'object') return
@@ -661,8 +707,9 @@ const normalizeQuestionShape = (question, questionNumber = 1) => {
     }
     if (isMcqType(question.question_type)) {
         question.question_type = 'MCQ'
-        if (!Array.isArray(question.options) || question.options.length === 0) {
-            question.options = Array(4).fill().map((_, idx) => ({ text: '', is_correct: idx === 0 }))
+        question.options = readQuestionOptions(question)
+        if (question.options.length === 0) {
+            question.options = createEmptyMcqOptions()
         }
 
         if (question.options.length < 4) {
@@ -672,11 +719,21 @@ const normalizeQuestionShape = (question, questionNumber = 1) => {
             }
         }
 
-        question.options = question.options.slice(0, 4).map((option, optionIndex) => {
-            const optionText = (option?.text || '').toString().trim()
+        const explicitCorrectAnswer = (
+            question.correct_answer_text
+            || question.correct_answer
+            || ''
+        ).toString().trim().toLowerCase()
+
+        question.options = question.options.slice(0, 4).map((option) => {
+            const optionText = readOptionText(option)
+            const normalizedText = optionText.toLowerCase()
+            const isCorrectFromPayload = typeof option === 'object' && option !== null
+                ? !!(option.is_correct ?? option.isCorrect)
+                : false
             return {
-                text: optionText && optionText !== '...' ? optionText : `Option ${String.fromCharCode(65 + optionIndex)}`,
-                is_correct: !!option?.is_correct
+                text: isGenericOptionText(optionText) ? '' : optionText,
+                is_correct: isCorrectFromPayload || (!!explicitCorrectAnswer && explicitCorrectAnswer === normalizedText)
             }
         })
 
@@ -764,7 +821,7 @@ const onQuestionTypeChange = (question) => {
     if (isMcqType(question.question_type)) {
         question.question_type = 'MCQ'
         if (!Array.isArray(question.options) || question.options.length === 0) {
-            question.options = Array(4).fill().map((_, idx) => ({ text: '', is_correct: idx === 0 }))
+            question.options = createEmptyMcqOptions()
         }
     } else {
         if ((question.question_type || '').toString().trim().toLowerCase().includes('long')) {
@@ -790,7 +847,7 @@ const addQuestion = () => {
     if (!quiz.value.questions) quiz.value.questions = []
     quiz.value.questions.push({
         question_text: '', question_type: 'MCQ', marks: 1,
-        options: Array(4).fill().map((_, idx) => ({ text: '', is_correct: idx === 0 }))
+        options: createEmptyMcqOptions()
     })
 }
 
@@ -879,7 +936,103 @@ const downloadTXT = () => {
 }
 
 const downloadPDF = () => {
-    window.print()
+    if (!quiz.value || !quiz.value.questions) {
+        showAlert('warning', 'No quiz questions to export.');
+        return;
+    }
+
+    try {
+        const doc = new jsPDF();
+        let y = 20;
+        const pageHeight = doc.internal.pageSize.height;
+        const marginLeft = 15;
+        const marginY = 10;
+        const maxLineWidth = 180;
+
+        const checkPageBreak = (neededSpace) => {
+            if (y + neededSpace > pageHeight - marginY) {
+                doc.addPage();
+                y = 20;
+            }
+        };
+
+        // Title
+        doc.setFontSize(18);
+        doc.setFont('helvetica', 'bold');
+        const title = doc.splitTextToSize(quiz.value.title || 'Generated Quiz', maxLineWidth);
+        doc.text(title, marginLeft, y);
+        y += (title.length * 8) + 4;
+        
+        // Metadata
+        doc.setFontSize(12);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(100, 100, 100);
+        doc.text(`Subject: ${quiz.value.subject || 'General'}  |  Grade: ${quiz.value.grade_level || 'N/A'}`, marginLeft, y);
+        doc.setTextColor(0, 0, 0);
+        y += 15;
+        
+        doc.setFontSize(11);
+        
+        quiz.value.questions.forEach((q, i) => {
+            // Question Text
+            doc.setFont('helvetica', 'bold');
+            const qStr = `Q${i + 1} (${q.marks} pts): ${q.question_text || ''}`;
+            const qTexts = doc.splitTextToSize(qStr, maxLineWidth);
+            
+            checkPageBreak(qTexts.length * 6 + 10);
+            doc.text(qTexts, marginLeft, y);
+            y += qTexts.length * 6;
+
+            doc.setFont('helvetica', 'normal');
+            
+            // Options
+            if (isMcqType(q.question_type) && q.options) {
+                q.options.forEach((o, oi) => {
+                    const line = `    ${String.fromCharCode(65 + oi)}) ${o.text || ''}`;
+                    const lineTexts = doc.splitTextToSize(line, maxLineWidth);
+                    checkPageBreak(lineTexts.length * 5 + 2);
+                    
+                    if (o.is_correct) {
+                        doc.setTextColor(0, 128, 0); // Green for correct option
+                        doc.text(`    ${String.fromCharCode(65 + oi)}) ${o.text || ''} [CORRECT]`, marginLeft, y);
+                        doc.setTextColor(0, 0, 0);
+                    } else {
+                        doc.text(lineTexts, marginLeft, y);
+                    }
+                    y += lineTexts.length * 5 + 2;
+                });
+            } else if (q.correct_answer_text) {
+                const aTexts = doc.splitTextToSize(`Expected Answer: ${q.correct_answer_text}`, maxLineWidth - 10);
+                checkPageBreak(aTexts.length * 5 + 4);
+                
+                doc.setTextColor(0, 100, 200); // Blue for short/long answers
+                doc.text(aTexts, marginLeft + 5, y);
+                doc.setTextColor(0, 0, 0);
+                y += aTexts.length * 5 + 4;
+            }
+
+            // Explanation
+            if (q.explanation) {
+                doc.setFontSize(10);
+                doc.setTextColor(100, 100, 100);
+                const expTexts = doc.splitTextToSize(`Explanation: ${q.explanation}`, maxLineWidth - 10);
+                
+                checkPageBreak(expTexts.length * 5 + 4);
+                doc.text(expTexts, marginLeft + 5, y);
+                doc.setTextColor(0, 0, 0);
+                doc.setFontSize(11);
+                y += expTexts.length * 5 + 4;
+            }
+            
+            y += 8; // Spacing between questions
+        });
+
+        doc.save(`${quiz.value.title || 'Quiz_Blueprint'}.pdf`);
+        showAlert('success', 'Quiz exported as PDF successfully.');
+    } catch (err) {
+        console.error('PDF Export Error:', err);
+        showAlert('error', 'Failed to generate PDF.');
+    }
 }
 
 const difficultyClass = (diff) => ({

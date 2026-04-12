@@ -11,6 +11,15 @@
         </div>
         <div class="modal-body">
           <form @submit.prevent="$emit('save')">
+            <AlertMessage
+              v-if="showTeacherUnavailableAlert"
+              type="warning"
+              title="Teacher Unavailable"
+              :message="teacherUnavailableAlertMessage"
+              :auto-close="false"
+              @close="dismissTeacherAlert"
+            />
+
             <!-- Day and Time Selection -->
             <div class="row mb-3">
               <div class="col-md-4">
@@ -46,10 +55,16 @@
                 <label class="form-label">Teacher <span class="text-danger">*</span></label>
                 <select v-model="form.teacher" class="form-select" required>
                   <option value="">Select Teacher</option>
-                  <option v-for="teacher in teachers" :key="teacher.id" :value="teacher.id">
+                  <option
+                    v-for="teacher in teachers"
+                    :key="teacher.id"
+                    :value="teacher.id"
+                    :disabled="isTeacherUnavailable(teacher.id)"
+                  >
                     {{ teacher.full_name }} - {{ teacher.employee_id }}
                   </option>
                 </select>
+                <small v-if="unavailableTeacherIds.length" class="text-muted">Busy teachers are disabled for the selected day and time.</small>
               </div>
             </div>
 
@@ -73,7 +88,7 @@
                 <select v-model="form.semester" class="form-select" :disabled="!form.program">
                   <option value="">Select Semester (Optional)</option>
                   <option v-for="semester in semesters" :key="semester.id" :value="semester.id">
-                    Semester {{ semester.number }} - {{ semester.name }}
+                    {{ formatSemesterLabel(semester) }}
                   </option>
                 </select>
                 <small v-if="!form.program" class="text-muted">Select a program first</small>
@@ -102,20 +117,65 @@
 </template>
 
 <script setup>
+import { computed, ref, watch } from 'vue'
+import { AlertMessage } from '@/components/shared/common'
 import { DAYS_OF_WEEK, DAY_LABELS } from '@/utils/constants/config'
 
-defineProps({
+const formatSemesterLabel = (semester) => {
+  if (!semester) return 'Semester'
+  const number = semester.number != null ? `Semester ${semester.number}` : 'Semester'
+  const name = String(semester.name || '').trim()
+  if (!name) return number
+
+  const normalizedName = name.toLowerCase()
+  if (normalizedName.startsWith(number.toLowerCase())) {
+    return name
+  }
+  return `${number} - ${name}`
+}
+
+const props = defineProps({
   show: { type: Boolean, default: false },
   form: { type: Object, required: true },
   isEdit: { type: Boolean, default: false },
   saving: { type: Boolean, default: false },
   subjects: { type: Array, default: () => [] },
   teachers: { type: Array, default: () => [] },
+  unavailableTeacherIds: { type: Array, default: () => [] },
+  unavailableTeacherConflicts: { type: Object, default: () => ({}) },
   programs: { type: Array, default: () => [] },
   semesters: { type: Array, default: () => [] },
   days: { type: Array, default: () => DAYS_OF_WEEK },
   dayLabels: { type: Array, default: () => DAY_LABELS }
 })
+
+const isTeacherUnavailable = (teacherId) => props.unavailableTeacherIds.includes(String(teacherId)) || props.unavailableTeacherIds.includes(Number(teacherId))
+
+const dismissedTeacherAlert = ref(false)
+
+const selectedTeacherConflictTimes = computed(() => {
+  const teacherKey = String(props.form?.teacher || '')
+  if (!teacherKey) return []
+  return props.unavailableTeacherConflicts[teacherKey] || []
+})
+
+const teacherUnavailableAlertMessage = computed(() => {
+  if (!selectedTeacherConflictTimes.value.length) return ''
+  return `Selected teacher is unavailable at this time. Existing lecture time(s): ${selectedTeacherConflictTimes.value.join(', ')}`
+})
+
+const showTeacherUnavailableAlert = computed(() => selectedTeacherConflictTimes.value.length > 0 && !dismissedTeacherAlert.value)
+
+const dismissTeacherAlert = () => {
+  dismissedTeacherAlert.value = true
+}
+
+watch(
+  () => `${props.form?.day || ''}|${props.form?.start_time || ''}|${props.form?.end_time || ''}|${props.form?.teacher || ''}`,
+  () => {
+    dismissedTeacherAlert.value = false
+  }
+)
 
 defineEmits(['close', 'save', 'time-change', 'program-change'])
 </script>

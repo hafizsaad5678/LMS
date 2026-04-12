@@ -7,6 +7,8 @@ def compact_text(value: str) -> str:
     v = re.sub(r"\s+", " ", v).strip()
     return v.replace(" ", "")
 
-def get_doc_mode_cache_key(user_id: int) -> str:
+def get_doc_mode_cache_key(user_id: int, session_id: str | None = None) -> str:
+    if session_id:
+        return f"doc_mode_active_{user_id}_{session_id}"
     return f"doc_mode_active_{user_id}"
 

@@ -90,7 +90,14 @@ class QuizGeneratorService:
 
         quiz_data = _extract_json_with_repair(response, expect_list=False, fallback_title=f"Quiz on {topic}")
         requested_type = str(config.get("question_type", "MCQ"))
-        return _enforce_requested_question_type(quiz_data, requested_type)
+        quiz_data = _enforce_requested_question_type(quiz_data, requested_type)
+        _repair_quiz_mcq_options(
+            quiz_data,
+            topic=topic,
+            subject=subject,
+            difficulty=str(config.get("difficulty", QUIZ_DEFAULT_DIFFICULTY)),
+        )
+        return quiz_data
 
     @staticmethod
     def generate_single_question(
@@ -116,7 +123,15 @@ class QuizGeneratorService:
         )
         logger.debug("generate_single_question raw (500): %s", response[:500])
 
-        return _extract_json_with_repair(response, expect_list=False, fallback_title="Question")
+        single_question = _extract_json_with_repair(response, expect_list=False, fallback_title="Question")
+        normalized_single = {"questions": [single_question]} if isinstance(single_question, dict) else {"questions": []}
+        _repair_quiz_mcq_options(
+            normalized_single,
+            topic=topic,
+            subject=subject,
+            difficulty=str(config.get("difficulty", QUIZ_DEFAULT_DIFFICULTY)),
+        )
+        return normalized_single["questions"][0] if normalized_single["questions"] else single_question
 
 
 def _extract_json(response: str, expect_list: bool = False, fallback_title: str = "Quiz"):
@@ -272,6 +287,144 @@ def _normalize_question_type(question_type: str) -> str:
     if "short" in value:
         return "Short Answer"
     return "MCQ"
+
+
+def _extract_option_text(option) -> str:
+    if isinstance(option, (str, int, float)):
+        return str(option).strip()
+    if isinstance(option, dict):
+        for key in ("text", "option_text", "option", "value", "label"):
+            val = option.get(key)
+            if isinstance(val, (str, int, float)) and str(val).strip():
+                return str(val).strip()
+    return ""
+
+
+def _is_generic_option_text(text: str) -> bool:
+    normalized = (text or "").strip().lower()
+    if not normalized:
+        return True
+    return bool(
+        normalized == "..."
+        or re.match(r"^option\s+[a-d]$", normalized)
+        or normalized in {
+            "first choice answer text",
+            "second choice answer text",
+            "third choice answer text",
+            "fourth choice answer text",
+        }
+    )
+
+
+def _parse_mcq_options(options_data, correct_answer_text: str = "") -> list:
+    parsed = []
+    correct_norm = (correct_answer_text or "").strip().lower()
+
+    for opt in options_data or []:
+        text = _extract_option_text(opt)
+        if not text:
+            continue
+
+        is_correct = False
+        if isinstance(opt, dict):
+            is_correct = bool(opt.get("is_correct") or opt.get("isCorrect"))
+        if not is_correct and correct_norm and text.strip().lower() == correct_norm:
+            is_correct = True
+
+        parsed.append({"text": text, "is_correct": is_correct})
+
+    return parsed
+
+
+def _is_valid_mcq_option_set(options: list) -> bool:
+    if not isinstance(options, list) or len(options) < 4:
+        return False
+
+    texts = [_extract_option_text(o) for o in options[:4]]
+    if any(_is_generic_option_text(t) for t in texts):
+        return False
+
+    return len([t for t in texts if t.strip()]) == 4
+
+
+def _regenerate_mcq_options(question_text: str, subject: str, topic: str, difficulty: str, correct_answer_text: str = "") -> list:
+    prompt = f"""
+Generate exactly 4 MCQ options for the following question.
+
+Question: {question_text}
+Subject: {subject}
+Topic: {topic}
+Difficulty: {difficulty}
+Known correct answer (if provided): {correct_answer_text or 'N/A'}
+
+Rules:
+- Return ONLY a JSON array with 4 objects.
+- Each object must be: {{"text": "...", "is_correct": true/false}}
+- Exactly one option must have is_correct=true.
+- All option texts must be specific and content-rich.
+- Never use generic labels like Option A, Option B, etc.
+""".strip()
+
+    repaired_raw = call_llm(
+        prompt,
+        system_prompt=JSON_ENFORCER,
+        temperature=QUIZ_DEFAULT_TEMPERATURE,
+        request_timeout=QUIZ_LLM_TIMEOUT_SECONDS,
+        request_retries=QUIZ_LLM_REQUEST_RETRIES,
+    )
+    repaired_data = _extract_json_with_repair(repaired_raw, expect_list=True, fallback_title="mcq_options")
+    if not isinstance(repaired_data, list):
+        return []
+
+    normalized = _parse_mcq_options(repaired_data, correct_answer_text=correct_answer_text)
+    if not _is_valid_mcq_option_set(normalized):
+        return []
+
+    normalized = normalized[:4]
+    if not any(opt.get("is_correct") for opt in normalized):
+        normalized[0]["is_correct"] = True
+    return normalized
+
+
+def _repair_quiz_mcq_options(quiz_data: dict, topic: str, subject: str, difficulty: str):
+    questions = quiz_data.get("questions", []) if isinstance(quiz_data, dict) else []
+    if not isinstance(questions, list):
+        return
+
+    for question in questions:
+        if not isinstance(question, dict):
+            continue
+        q_type = _normalize_question_type(str(question.get("question_type", "")))
+        if q_type != "MCQ":
+            continue
+
+        existing_options = _parse_mcq_options(
+            question.get("options", []),
+            correct_answer_text=str(question.get("correct_answer_text") or question.get("correct_answer") or ""),
+        )
+
+        if _is_valid_mcq_option_set(existing_options):
+            question["options"] = existing_options[:4]
+            if not any(opt.get("is_correct") for opt in question["options"]):
+                question["options"][0]["is_correct"] = True
+            continue
+
+        regenerated = _regenerate_mcq_options(
+            question_text=str(question.get("question_text") or ""),
+            subject=subject,
+            topic=topic,
+            difficulty=difficulty,
+            correct_answer_text=str(question.get("correct_answer_text") or question.get("correct_answer") or ""),
+        )
+        if regenerated:
+            question["options"] = regenerated
+            if not question.get("correct_answer_text"):
+                for opt in regenerated:
+                    if opt.get("is_correct"):
+                        question["correct_answer_text"] = opt.get("text", "")
+                        break
+        else:
+            question["options"] = existing_options[:4] if existing_options else []
 
 
 def _enforce_requested_question_type(quiz_data: dict, requested_type: str) -> dict:

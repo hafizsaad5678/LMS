@@ -24,6 +24,61 @@ from ..serializers.grading import (
 )
 
 
+def _evaluate_attempt(attempt):
+    answers_map = attempt.answers or {}
+    total_score = Decimal('0')
+    flagged = []
+
+    for question in attempt.quiz.questions.all():
+        payload = answers_map.get(str(question.id), {})
+        selected_option_id = payload.get('selected_option')
+        answer_text = payload.get('answer_text') or ''
+        is_flagged = bool(payload.get('is_flagged'))
+        status_value = payload.get('status') or 'not_visited'
+
+        marks_earned = Decimal('0')
+
+        if question.question_type == 'mcq' and selected_option_id:
+            selected_option = QuizOption.objects.filter(id=selected_option_id, question=question).first()
+            if selected_option and selected_option.is_correct:
+                marks_earned = Decimal(str(question.marks))
+        elif question.question_type == 'short_answer' and answer_text:
+            correct_text = (question.correct_answer_text or '').strip().lower()
+            student_text = str(answer_text).strip().lower()
+            if correct_text and student_text == correct_text:
+                marks_earned = Decimal(str(question.marks))
+
+        if is_flagged:
+            flagged.append(str(question.id))
+
+        total_score += marks_earned
+
+        QuizAnswer.objects.update_or_create(
+            attempt=attempt,
+            question=question,
+            defaults={
+                'selected_option_id': selected_option_id if selected_option_id else None,
+                'answer_text': answer_text,
+                'marks_earned': marks_earned,
+                'status': status_value,
+                'is_flagged': is_flagged
+            }
+        )
+
+    attempt.flagged_questions = flagged
+    attempt.score = total_score
+
+
+def _close_attempt(attempt, close_status):
+    attempt.is_completed = True
+    attempt.is_submitted = True
+    attempt.status = close_status
+    attempt.completed_at = timezone.now()
+    _evaluate_attempt(attempt)
+    attempt.status = 'evaluated'
+    attempt.save()
+
+
 class QuizViewSet(viewsets.ModelViewSet):
     serializer_class = QuizSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -100,6 +155,12 @@ class QuizViewSet(viewsets.ModelViewSet):
                     'end_time': timezone.now() + timedelta(minutes=quiz.time_limit_minutes or 30)
                 }
             )
+
+            # If an old in-progress attempt already expired, close it on the server
+            # before returning state so the client doesn't auto-submit on first tick.
+            if not created and not attempt.is_locked and attempt.is_expired:
+                _close_attempt(attempt, 'auto_submitted')
+                attempt.refresh_from_db()
 
             if attempt.is_locked:
                 return Response(QuizAttemptStateSerializer(attempt, context={'request': request}).data)
@@ -191,57 +252,10 @@ class QuizAttemptViewSet(viewsets.ModelViewSet):
         )
 
     def _evaluate_attempt(self, attempt):
-        answers_map = attempt.answers or {}
-        total_score = Decimal('0')
-        flagged = []
-
-        for question in attempt.quiz.questions.all():
-            payload = answers_map.get(str(question.id), {})
-            selected_option_id = payload.get('selected_option')
-            answer_text = payload.get('answer_text') or ''
-            is_flagged = bool(payload.get('is_flagged'))
-            status_value = payload.get('status') or 'not_visited'
-
-            marks_earned = Decimal('0')
-
-            if question.question_type == 'mcq' and selected_option_id:
-                selected_option = QuizOption.objects.filter(id=selected_option_id, question=question).first()
-                if selected_option and selected_option.is_correct:
-                    marks_earned = Decimal(str(question.marks))
-            elif question.question_type == 'short_answer' and answer_text:
-                correct_text = (question.correct_answer_text or '').strip().lower()
-                student_text = str(answer_text).strip().lower()
-                if correct_text and student_text == correct_text:
-                    marks_earned = Decimal(str(question.marks))
-
-            if is_flagged:
-                flagged.append(str(question.id))
-
-            total_score += marks_earned
-
-            QuizAnswer.objects.update_or_create(
-                attempt=attempt,
-                question=question,
-                defaults={
-                    'selected_option_id': selected_option_id if selected_option_id else None,
-                    'answer_text': answer_text,
-                    'marks_earned': marks_earned,
-                    'status': status_value,
-                    'is_flagged': is_flagged
-                }
-            )
-
-        attempt.flagged_questions = flagged
-        attempt.score = total_score
+        _evaluate_attempt(attempt)
 
     def _close_attempt(self, attempt, close_status):
-        attempt.is_completed = True
-        attempt.is_submitted = True
-        attempt.status = close_status
-        attempt.completed_at = timezone.now()
-        self._evaluate_attempt(attempt)
-        attempt.status = 'evaluated'
-        attempt.save()
+        _close_attempt(attempt, close_status)
 
     def _handle_expired_attempt(self, attempt):
         if not attempt.is_locked and attempt.is_expired:
