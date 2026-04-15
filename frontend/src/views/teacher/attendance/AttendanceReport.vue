@@ -28,9 +28,9 @@
           <div class="col-md-3">
             <select v-model="filters.month" class="form-select">
               <option value="">All Time</option>
-              <option value="2025-12">December 2025</option>
-              <option value="2025-11">November 2025</option>
-              <option value="2025-10">October 2025</option>
+              <option v-for="option in monthOptions" :key="option.value" :value="option.value">
+                {{ option.label }}
+              </option>
             </select>
           </div>
         </template>
@@ -247,6 +247,27 @@ const statsCards = computed(() => [
     iconColor: 'text-warning'
   }
 ])
+
+const monthOptions = computed(() => {
+  const monthMap = new Map()
+
+  attendanceRecords.value.forEach(record => {
+    const rawDate = String(record?.session_date || '').trim()
+    if (!rawDate) return
+
+    const monthKey = rawDate.slice(0, 7)
+    if (!/^\d{4}-\d{2}$/.test(monthKey) || monthMap.has(monthKey)) return
+
+    const dateObj = new Date(`${monthKey}-01T00:00:00`)
+    const label = Number.isNaN(dateObj.getTime())
+      ? monthKey
+      : dateObj.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+
+    monthMap.set(monthKey, { value: monthKey, label })
+  })
+
+  return Array.from(monthMap.values()).sort((a, b) => b.value.localeCompare(a.value))
+})
 
 const getAttendanceColor = (percentage) => getAttendanceColorClass(percentage)
 

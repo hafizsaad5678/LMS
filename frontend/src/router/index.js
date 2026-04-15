@@ -35,6 +35,10 @@ router.beforeEach((to, from, next) => {
   const token = safeStorage.get('access_token')
   const userRole = safeStorage.get('userRole')
 
+  const requiresGuest = to.matched.some(record => record.meta?.requiresGuest)
+  const requiresAuth = to.matched.some(record => record.meta?.requiresAuth)
+  const requiredRole = to.matched.map(record => record.meta?.role).find(Boolean)
+
   const dashboardPaths = {
     [USER_ROLES.ADMIN]: ADMIN_ROUTES.DASHBOARD.path,
     [USER_ROLES.TEACHER]: TEACHER_ROUTES.DASHBOARD.path,
@@ -42,23 +46,24 @@ router.beforeEach((to, from, next) => {
   }
 
   // Guest-only pages
-  if (to.meta.requiresGuest && token) {
+  if (requiresGuest && token) {
     return next(dashboardPaths[userRole] || '/')
   }
 
   // Protected pages
-  if (to.meta.requiresAuth && !token) {
+  if (requiresAuth && !token) {
     return next({ name: 'Login' })
   }
 
-  // Role-based protection
-  if (token && userRole) {
-    const path = to.path
-    if (userRole === USER_ROLES.STUDENT && (path.startsWith(ADMIN_ROUTES.DASHBOARD.path) || path.startsWith(TEACHER_ROUTES.DASHBOARD.path))) {
-      return next(STUDENT_ROUTES.DASHBOARD.path)
+  // Role-based protection using route metadata
+  if (requiresAuth && token) {
+    if (!userRole) {
+      safeStorage.clear()
+      return next({ name: 'Login' })
     }
-    if (userRole === USER_ROLES.TEACHER && path.startsWith(ADMIN_ROUTES.DASHBOARD.path)) {
-      return next(TEACHER_ROUTES.DASHBOARD.path)
+
+    if (requiredRole && userRole !== requiredRole) {
+      return next(dashboardPaths[userRole] || '/')
     }
   }
 

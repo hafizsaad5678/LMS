@@ -97,9 +97,12 @@
       </template>
 
       <template #cell-actions="{ row }">
-        <button @click="viewSubmissions(row)" class="btn btn-sm btn-outline-info" title="View Submissions">
-          <i class="bi bi-list-check"></i>
-        </button>
+        <ActionButtons
+          :item="row"
+          :show-view="false"
+          @edit="editAssignment"
+          @delete="deleteAssignment"
+        />
       </template>
     </DataTable>
 
@@ -113,7 +116,7 @@
 import { ref, onMounted, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { AdminPageTemplate } from '@/components/shared/panels'
-import { StatCard, DataTable, SearchFilter, SelectInput } from '@/components/shared/common'
+import { StatCard, DataTable, SearchFilter, ActionButtons } from '@/components/shared/common'
 import { useEntityList } from '@/composables/shared'
 import { assignmentService } from '@/services/shared'
 import { subjectService } from '@/services/shared'
@@ -206,8 +209,12 @@ const resetFilters = () => {
   baseResetFilters()
 }
 
-const viewSubmissions = (assignment) => {
-  router.push(`${ADMIN_ROUTES.ASSIGNMENTS.path}/${assignment.id}/submissions`)
+const editAssignment = (assignment) => {
+  router.push({ name: ADMIN_ROUTES.ASSIGNMENT_EDIT.name, params: { id: assignment.id } })
+}
+
+const deleteAssignment = (assignment) => {
+  router.push({ name: ADMIN_ROUTES.ASSIGNMENT_DELETE.name, params: { id: assignment.id } })
 }
 
 // Use shared formatDate utility

@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from ..models import (
     Institution, Department, Program, AcademicSession, Semester, Subject,
-    Student, Teacher, TeacherSubject, Timetable
+    Student, Teacher, TeacherSubject, Timetable, Grade, StudentMark
 )
 
 
@@ -168,10 +168,71 @@ class SubjectDetailSerializer(SubjectSerializer):
         return None
 
     def get_current_grade(self, obj):
-        # Fetch generic current grade or average if available
-        # This is complex as it requires calculating from assignments
-        # For now, return None or a placeholder
-        return "N/A"
+        request = self.context.get('request')
+        if not request or not hasattr(request.user, 'student_profile'):
+            return None
+
+        student = request.user.student_profile
+
+        total_obtained = 0.0
+        total_possible = 0.0
+
+        # Assignment grades (linked via submission history)
+        assignment_grades = Grade.objects.filter(
+            submission__student=student,
+            submission__assignment__subject=obj,
+        ).select_related('submission__assignment')
+
+        for grade in assignment_grades:
+            obtained = float(grade.marks_obtained or 0)
+            possible = float((grade.submission.assignment.total_marks if grade.submission and grade.submission.assignment else 0) or 0)
+            if possible > 0:
+                total_obtained += obtained
+                total_possible += possible
+
+        # Other assessment components (quiz, midterm, final, etc.)
+        component_marks = StudentMark.objects.filter(
+            student=student,
+            component__subject=obj,
+            marks_obtained__isnull=False,
+        ).select_related('component')
+
+        for mark in component_marks:
+            obtained = float(mark.marks_obtained or 0)
+            possible = float((mark.component.max_marks if mark.component else 0) or 0)
+            if possible > 0:
+                total_obtained += obtained
+                total_possible += possible
+
+        if total_possible <= 0:
+            return "N/A"
+
+        percentage = round((total_obtained / total_possible) * 100, 1)
+
+        if percentage >= 90:
+            letter = 'A+'
+        elif percentage >= 85:
+            letter = 'A'
+        elif percentage >= 80:
+            letter = 'A-'
+        elif percentage >= 75:
+            letter = 'B+'
+        elif percentage >= 70:
+            letter = 'B'
+        elif percentage >= 65:
+            letter = 'B-'
+        elif percentage >= 60:
+            letter = 'C+'
+        elif percentage >= 55:
+            letter = 'C'
+        elif percentage >= 50:
+            letter = 'C-'
+        elif percentage >= 40:
+            letter = 'D'
+        else:
+            letter = 'F'
+
+        return f"{letter} ({percentage}%)"
 
 
 # Detail Serializers (with nested data)

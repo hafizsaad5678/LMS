@@ -108,7 +108,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useAlert } from '@/composables/shared'
-import { studentService, studentPanelService } from '@/services/shared'
+import { studentService } from '@/services/shared'
 import { StudentPageTemplate } from '@/components/shared/panels'
 import { AlertMessage, StatCard, StudentSectionHeader } from '@/components/shared/common'
 import { STUDENT_ROUTES } from '@/utils/constants/routes'
@@ -116,10 +116,14 @@ import { useStudentId } from '@/composables/shared/domain/useStudentId'
 
 const { studentId } = useStudentId()
 const loading = ref(true)
-const grades = ref([])
-const enrolledSubjects = ref([])
 const studentName = ref('')
 const studentEnrollment = ref('')
+const report = ref({
+  summary: { overall_gpa: '0.00', average_score: 0, total_subjects: 0, total_grades: 0 },
+  distribution: { A: 0, B: 0, C: 0, F: 0, other: 0 },
+  performance_summary: [],
+  subject_performance: []
+})
 
 const { alert, showInfo } = useAlert()
 const breadcrumbs = [
@@ -128,94 +132,46 @@ const breadcrumbs = [
   { name: 'Grade Report' }
 ]
 
-// GPA & Score Logic (Shared via studentPanelService where possible)
-const overallGPA = computed(() => studentPanelService.calculateGPA(grades.value))
-const averageScore = computed(() => {
-  if (grades.value.length === 0) return 0
-  const total = grades.value.reduce((sum, g) => sum + getPercentage(g), 0)
-  return Math.round(total / grades.value.length)
-})
-
 const statCards = computed(() => [
-  { title: 'Overall GPA', value: overallGPA.value, icon: 'bi bi-trophy-fill', type: 'student' },
-  { title: 'Average Score', value: `${averageScore.value}%`, icon: 'bi bi-percent', iconColor: 'text-success', bgColor: 'bg-success-light' },
-  { title: 'Total Subjects', value: enrolledSubjects.value.length, icon: 'bi bi-book-fill', type: 'department' },
-  { title: 'Total Grades', value: grades.value.length, icon: 'bi bi-graph-up', type: 'teacher' }
+  { title: 'Overall GPA', value: report.value.summary.overall_gpa, icon: 'bi bi-trophy-fill', type: 'student' },
+  { title: 'Average Score', value: `${Math.round(Number(report.value.summary.average_score || 0))}%`, icon: 'bi bi-percent', iconColor: 'text-success', bgColor: 'bg-success-light' },
+  { title: 'Total Subjects', value: Number(report.value.summary.total_subjects || 0), icon: 'bi bi-book-fill', type: 'department' },
+  { title: 'Total Grades', value: Number(report.value.summary.total_grades || 0), icon: 'bi bi-graph-up', type: 'teacher' }
 ])
 
 const distributions = computed(() => {
-  const dist = { A: 0, B: 0, C: 0, F: 0, other: 0 }
-  grades.value.forEach(g => {
-    const l = g.grade_value || calculateLetterGrade(getPercentage(g))
-    if (l.includes('A')) dist.A++
-    else if (l.includes('B')) dist.B++
-    else if (l.includes('C')) dist.C++
-    else if (l === 'F') dist.F++
-    else dist.other++
-  })
+  const dist = report.value.distribution || { A: 0, B: 0, C: 0, F: 0, other: 0 }
   return [
-    { label: 'A', value: dist.A, bgClass: 'bg-student-light', textClass: 'text-student' },
-    { label: 'B', value: dist.B, bgClass: 'bg-student-light', textClass: 'text-student' },
-    { label: 'C', value: dist.C, bgClass: 'bg-warning-light', textClass: 'text-warning' },
-    { label: 'F', value: dist.F, bgClass: 'bg-danger-light', textClass: 'text-danger' },
-    { label: 'Other', value: dist.other, bgClass: 'bg-light', textClass: 'text-secondary' }
+    { label: 'A', value: Number(dist.A || 0), bgClass: 'bg-student-light', textClass: 'text-student' },
+    { label: 'B', value: Number(dist.B || 0), bgClass: 'bg-student-light', textClass: 'text-student' },
+    { label: 'C', value: Number(dist.C || 0), bgClass: 'bg-warning-light', textClass: 'text-warning' },
+    { label: 'F', value: Number(dist.F || 0), bgClass: 'bg-danger-light', textClass: 'text-danger' },
+    { label: 'Other', value: Number(dist.other || 0), bgClass: 'bg-light', textClass: 'text-secondary' }
   ]
 })
 
-const performanceBars = computed(() => {
-  const s = { excellent: 0, good: 0, average: 0, belowAverage: 0 }
-  grades.value.forEach(g => {
-    const p = getPercentage(g)
-    if (p >= 90) s.excellent++
-    else if (p >= 80) s.good++
-    else if (p >= 60) s.average++
-    else s.belowAverage++
-  })
-  const total = grades.value.length || 1
-  return [
-    { label: 'Excellent', range: '90-100%', value: s.excellent, percent: (s.excellent / total) * 100, color: 'success' },
-    { label: 'Good', range: '80-89%', value: s.good, percent: (s.good / total) * 100, color: 'success', opacity: 'bg-opacity-75' },
-    { label: 'Average', range: '60-79%', value: s.average, percent: (s.average / total) * 100, color: 'warning' },
-    { label: 'Below Average', range: '<60%', value: s.belowAverage, percent: (s.belowAverage / total) * 100, color: 'danger' }
-  ]
-})
+const performanceBars = computed(() => Array.isArray(report.value.performance_summary) ? report.value.performance_summary : [])
 
-const subjectPerformance = computed(() => {
-  const subjects = {}
-  grades.value.forEach(g => {
-    const name = g.subject_name || g.assignment?.subject?.name || 'Unknown'
-    const code = g.subject_code || g.assignment?.subject?.code || 'N/A'
-    if (!subjects[name]) subjects[name] = { name, code, scores: [], count: 0 }
-    subjects[name].scores.push(getPercentage(g))
-    subjects[name].count++
-  })
-  return Object.values(subjects).map(s => ({
-    ...s,
-    average: Math.round(s.scores.reduce((a, b) => a + b, 0) / s.scores.length),
-    best: Math.max(...s.scores),
-    worst: Math.min(...s.scores)
-  }))
-})
+const subjectPerformance = computed(() => Array.isArray(report.value.subject_performance) ? report.value.subject_performance : [])
 
-const getPercentage = (g) => Math.round(((g.marks_obtained || g.marks || 0) / (g.total_marks || g.max_marks || 100)) * 100)
-const calculateLetterGrade = (p) => {
-  if (p >= 90) return 'A+'; if (p >= 80) return 'A'; if (p >= 70) return 'B'; if (p >= 60) return 'C'; return 'F'
-}
 const getPerformanceClass = (p) => p >= 80 ? 'bg-success' : p >= 60 ? 'bg-warning' : 'bg-danger'
 
 const loadData = async () => {
   if (!studentId.value) return
   loading.value = true
   try {
-    const [profile, gradesRes, subjectsRes] = await Promise.all([
+    const [profile, gradeReport] = await Promise.all([
       studentService.getStudent(studentId.value),
-      studentService.getGrades(studentId.value),
-      studentService.getEnrolledSubjects(studentId.value)
+      studentService.getGradeReport(studentId.value)
     ])
     studentName.value = profile.full_name
     studentEnrollment.value = profile.enrollment_number
-    grades.value = Array.isArray(gradesRes) ? gradesRes : (gradesRes.results || [])
-    enrolledSubjects.value = Array.isArray(subjectsRes) ? subjectsRes : (subjectsRes.results || [])
+    report.value = {
+      summary: gradeReport?.summary || report.value.summary,
+      distribution: gradeReport?.distribution || report.value.distribution,
+      performance_summary: Array.isArray(gradeReport?.performance_summary) ? gradeReport.performance_summary : [],
+      subject_performance: Array.isArray(gradeReport?.subject_performance) ? gradeReport.subject_performance : []
+    }
   } catch (err) { console.error(err) } finally { loading.value = false }
 }
 

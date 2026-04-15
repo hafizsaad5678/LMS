@@ -73,8 +73,8 @@ export const adminRoutes = {
         // Assignment routes
         { path: 'assignments', name: 'ListAssignment', component: () => import('../../views/admin/assignment/ListAssignment.vue') },
         { path: 'assignments/add', name: 'AddAssignment', component: () => import('../../views/admin/assignment/AddAssignment.vue') },
-        { path: 'assignments/edit', name: 'EditAssignment', component: () => import('../../views/admin/assignment/EditAssignment.vue') },
-        { path: 'assignments/delete', name: 'DeleteAssignment', component: () => import('../../views/admin/assignment/DeleteAssignment.vue') },
+        { path: 'assignments/edit/:id?', name: 'EditAssignment', component: () => import('../../views/admin/assignment/EditAssignment.vue') },
+        { path: 'assignments/delete/:id?', name: 'DeleteAssignment', component: () => import('../../views/admin/assignment/DeleteAssignment.vue') },
 
         // Management routes
         { path: 'accounts', name: 'Accounts', component: () => import('../../views/admin/management/Accounts.vue') },

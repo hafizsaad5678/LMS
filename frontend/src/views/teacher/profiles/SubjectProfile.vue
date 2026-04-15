@@ -35,8 +35,9 @@
         icon="bi bi-book"
         avatarClass="profile-avatar-subject"
         :badges="profileBadges"
+        :showStatusBadge="false"
+        :showEditButton="false"
         theme="teacher"
-        @edit="router.push({ name: TEACHER_ROUTES.EDIT_SUBJECT?.name, params: { id: subject.id } })"
       />
 
       <div class="row g-4">
@@ -84,9 +85,8 @@ const actions = computed(() => [
 
 const profileBadges = computed(() => {
   const badges = []
-  if (subject.value.id) badges.push({ text: 'Active', class: 'bg-teacher' })
   badges.push({ text: `${subject.value.credit_hours} Credit Hours`, class: 'bg-info' })
-  if (subject.value.department_name) badges.push({ text: subject.value.department_name, class: 'bg-teacher-outline text-teacher' })
+  if (subject.value.department_name) badges.push({ text: subject.value.department_name, class: 'bg-teacher' })
   if (subject.value.program_name) badges.push({ text: subject.value.program_name, class: 'bg-secondary' })
   if (subject.value.semester_number) badges.push({ text: `Semester ${subject.value.semester_number}`, class: 'bg-warning text-dark' })
   return badges

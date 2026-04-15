@@ -37,9 +37,9 @@
                 </div>
                 <div class="col-md-5">
                   <label class="form-label small">Subject <span class="text-danger">*</span></label>
-                  <select v-model="form.subject" class="form-select form-select-sm" required>
-                    <option value="">Select Subject</option>
-                    <option v-for="subject in subjects" :key="subject.id" :value="subject.id">{{ subject.code }} - {{ subject.name }}</option>
+                  <select v-model="form.subject" class="form-select form-select-sm" :disabled="!form.semester" required>
+                    <option value="">{{ form.semester ? 'Select Subject' : 'Select Semester First' }}</option>
+                    <option v-for="subject in getFilteredSubjects(form)" :key="subject.id" :value="subject.id">{{ subject.code }} - {{ subject.name }}</option>
                   </select>
                 </div>
                 <div class="col-md-4">
@@ -54,16 +54,16 @@
                   <input v-model="form.room" type="text" class="form-control form-control-sm" placeholder="101" required>
                 </div>
                 <div class="col-md-3">
-                  <label class="form-label small">Program</label>
-                  <select v-model="form.program" class="form-select form-select-sm" @change="$emit('program-change', index)">
-                    <option value="">Select</option>
+                  <label class="form-label small">Program <span class="text-danger">*</span></label>
+                  <select v-model="form.program" class="form-select form-select-sm" required @change="$emit('program-change', index)">
+                    <option value="">Select Program</option>
                     <option v-for="program in programs" :key="program.id" :value="program.id">{{ program.name }}</option>
                   </select>
                 </div>
                 <div class="col-md-3">
-                  <label class="form-label small">Semester</label>
-                  <select v-model="form.semester" class="form-select form-select-sm" :disabled="!form.program">
-                    <option value="">Select</option>
+                  <label class="form-label small">Semester <span class="text-danger">*</span></label>
+                  <select v-model="form.semester" class="form-select form-select-sm" :disabled="!form.program" required @change="form.subject = ''">
+                    <option value="">Select Semester</option>
                     <option v-for="semester in form.availableSemesters || []" :key="semester.id" :value="semester.id">Sem {{ semester.number }}</option>
                   </select>
                 </div>
@@ -90,7 +90,19 @@
 <script setup>
 import { DAYS_OF_WEEK, DAY_LABELS } from '@/utils/constants/config'
 
-defineProps({
+const extractSemesterId = (subject) => {
+  const raw = subject?.semester_id ?? subject?.semester ?? subject?.semesterId
+  if (raw && typeof raw === 'object') return raw.id ?? raw.pk ?? ''
+  return raw ?? ''
+}
+
+const getFilteredSubjects = (form) => {
+  const selectedSemesterId = String(form?.semester || '')
+  if (!selectedSemesterId) return []
+  return props.subjects.filter(subject => String(extractSemesterId(subject)) === selectedSemesterId)
+}
+
+const props = defineProps({
   show: { type: Boolean, default: false },
   forms: { type: Array, required: true },
   saving: { type: Boolean, default: false },

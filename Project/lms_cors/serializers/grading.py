@@ -228,6 +228,31 @@ class StudentMarkSerializer(serializers.ModelSerializer):
     subject_name = serializers.CharField(source='component.subject.name', read_only=True)
     subject_code = serializers.CharField(source='component.subject.code', read_only=True)
     total_marks = serializers.DecimalField(source='component.max_marks', max_digits=6, decimal_places=2, read_only=True)
+    grade_value = serializers.SerializerMethodField()
+
+    def get_grade_value(self, obj):
+        percentage = float(obj.percentage or 0)
+        if percentage >= 90:
+            return 'A+'
+        if percentage >= 85:
+            return 'A'
+        if percentage >= 80:
+            return 'A-'
+        if percentage >= 75:
+            return 'B+'
+        if percentage >= 70:
+            return 'B'
+        if percentage >= 65:
+            return 'B-'
+        if percentage >= 60:
+            return 'C+'
+        if percentage >= 55:
+            return 'C'
+        if percentage >= 50:
+            return 'C-'
+        if percentage >= 40:
+            return 'D'
+        return 'F'
     
     class Meta:
         model = StudentMark
@@ -237,6 +262,7 @@ class StudentMarkSerializer(serializers.ModelSerializer):
             'assignment_title', 'subject_name', 'subject_code',
             'marks_obtained', 'total_marks', 'max_marks', 
             'percentage', 'weighted_marks', 'remarks', 
+            'grade_value',
             'is_absent', 'is_locked', 'graded_by', 'graded_by_name',
             'graded_at', 'created_at'
         ]

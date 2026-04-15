@@ -70,15 +70,15 @@
         <div class="card border-0 shadow-sm">
           <StudentSectionHeader title="Class Schedule" />
           <div class="card-body">
-            <div v-if="subject.schedule && subject.schedule.length > 0">
+            <div v-if="normalizedSchedule.length > 0">
               <!-- Iterate over schedule -->
-              <div v-for="(slot, index) in subject.schedule" :key="index"
+              <div v-for="(slot, index) in normalizedSchedule" :key="index"
                 class="d-flex align-items-center mb-3 last-mb-0 border-bottom pb-2">
                 <div class="me-3 text-center min-w-80">
-                  <span class="badge badge-soft-success text-capitalize d-block mb-1">{{ slot.day }}</span>
+                  <span class="badge badge-soft-success text-capitalize d-block mb-1">{{ formatDayLabel(slot.day) }}</span>
                 </div>
                 <div class="flex-grow-1">
-                  <div class="fw-bold fs-5">{{ slot.start_time }} - {{ slot.end_time }}</div>
+                  <div class="fw-bold fs-5">{{ formatScheduleTime(slot.start_time, false) }} - {{ formatScheduleTime(slot.end_time, true) }}</div>
                   <div class="small text-muted">
                     <i class="bi bi-geo-alt-fill me-1"></i>
                     Room: {{ slot.room || 'TBD' }}
@@ -132,7 +132,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { studentService } from '@/services/shared'
 import { StudentPageTemplate } from '@/components/shared/panels'
@@ -151,6 +151,58 @@ const breadcrumbs = [
   { name: 'My Subjects', href: STUDENT_ROUTES.ENROLLED_SUBJECTS.path },
   { name: 'Subject Profile' }
 ]
+
+const dayOrder = {
+  monday: 1,
+  tuesday: 2,
+  wednesday: 3,
+  thursday: 4,
+  friday: 5,
+  saturday: 6,
+  sunday: 7
+}
+
+const toMinutes = (timeValue) => {
+  const raw = String(timeValue || '').trim()
+  if (!raw) return Number.POSITIVE_INFINITY
+  const [h, m] = raw.split(':').map(Number)
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return Number.POSITIVE_INFINITY
+  return h * 60 + m
+}
+
+const normalizedSchedule = computed(() => {
+  const slots = Array.isArray(subject.value?.schedule) ? [...subject.value.schedule] : []
+  return slots.sort((a, b) => {
+    const dayA = dayOrder[String(a?.day || '').toLowerCase()] || 99
+    const dayB = dayOrder[String(b?.day || '').toLowerCase()] || 99
+    if (dayA !== dayB) return dayA - dayB
+    return toMinutes(a?.start_time) - toMinutes(b?.start_time)
+  })
+})
+
+const formatDayLabel = (dayValue) => {
+  const raw = String(dayValue || '').trim().toLowerCase()
+  if (!raw) return 'N/A'
+  return raw.charAt(0).toUpperCase() + raw.slice(1)
+}
+
+const formatScheduleTime = (timeValue, isEnd = false) => {
+  const raw = String(timeValue || '').trim()
+  if (!raw) return '--:--'
+
+  const [hRaw, mRaw] = raw.split(':')
+  let hours = Number(hRaw)
+  let minutes = Number(mRaw)
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return raw
+
+  // Many backends store period end as xx:59 for inclusive ranges; render as next-hour xx:00.
+  if (isEnd && minutes === 59) {
+    hours += 1
+    minutes = 0
+  }
+
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`
+}
 
 const loadSubjectDetails = async () => {
   if (!subjectId || subjectId === 'undefined') {

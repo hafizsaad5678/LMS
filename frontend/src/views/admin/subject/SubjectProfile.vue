@@ -25,8 +25,9 @@
         :name="entity.name"
         :identifier="entity.code"
         :badges="profileBadges"
+        :showStatusBadge="false"
+        :showEditButton="false"
         theme="admin"
-        @edit="router.push({ name: ADMIN_ROUTES.SUBJECT_EDIT.name, params: { id: entity.id } })"
       />
 
       <div class="row g-4">

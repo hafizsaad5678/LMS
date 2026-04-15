@@ -222,7 +222,7 @@ const mapClassData = (cls) => ({
 const { data: classes, loading, error, load, refresh } = useCachedData(
   'teacher_classes_list',
   async () => {
-    const response = await teacherPanelService.getMyClasses()
+    const response = await teacherPanelService.getMyClasses({}, { forceRefresh: true })
     return (response.results || response || []).map(mapClassData)
   }
 )
@@ -273,6 +273,6 @@ const viewTodaySchedule = () => router.push({ name: TEACHER_ROUTES.CLASS_SCHEDUL
 const viewPendingReviews = () => router.push({ name: TEACHER_ROUTES.SUBMISSIONS.name })
 const viewSubjectStudents = (cls) => router.push({ name: TEACHER_ROUTES.STUDENT_LIST.name, query: { subject: cls.subject_id, subject_name: cls.subject_name } })
 
-onMounted(load)
+onMounted(() => load(true))
 </script>
 

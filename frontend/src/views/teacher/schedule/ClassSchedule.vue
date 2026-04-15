@@ -6,7 +6,7 @@
     :breadcrumbs="breadcrumbs"
     :actions="actions"
   >
-    <div class="row g-4">
+    <div class="row g-4 teacher-class-schedule">
       <!-- Schedule Overview -->
       <div class="col-lg-8">
         <div class="card border-0 shadow-sm">
@@ -48,6 +48,14 @@
                       >
                         <div class="fw-semibold">{{ getClassForSlot(day, timeSlot.time).subject }}</div>
                         <small>{{ getClassForSlot(day, timeSlot.time).room }}</small>
+
+                        <div class="schedule-hover-detail">
+                          <div class="fw-semibold mb-1">{{ getClassForSlot(day, timeSlot.time).subject }}</div>
+                          <div class="small"><i class="bi bi-upc-scan me-1"></i>{{ getClassForSlot(day, timeSlot.time).subjectCode || 'N/A' }}</div>
+                          <div class="small"><i class="bi bi-clock me-1"></i>{{ getClassForSlot(day, timeSlot.time).time }} - {{ getClassForSlot(day, timeSlot.time).endTime }}</div>
+                          <div class="small"><i class="bi bi-geo-alt me-1"></i>{{ getClassForSlot(day, timeSlot.time).room || 'N/A' }}</div>
+                          <div class="small"><i class="bi bi-people me-1"></i>{{ getClassForSlot(day, timeSlot.time).students }} students</div>
+                        </div>
                       </div>
                     </td>
                   </tr>
@@ -128,38 +136,75 @@ const actions = [
 ]
 
 const currentWeek = ref(new Date())
-const weekDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
-const timeSlots = [
-  { time: '08:00' },
-  { time: '09:00' },
-  { time: '10:00' },
-  { time: '11:00' },
-  { time: '12:00' },
-  { time: '13:00' },
-  { time: '14:00' },
-  { time: '15:00' },
-  { time: '16:00' }
-]
+const weekDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
-// Mock schedule data - will be replaced with real API data
+const normalizeTime = (value) => {
+  const raw = String(value || '').trim()
+  if (!raw) return ''
+  const parts = raw.split(':')
+  if (parts.length < 2) return ''
+  const hours = String(parts[0]).padStart(2, '0')
+  const minutes = String(parts[1]).padStart(2, '0')
+  return `${hours}:${minutes}`
+}
+
+const timeToMinutes = (value) => {
+  const normalized = normalizeTime(value)
+  if (!normalized) return NaN
+  const [hours, minutes] = normalized.split(':').map(Number)
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return NaN
+  return hours * 60 + minutes
+}
+
+const dayLabel = (value) => {
+  const day = String(value || '').trim().toLowerCase()
+  if (!day) return ''
+  return day.charAt(0).toUpperCase() + day.slice(1)
+}
+
+const timeSlots = computed(() => {
+  if (!schedule.value.length) {
+    return Array.from({ length: 10 }, (_, idx) => ({ time: `${String(idx + 8).padStart(2, '0')}:00` }))
+  }
+
+  const starts = schedule.value
+    .map(item => timeToMinutes(item.time))
+    .filter(Number.isFinite)
+
+  if (!starts.length) {
+    return Array.from({ length: 10 }, (_, idx) => ({ time: `${String(idx + 8).padStart(2, '0')}:00` }))
+  }
+
+  const minHour = Math.max(6, Math.floor(Math.min(...starts) / 60) - 1)
+  const maxHour = Math.min(20, Math.ceil(Math.max(...starts) / 60) + 1)
+  const slots = []
+  for (let hour = minHour; hour <= maxHour; hour += 1) {
+    slots.push({ time: `${String(hour).padStart(2, '0')}:00` })
+  }
+  return slots
+})
+
 const schedule = ref([])
 
 const loadSchedule = async () => {
   try {
     const response = await teacherPanelService.getTimetable()
+    const rows = Array.isArray(response) ? response : (response?.results || [])
     const now = new Date()
     const currentDay = now.toLocaleDateString('en-US', { weekday: 'long' })
     
-    schedule.value = response.results.map(slot => {
+    schedule.value = rows.map(slot => {
       // Determine status based on current time
       const currentTime = now.getHours() * 60 + now.getMinutes()
-      const [startHour, startMin] = slot.start_time.split(':').map(Number)
-      const [endHour, endMin] = slot.end_time.split(':').map(Number)
+      const normalizedStart = normalizeTime(slot.start_time)
+      const normalizedEnd = normalizeTime(slot.end_time)
+      const [startHour, startMin] = normalizedStart.split(':').map(Number)
+      const [endHour, endMin] = normalizedEnd.split(':').map(Number)
       const slotStart = startHour * 60 + startMin
       const slotEnd = endHour * 60 + endMin
       
-      // Capitalize the day from backend for comparison
-      const slotDay = slot.day.charAt(0).toUpperCase() + slot.day.slice(1)
+      // Normalize day from backend for comparison
+      const slotDay = dayLabel(slot.day)
       
       let status = 'upcoming'
       if (slotDay === currentDay) {
@@ -173,12 +218,12 @@ const loadSchedule = async () => {
       return {
         id: slot.id,
         day: slotDay,
-        time: slot.start_time,
-        endTime: slot.end_time,
-        subject: slot.subject,
+        time: normalizedStart,
+        endTime: normalizedEnd,
+        subject: slot.subject || slot.subject_name || slot.subjectCode || 'N/A',
         subjectCode: slot.subject_code,
         room: slot.room,
-        students: slot.students,
+        students: slot.students ?? slot.student_count ?? 0,
         status: status
       }
     })
@@ -198,21 +243,40 @@ const currentWeekLabel = computed(() => {
 const todayClasses = computed(() => {
   const today = new Date().toLocaleDateString('en-US', { weekday: 'long' })
   return schedule.value.filter(cls => cls.day === today).sort((a, b) => {
-    return a.time.localeCompare(b.time)
+    return timeToMinutes(a.time) - timeToMinutes(b.time)
   })
 })
 
 const getClassForSlot = (day, time) => {
-  return schedule.value.find(cls => cls.day === day && cls.time === time)
+  const slotStart = timeToMinutes(time)
+  const slotEnd = slotStart + 60
+
+  return schedule.value.find(cls => {
+    if (cls.day !== day) return false
+    const classStart = timeToMinutes(cls.time)
+    // render class in the slot where its start time falls
+    return classStart >= slotStart && classStart < slotEnd
+  })
 }
 
 const getClassColor = (cls) => {
-  const colors = {
-    'Data Structures': 'bg-primary text-white',
-    'Database Systems': 'bg-success text-white',
-    'Web Development': 'bg-info text-white'
-  }
-  return colors[cls.subject] || 'bg-secondary text-white'
+  const palette = [
+    'bg-primary text-white',
+    'bg-success text-white',
+    'bg-info text-white',
+    'bg-warning text-dark',
+    'bg-danger text-white',
+    'bg-secondary text-white'
+  ]
+
+  const seed = String(cls?.subjectCode || cls?.subject || cls?.id || '')
+  if (!seed) return palette[palette.length - 1]
+
+  const hash = seed
+    .split('')
+    .reduce((acc, ch) => acc + ch.charCodeAt(0), 0)
+
+  return palette[hash % palette.length]
 }
 
 const getStatusBadge = (status) => {

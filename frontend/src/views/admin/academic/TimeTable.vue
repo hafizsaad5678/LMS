@@ -625,6 +625,7 @@ const loadSemestersByProgram = async (programId, target = 'form') => {
 
 const onProgramChange = async () => {
   scheduleForm.value.semester = ''
+  scheduleForm.value.subject = ''
   if (scheduleForm.value.program) await loadSemestersByProgram(scheduleForm.value.program, 'form')
   else programSemesters.value = []
 }
@@ -632,6 +633,7 @@ const onProgramChange = async () => {
 const onMultipleProgramChange = async (index) => {
   const form = multipleScheduleForms.value[index]
   form.semester = ''
+  form.subject = ''
   if (form.program) {
     try {
       const response = await programService.getProgramSemesters(form.program)

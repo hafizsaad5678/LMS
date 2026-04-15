@@ -113,6 +113,14 @@ class GradeSerializer(serializers.ModelSerializer):
     subject_code = serializers.CharField(source='submission.assignment.subject.code', read_only=True)
     total_marks = serializers.DecimalField(source='submission.assignment.total_marks', max_digits=6, decimal_places=2, read_only=True)
     graded_by_name = serializers.CharField(source='graded_by.full_name', read_only=True)
+    percentage = serializers.SerializerMethodField()
+
+    def get_percentage(self, obj):
+        total = float((obj.submission.assignment.total_marks if obj.submission and obj.submission.assignment else 0) or 0)
+        obtained = float(obj.marks_obtained or 0)
+        if total <= 0:
+            return 0
+        return round((obtained / total) * 100, 2)
     
     class Meta:
         model = Grade

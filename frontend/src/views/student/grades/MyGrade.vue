@@ -56,16 +56,16 @@
                   <td>
                     <div class="d-flex align-items-center">
                       <div class="progress flex-grow-1 me-2 progress-h-8">
-                        <div class="progress-bar" :class="getProgressBarClass(getPercentage(grade))"
-                          :style="{ width: getPercentage(grade) + '%' }"></div>
+                        <div class="progress-bar" :class="getProgressBarClass(resolvePercentage(grade))"
+                          :style="{ width: resolvePercentage(grade) + '%' }"></div>
                       </div>
-                      <span class="small">{{ getPercentage(grade) }}%</span>
+                      <span class="small">{{ resolvePercentage(grade) }}%</span>
                     </div>
                   </td>
                   <td>
                     <span class="badge"
-                      :class="getGradeBadgeClass(grade.grade_value || calculateLetterGrade(getPercentage(grade)))">
-                      {{ grade.grade_value || calculateLetterGrade(getPercentage(grade)) }}
+                      :class="getGradeBadgeClass(resolveGradeValue(grade))">
+                      {{ resolveGradeValue(grade) }}
                     </span>
                   </td>
                   <td><small>{{ formatDate(grade.graded_at || grade.created_at) }}</small></td>
@@ -84,7 +84,7 @@
 
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
-import { studentService, studentPanelService } from '@/services/shared'
+import { studentService } from '@/services/shared'
 import { StudentPageTemplate } from '@/components/shared/panels'
 import { AlertMessage, StatCard, LoadingSpinner, EmptyState, Pagination, SearchFilter, SelectInput } from '@/components/shared/common'
 import { useEntityList, usePagination } from '@/composables/shared'
@@ -94,7 +94,12 @@ import { getProgressBarClass, getGradeBadgeClass, calculateLetterGrade } from '@
 import { STUDENT_ROUTES } from '@/utils/constants/routes'
 
 const { studentId, studentName, studentEnrollment, loadProfile } = useStudentBase()
-const enrolledSubjects = ref([])
+const gradeSummary = ref({
+  overall_gpa: '0.00',
+  average_score: 0,
+  total_subjects: 0,
+  total_grades: 0
+})
 
 const breadcrumbs = [
   { name: 'Dashboard', href: STUDENT_ROUTES.DASHBOARD.path },
@@ -137,22 +142,47 @@ const subjectOptions = computed(() => {
   return subs.sort().map(s => ({ value: s, label: s }))
 })
 
-const averageScore = computed(() => {
-  if (grades.value.length === 0) return 0
-  const total = grades.value.reduce((sum, g) => sum + getPercentage(g), 0)
-  return Math.round(total / grades.value.length)
-})
-
 const statsCards = computed(() => [
-  { title: 'Overall GPA', value: studentPanelService.calculateGPA(grades.value), icon: 'bi bi-trophy-fill', type: 'student' },
-  { title: 'Total Subjects', value: enrolledSubjects.value.length, icon: 'bi bi-book-fill', type: 'department' },
-  { title: 'Average Score', value: `${averageScore.value}%`, icon: 'bi bi-star-fill', type: 'teacher' }
+  { title: 'Overall GPA', value: gradeSummary.value.overall_gpa, icon: 'bi bi-trophy-fill', type: 'student' },
+  { title: 'Total Subjects', value: Number(gradeSummary.value.total_subjects || 0), icon: 'bi bi-book-fill', type: 'department' },
+  { title: 'Average Score', value: `${Math.round(Number(gradeSummary.value.average_score || 0))}%`, icon: 'bi bi-star-fill', type: 'teacher' }
 ])
 
-const getPercentage = (g) => Math.round(((g.marks_obtained || g.marks || 0) / (g.total_marks || g.max_marks || 100)) * 100)
+const resolvePercentage = (grade) => {
+  const backendPercentage = Number(grade?.percentage)
+  if (Number.isFinite(backendPercentage)) {
+    return Math.round(backendPercentage)
+  }
+
+  const marks = Number(grade?.marks_obtained ?? grade?.marks ?? 0)
+  const totalMarks = Number(grade?.total_marks ?? grade?.max_marks ?? 100)
+  if (!Number.isFinite(totalMarks) || totalMarks <= 0) return 0
+
+  return Math.round((marks / totalMarks) * 100)
+}
+
+const resolveGradeValue = (grade) => {
+  if (grade?.grade_value) return grade.grade_value
+  return calculateLetterGrade(resolvePercentage(grade))
+}
 
 const resetFilters = () => {
   filters.value = { search: '', subject: '' }
+}
+
+const loadGradeSummary = async () => {
+  try {
+    const report = await studentService.getGradeReport(studentId)
+    const summary = report?.summary || {}
+    gradeSummary.value = {
+      overall_gpa: String(summary.overall_gpa ?? '0.00'),
+      average_score: Number(summary.average_score ?? 0),
+      total_subjects: Number(summary.total_subjects ?? 0),
+      total_grades: Number(summary.total_grades ?? 0)
+    }
+  } catch (err) {
+    console.error('Error loading grade summary:', err)
+  }
 }
 
 onMounted(async () => {
@@ -160,15 +190,9 @@ onMounted(async () => {
 
   loadProfile()
 
-  // Load grades via useEntityList
-  await loadData(() => studentService.getGrades(studentId))
-
-  // Load additional subject data
-  try {
-    const subjectsRes = await studentService.getEnrolledSubjects(studentId)
-    enrolledSubjects.value = Array.isArray(subjectsRes) ? subjectsRes : (subjectsRes.results || [])
-  } catch (err) {
-    console.error('Error loading subjects:', err)
-  }
+  await Promise.all([
+    loadData(() => studentService.getGrades(studentId)),
+    loadGradeSummary()
+  ])
 })
 </script>

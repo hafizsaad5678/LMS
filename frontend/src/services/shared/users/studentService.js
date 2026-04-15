@@ -84,6 +84,12 @@ export const studentService = {
         )
     },
 
+    async getGradeReport(id) {
+        return dedupeRequest(getCacheKey(id, 'grade-report'), () =>
+            apiGet(`/students/${id}/grade-report/`, null, `fetching grade report for student ${id}`)
+        )
+    },
+
     async getAssignments(id) {
         return dedupeRequest(getCacheKey(id, 'assignments'), () =>
             apiGet(`/students/${id}/assignments/`, null, `fetching assignments for student ${id}`)

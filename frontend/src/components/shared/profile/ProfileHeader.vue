@@ -13,7 +13,7 @@
             <i class="bi bi-hash me-1"></i>{{ identifier }}
           </p>
           <div class="d-flex flex-wrap gap-2">
-            <span :class="['badge', isActive ? 'bg-success' : 'bg-warning']">
+            <span v-if="showStatusBadge" :class="['badge', isActive ? 'bg-success' : 'bg-warning']">
               {{ isActive ? 'Active' : 'Inactive' }}
             </span>
             <span v-for="(badge, index) in badges" :key="index" :class="['badge', badge.class || 'bg-info']">
@@ -44,6 +44,10 @@ const props = defineProps({
     required: true
   },
   isActive: {
+    type: Boolean,
+    default: true
+  },
+  showStatusBadge: {
     type: Boolean,
     default: true
   },

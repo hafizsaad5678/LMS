@@ -96,12 +96,24 @@ export const teacherPanelService = {
     },
 
     // ==================== Classes/Subjects ====================
-    async getMyClasses(params = {}) {
+    async getMyClasses(params = {}, options = {}) {
+        const { forceRefresh = false } = options
         const normalizedParams = {}
         if (params.session) normalizedParams.session = params.session
         if (params.subject) normalizedParams.subject = params.subject
 
         const key = `${CACHE_KEYS.MY_CLASSES}:${JSON.stringify(normalizedParams)}`
+
+        if (forceRefresh) {
+            cacheService.clear(key)
+            pendingRequests.delete(key)
+
+            const response = await api.get('/teacher/my-classes/', {
+                params: Object.keys(normalizedParams).length ? normalizedParams : undefined
+            })
+            cacheService.set(key, response.data)
+            return response.data
+        }
 
         return dedupeRequest(key, async () => {
             const response = await api.get('/teacher/my-classes/', {

@@ -1,3 +1,5 @@
+from collections import defaultdict
+
 from rest_framework import status
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
@@ -7,7 +9,7 @@ from django.utils import timezone
 from .base import BaseProfileViewSet, BaseViewSet
 from ..models import (
     Student, Teacher, Admin, TeacherSubject, StudentSubject, 
-    Grade, StudentMark, Assignment, SubmissionHistory
+    Grade, StudentMark, Assignment, SubmissionHistory, Subject, Timetable
 )
 from ..serializers import (
     StudentSerializer, StudentDetailSerializer,
@@ -36,66 +38,114 @@ def teacher_my_classes(request):
     session_id = request.query_params.get('session')
     subject_id = request.query_params.get('subject')
 
-    # Get all TeacherSubject assignments for this teacher with related data
+    # Primary source: direct teacher-subject assignments
     teacher_subjects = TeacherSubject.objects.filter(
-        teacher=teacher, 
-        is_active=True
+        teacher=teacher,
+        subject__isnull=False
     ).select_related(
-        'subject', 
-        'subject__semester', 
+        'subject',
+        'subject__semester',
         'subject__semester__session',
         'subject__semester__program',
         'subject__semester__program__department'
     )
 
-    if session_id:
-        teacher_subjects = teacher_subjects.filter(subject__semester__session_id=session_id)
+    # Secondary source: subjects appearing in teacher timetable
+    timetable_subject_ids = Timetable.objects.filter(
+        teacher=teacher,
+        subject__isnull=False,
+        is_active=True
+    ).values_list('subject_id', flat=True).distinct()
+
+    # Map subject_id -> assignment row (when available)
+    teacher_subject_map = {
+        str(ts.subject_id): ts
+        for ts in teacher_subjects
+        if ts.subject_id
+    }
+
+    # Consolidate unique subjects from both sources
+    subject_map = {
+        str(ts.subject.id): ts.subject
+        for ts in teacher_subjects
+        if ts.subject
+    }
+
+    missing_subject_ids = [
+        sid for sid in timetable_subject_ids
+        if str(sid) not in subject_map
+    ]
+
+    if missing_subject_ids:
+        fallback_subjects = Subject.objects.filter(id__in=missing_subject_ids).select_related(
+            'semester',
+            'semester__session',
+            'semester__program',
+            'semester__program__department'
+        )
+        for subject in fallback_subjects:
+            subject_map[str(subject.id)] = subject
+
+    # Apply optional filters after merge
     if subject_id:
-        teacher_subjects = teacher_subjects.filter(subject_id=subject_id)
-    
+        subject_map = {
+            sid: subject
+            for sid, subject in subject_map.items()
+            if sid == str(subject_id)
+        }
+
+    if session_id:
+        subject_map = {
+            sid: subject
+            for sid, subject in subject_map.items()
+            if getattr(getattr(subject, 'semester', None), 'session_id', None) and str(subject.semester.session_id) == str(session_id)
+        }
+
     # Build response data with full academic hierarchy
     classes = []
-    for ts in teacher_subjects:
-        subject = ts.subject
-        if subject:
-            semester = subject.semester
-            session = semester.session if semester else None
-            program = semester.program if semester else None
-            department = program.department if program else None
-            
-            # Count enrolled students for this subject
-            student_count = StudentSubject.objects.filter(subject=subject).count()
-            
-            classes.append({
-                'id': str(ts.id),
-                'subject_id': str(subject.id),
-                'subject_name': subject.name,
-                'subject_code': subject.code,
-                'credit_hours': subject.credit_hours,
-                'description': subject.description or '',
-                'student_count': student_count,
-                
-                # Semester Information
-                'semester': f"Semester {semester.number}" if semester else "N/A",
-                'semester_id': str(semester.id) if semester else None,
-                'semester_number': semester.number if semester else None,
+    for sid, subject in subject_map.items():
+        semester = subject.semester
+        session = semester.session if semester else None
+        program = semester.program if semester else None
+        department = program.department if program else None
 
-                # Session Information
-                'session_id': str(session.id) if session else None,
-                'session_name': session.session_name if session else "N/A",
-                'session_code': session.session_code if session else "N/A",
-                
-                # Program Information
-                'program_name': program.name if program else "N/A",
-                'program_code': program.code if program else "N/A",
-                'program_id': str(program.id) if program else None,
-                'program_level': program.program_level if program else "N/A",
-                
-                # Department Information
-                'department_name': department.name if department else "N/A",
-                'department_code': department.code if department else "N/A",
-                'department_id': str(department.id) if department else None,
-            })
+        # Count enrolled students for this subject
+        student_count = StudentSubject.objects.filter(subject=subject).count()
+
+        # Keep existing id semantics (TeacherSubject id when present) for compatibility
+        ts = teacher_subject_map.get(sid)
+        class_row_id = str(ts.id) if ts else str(subject.id)
+
+        classes.append({
+            'id': class_row_id,
+            'subject_id': str(subject.id),
+            'subject_name': subject.name,
+            'subject_code': subject.code,
+            'credit_hours': subject.credit_hours,
+            'description': subject.description or '',
+            'student_count': student_count,
+
+            # Semester Information
+            'semester': f"Semester {semester.number}" if semester else "N/A",
+            'semester_id': str(semester.id) if semester else None,
+            'semester_number': semester.number if semester else None,
+
+            # Session Information
+            'session_id': str(session.id) if session else None,
+            'session_name': session.session_name if session else "N/A",
+            'session_code': session.session_code if session else "N/A",
+
+            # Program Information
+            'program_name': program.name if program else "N/A",
+            'program_code': program.code if program else "N/A",
+            'program_id': str(program.id) if program else None,
+            'program_level': program.program_level if program else "N/A",
+
+            # Department Information
+            'department_name': department.name if department else "N/A",
+            'department_code': department.code if department else "N/A",
+            'department_id': str(department.id) if department else None,
+        })
     
     return Response({'results': classes, 'count': len(classes)})
 
@@ -156,14 +206,38 @@ def teacher_class_students(request, class_id):
     except Teacher.DoesNotExist:
         return Response({'detail': 'Teacher profile not found.'}, status=status.HTTP_404_NOT_FOUND)
     
-    # Verify teacher teaches this subject
-    try:
-        teacher_subject = TeacherSubject.objects.get(
-            id=class_id, 
-            teacher=teacher, 
-            is_active=True
-        )
-    except TeacherSubject.DoesNotExist:
+    # Resolve class identifier from multiple sources for compatibility:
+    # 1) TeacherSubject.id (legacy/current)
+    # 2) Subject.id (class cards merged from timetable)
+    # 3) Timetable.id (when provided from schedule contexts)
+    teacher_subject = TeacherSubject.objects.filter(
+        id=class_id,
+        teacher=teacher,
+        subject__isnull=False
+    ).select_related('subject', 'subject__semester').first()
+
+    subject = teacher_subject.subject if teacher_subject else None
+
+    if not subject:
+        subject = Subject.objects.filter(id=class_id).select_related('semester').first()
+
+    if not subject:
+        timetable_row = Timetable.objects.filter(
+            id=class_id,
+            teacher=teacher,
+            subject__isnull=False
+        ).select_related('subject', 'subject__semester').first()
+        subject = timetable_row.subject if timetable_row else None
+
+    if not subject:
+        return Response({'detail': 'Class not found or not assigned to you.'}, status=status.HTTP_404_NOT_FOUND)
+
+    has_access = (
+        TeacherSubject.objects.filter(teacher=teacher, subject=subject).exists()
+        or Timetable.objects.filter(teacher=teacher, subject=subject, is_active=True).exists()
+    )
+
+    if not has_access:
         return Response({'detail': 'Class not found or not assigned to you.'}, status=status.HTTP_404_NOT_FOUND)
     
     # Optional filters
@@ -171,7 +245,7 @@ def teacher_class_students(request, class_id):
 
     # Get students enrolled in this subject
     student_subjects = StudentSubject.objects.filter(
-        subject=teacher_subject.subject
+        subject=subject
     ).select_related('student', 'student__session')
 
     if session_id:
@@ -200,9 +274,9 @@ def teacher_class_students(request, class_id):
         'results': students_data, 
         'count': len(students_data),
         'class_info': {
-            'subject_name': teacher_subject.subject.name,
-            'subject_code': teacher_subject.subject.code,
-            'semester': f"Semester {teacher_subject.subject.semester.number}" if teacher_subject.subject.semester else "N/A"
+            'subject_name': subject.name,
+            'subject_code': subject.code,
+            'semester': f"Semester {subject.semester.number}" if subject.semester else "N/A"
         }
     })
 
@@ -218,6 +292,61 @@ class StudentViewSet(BaseProfileViewSet):
     
     def get_serializer_class(self):
         return StudentDetailSerializer if self.action == 'retrieve' else StudentSerializer
+
+    @staticmethod
+    def _grade_point_from_percentage(percentage):
+        if percentage >= 85:
+            return 4.00
+        if percentage >= 80:
+            return 3.70
+        if percentage >= 75:
+            return 3.30
+        if percentage >= 70:
+            return 3.00
+        if percentage >= 65:
+            return 2.70
+        if percentage >= 61:
+            return 2.30
+        if percentage >= 50:
+            return 2.00
+        return 0.00
+
+    @staticmethod
+    def _grade_value_from_percentage(percentage):
+        if percentage >= 90:
+            return 'A+'
+        if percentage >= 85:
+            return 'A'
+        if percentage >= 80:
+            return 'A-'
+        if percentage >= 75:
+            return 'B+'
+        if percentage >= 70:
+            return 'B'
+        if percentage >= 65:
+            return 'B-'
+        if percentage >= 60:
+            return 'C+'
+        if percentage >= 55:
+            return 'C'
+        if percentage >= 50:
+            return 'C-'
+        if percentage >= 40:
+            return 'D'
+        return 'F'
+
+    @staticmethod
+    def _distribution_bucket(grade_value):
+        value = str(grade_value or '').upper()
+        if 'A' in value:
+            return 'A'
+        if 'B' in value:
+            return 'B'
+        if 'C' in value:
+            return 'C'
+        if value == 'F':
+            return 'F'
+        return 'other'
     
     @action(detail=True)
     def submissions(self, request, pk=None):
@@ -269,6 +398,146 @@ class StudentViewSet(BaseProfileViewSet):
         )
         
         return Response(combined_grades)
+
+    @action(detail=True, url_path='grade-report')
+    def grade_report(self, request, pk=None):
+        student = self.get_object()
+
+        assignment_grades = Grade.objects.filter(submission__student=student).select_related(
+            'submission', 'submission__assignment', 'submission__assignment__subject'
+        )
+        component_marks = StudentMark.objects.filter(
+            student=student,
+            component__is_visible_to_students=True
+        ).select_related('component', 'component__subject')
+
+        records = []
+
+        for grade in assignment_grades:
+            assignment = grade.submission.assignment if grade.submission else None
+            subject = assignment.subject if assignment else None
+            total_marks = float((assignment.total_marks if assignment else 0) or 0)
+            marks_obtained = float(grade.marks_obtained or 0)
+            percentage = round((marks_obtained / total_marks) * 100, 2) if total_marks > 0 else 0
+            records.append({
+                'subject_name': subject.name if subject else 'Unknown',
+                'subject_code': subject.code if subject else 'N/A',
+                'percentage': percentage,
+                'grade_value': grade.grade_value,
+            })
+
+        for mark in component_marks:
+            subject = mark.component.subject if mark.component else None
+            percentage = float(mark.percentage or 0)
+            records.append({
+                'subject_name': subject.name if subject else 'Unknown',
+                'subject_code': subject.code if subject else 'N/A',
+                'percentage': round(percentage, 2),
+                'grade_value': self._grade_value_from_percentage(percentage),
+            })
+
+        total_grades = len(records)
+        total_subjects = student.enrolled_subjects.count()
+        average_score = round(sum(r['percentage'] for r in records) / total_grades, 2) if total_grades else 0
+        gpa = round(sum(self._grade_point_from_percentage(r['percentage']) for r in records) / total_grades, 2) if total_grades else 0
+
+        distribution = {'A': 0, 'B': 0, 'C': 0, 'F': 0, 'other': 0}
+        performance = {'excellent': 0, 'good': 0, 'average': 0, 'below_average': 0}
+        subjects = defaultdict(lambda: {
+            'name': 'Unknown',
+            'code': 'N/A',
+            'count': 0,
+            'sum_score': 0.0,
+            'best': 0.0,
+            'worst': None,
+        })
+
+        for record in records:
+            percentage = float(record['percentage'])
+
+            distribution[self._distribution_bucket(record.get('grade_value'))] += 1
+
+            if percentage >= 90:
+                performance['excellent'] += 1
+            elif percentage >= 80:
+                performance['good'] += 1
+            elif percentage >= 60:
+                performance['average'] += 1
+            else:
+                performance['below_average'] += 1
+
+            subject_key = f"{record['subject_name']}::{record['subject_code']}"
+            summary = subjects[subject_key]
+            summary['name'] = record['subject_name']
+            summary['code'] = record['subject_code']
+            summary['count'] += 1
+            summary['sum_score'] += percentage
+            summary['best'] = max(summary['best'], percentage)
+            summary['worst'] = percentage if summary['worst'] is None else min(summary['worst'], percentage)
+
+        total = total_grades or 1
+        performance_summary = [
+            {
+                'label': 'Excellent',
+                'range': '90-100%',
+                'value': performance['excellent'],
+                'percent': round((performance['excellent'] / total) * 100, 2),
+                'color': 'success',
+            },
+            {
+                'label': 'Good',
+                'range': '80-89%',
+                'value': performance['good'],
+                'percent': round((performance['good'] / total) * 100, 2),
+                'color': 'success',
+                'opacity': 'bg-opacity-75',
+            },
+            {
+                'label': 'Average',
+                'range': '60-79%',
+                'value': performance['average'],
+                'percent': round((performance['average'] / total) * 100, 2),
+                'color': 'warning',
+            },
+            {
+                'label': 'Below Average',
+                'range': '<60%',
+                'value': performance['below_average'],
+                'percent': round((performance['below_average'] / total) * 100, 2),
+                'color': 'danger',
+            },
+        ]
+
+        subject_performance = []
+        for subject in subjects.values():
+            count = subject['count'] or 1
+            subject_performance.append({
+                'name': subject['name'],
+                'code': subject['code'],
+                'count': subject['count'],
+                'average': round(subject['sum_score'] / count, 2),
+                'best': round(subject['best'], 2),
+                'worst': round(subject['worst'] if subject['worst'] is not None else 0, 2),
+            })
+
+        subject_performance.sort(key=lambda s: (s['name'], s['code']))
+
+        return Response({
+            'student': {
+                'id': str(student.id),
+                'full_name': student.full_name,
+                'enrollment_number': student.enrollment_number,
+            },
+            'summary': {
+                'overall_gpa': f"{gpa:.2f}",
+                'average_score': average_score,
+                'total_subjects': total_subjects,
+                'total_grades': total_grades,
+            },
+            'distribution': distribution,
+            'performance_summary': performance_summary,
+            'subject_performance': subject_performance,
+        })
     
     @action(detail=True)
     def attendance(self, request, pk=None):

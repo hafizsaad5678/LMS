@@ -185,7 +185,7 @@ const students = ref([])
 const loadClasses = async () => {
   loading.value = true
   try {
-    const response = await teacherPanelService.getMyClasses()
+    const response = await teacherPanelService.getMyClasses({}, { forceRefresh: true })
     const classList = response.results || response || []
     classes.value = classList.map(cls => ({
       id: cls.id,

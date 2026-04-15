@@ -23,17 +23,19 @@ export const studentPanelService = {
 
         try {
             // Fetch all data once - studentService handles individual caching
-            const [subjects, grades, attendance, assignments, announcements] = await Promise.all([
+            const [subjects, gradeReport, attendance, assignments, announcements] = await Promise.all([
                 studentService.getEnrolledSubjects(studentId),
-                studentService.getGrades(studentId),
+                studentService.getGradeReport(studentId),
                 studentService.getAttendance(studentId),
                 studentService.getAssignments(studentId),
                 studentService.getAnnouncements(studentId)
             ])
 
+            const summary = gradeReport?.summary || {}
+
             const stats = {
                 enrolledCourses: normalizeToArray(subjects).length,
-                gpa: this._calculateGPA(normalizeToArray(grades)),
+                gpa: String(summary.overall_gpa ?? '0.00'),
                 attendance: `${this._calculateAttendance(attendance)}%`,
                 pendingAssignments: this._calculatePendingAssignments(normalizeToArray(assignments)),
                 unreadAnnouncements: this._calculateUnreadAnnouncements(normalizeToArray(announcements))
@@ -484,10 +486,6 @@ export const studentPanelService = {
         return { enrolledCourses: 0, gpa: '0.00', attendance: '0%', pendingAssignments: 0, unreadAnnouncements: 0 }
     },
 
-    calculateGPA(grades) {
-        return this._calculateGPA(grades)
-    },
-
     calculateAttendance(attendance) {
         return this._calculateAttendance(attendance)
     },
@@ -528,25 +526,6 @@ export const studentPanelService = {
      */
     getFileUrl(url) {
         return _getFileUrl(url)
-    },
-
-    _calculateGPA(grades) {
-        if (!grades || !grades.length) return '0.00'
-        const totalPoints = grades.reduce((sum, g) => {
-            const marks = parseFloat(g.marks_obtained || g.marks || g.grade_value || g.grade || 0)
-            const totalMarks = parseFloat(g.total_marks || g.max_marks || 100)
-            const percentage = totalMarks > 0 ? (marks / totalMarks) * 100 : 0
-            let points = 0.0
-            if (percentage >= 85) points = 4.00
-            else if (percentage >= 80) points = 3.70
-            else if (percentage >= 75) points = 3.30
-            else if (percentage >= 70) points = 3.00
-            else if (percentage >= 65) points = 2.70
-            else if (percentage >= 61) points = 2.30
-            else if (percentage >= 50) points = 2.00
-            return sum + points
-        }, 0)
-        return (totalPoints / grades.length).toFixed(2)
     },
 
     _calculateAttendance(attendance) {

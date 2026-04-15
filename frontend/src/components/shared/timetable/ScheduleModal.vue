@@ -44,12 +44,13 @@
             <div class="row">
               <div class="col-md-6 mb-3">
                 <label class="form-label">Subject <span class="text-danger">*</span></label>
-                <select v-model="form.subject" class="form-select" required>
-                  <option value="">Select Subject</option>
-                  <option v-for="subject in subjects" :key="subject.id" :value="subject.id">
+                <select v-model="form.subject" class="form-select" :disabled="!form.semester" required>
+                  <option value="">{{ form.semester ? 'Select Subject' : 'Select Semester First' }}</option>
+                  <option v-for="subject in filteredSubjects" :key="subject.id" :value="subject.id">
                     {{ subject.code }} - {{ subject.name }}
                   </option>
                 </select>
+                <small v-if="!form.semester" class="text-muted">Select a semester first</small>
               </div>
               <div class="col-md-6 mb-3">
                 <label class="form-label">Teacher <span class="text-danger">*</span></label>
@@ -74,9 +75,9 @@
                 <input v-model="form.room" type="text" class="form-control" placeholder="e.g., Room 101" required>
               </div>
               <div class="col-md-6 mb-3">
-                <label class="form-label">Program</label>
-                <select v-model="form.program" class="form-select" @change="$emit('program-change')">
-                  <option value="">Select Program (Optional)</option>
+                <label class="form-label">Program <span class="text-danger">*</span></label>
+                <select v-model="form.program" class="form-select" required @change="$emit('program-change')">
+                  <option value="">Select Program</option>
                   <option v-for="program in programs" :key="program.id" :value="program.id">{{ program.name }}</option>
                 </select>
               </div>
@@ -84,9 +85,9 @@
 
             <div class="row">
               <div class="col-md-6 mb-3">
-                <label class="form-label">Semester</label>
-                <select v-model="form.semester" class="form-select" :disabled="!form.program">
-                  <option value="">Select Semester (Optional)</option>
+                <label class="form-label">Semester <span class="text-danger">*</span></label>
+                <select v-model="form.semester" class="form-select" :disabled="!form.program" required>
+                  <option value="">Select Semester</option>
                   <option v-for="semester in semesters" :key="semester.id" :value="semester.id">
                     {{ formatSemesterLabel(semester) }}
                   </option>
@@ -121,6 +122,12 @@ import { computed, ref, watch } from 'vue'
 import { AlertMessage } from '@/components/shared/common'
 import { DAYS_OF_WEEK, DAY_LABELS } from '@/utils/constants/config'
 
+const extractSemesterId = (subject) => {
+  const raw = subject?.semester_id ?? subject?.semester ?? subject?.semesterId
+  if (raw && typeof raw === 'object') return raw.id ?? raw.pk ?? ''
+  return raw ?? ''
+}
+
 const formatSemesterLabel = (semester) => {
   if (!semester) return 'Semester'
   const number = semester.number != null ? `Semester ${semester.number}` : 'Semester'
@@ -151,6 +158,12 @@ const props = defineProps({
 
 const isTeacherUnavailable = (teacherId) => props.unavailableTeacherIds.includes(String(teacherId)) || props.unavailableTeacherIds.includes(Number(teacherId))
 
+const filteredSubjects = computed(() => {
+  const selectedSemesterId = String(props.form?.semester || '')
+  if (!selectedSemesterId) return []
+  return props.subjects.filter(subject => String(extractSemesterId(subject)) === selectedSemesterId)
+})
+
 const dismissedTeacherAlert = ref(false)
 
 const selectedTeacherConflictTimes = computed(() => {
@@ -174,6 +187,13 @@ watch(
   () => `${props.form?.day || ''}|${props.form?.start_time || ''}|${props.form?.end_time || ''}|${props.form?.teacher || ''}`,
   () => {
     dismissedTeacherAlert.value = false
+  }
+)
+
+watch(
+  () => props.form?.semester,
+  () => {
+    props.form.subject = ''
   }
 )
 
