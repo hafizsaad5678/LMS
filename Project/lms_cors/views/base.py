@@ -52,8 +52,12 @@ class BaseProfileViewSet(BaseViewSet):
     
     @action(detail=True, methods=['post'])
     def create_user_account(self, request, pk=None):
+        password = request.data.get('password')
+        if not password:
+            return Response({'error': 'password is required'}, status=status.HTTP_400_BAD_REQUEST)
+
         obj = self.get_object()
-        created, user = obj.create_user_account(request.data.get('password'))
+        created, user = obj.create_user_account(password)
         if user:
             return Response({
                 'status': 'created' if created else 'already_exists',

@@ -34,7 +34,7 @@ class Material(models.Model):
     )
     material_type = models.CharField(max_length=20, choices=MATERIAL_TYPES, default='other')
     access_level = models.CharField(max_length=20, choices=ACCESS_LEVELS, default='class_only')
-    file_upload = models.FileField(upload_to='materials/', blank=True, null=True)
+    file_upload = models.FileField(upload_to='materials/')
     file_url = models.URLField(max_length=500, blank=True)
     file_size = models.BigIntegerField(default=0, help_text="File size in bytes")
     download_count = models.IntegerField(default=0)

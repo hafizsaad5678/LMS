@@ -12,13 +12,17 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, onMounted } from 'vue'
 import DashboardLayout from '@/layouts/DashboardLayout.vue'
 import { sidebarSections, mainNav } from '@/panels/admin.js'
 import { useAuth } from '@/store/auth'
 
 const authStore = useAuth()
 
-// Get username from auth store with fallback
-const userName = computed(() => 'Admin')
+// Use actual logged-in identity instead of a hardcoded label.
+const userName = computed(() => authStore.displayName)
+
+onMounted(() => {
+  authStore.hydrateDisplayName().catch(() => {})
+})
 </script>

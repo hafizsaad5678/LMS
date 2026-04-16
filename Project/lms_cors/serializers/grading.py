@@ -27,6 +27,40 @@ class QuizQuestionSerializer(serializers.ModelSerializer):
         model = QuizQuestion
         fields = ['id', 'quiz', 'question_text', 'question_type', 'marks', 'correct_answer_text', 'explanation', 'order', 'options']
 
+    def validate(self, attrs):
+        question_type = attrs.get('question_type') or getattr(self.instance, 'question_type', 'mcq')
+        question_text = (attrs.get('question_text') or '').strip()
+        marks = attrs.get('marks')
+
+        if not question_text:
+            raise serializers.ValidationError({'question_text': 'This field is required.'})
+
+        if marks is None or marks <= 0:
+            raise serializers.ValidationError({'marks': 'Marks must be greater than zero.'})
+
+        if question_type == 'mcq':
+            options = self.initial_data.get('options', [])
+            if not isinstance(options, list) or len(options) < 2:
+                raise serializers.ValidationError({'options': 'At least two options are required for MCQ.'})
+
+            correct_count = 0
+            for opt in options:
+                text = str((opt or {}).get('option_text', '')).strip()
+                if not text:
+                    raise serializers.ValidationError({'options': 'Option text cannot be empty.'})
+                if bool((opt or {}).get('is_correct')):
+                    correct_count += 1
+
+            if correct_count != 1:
+                raise serializers.ValidationError({'options': 'Exactly one correct option is required for MCQ.'})
+
+        if question_type in {'short_answer', 'essay'}:
+            correct_text = str(attrs.get('correct_answer_text', '')).strip()
+            if not correct_text:
+                raise serializers.ValidationError({'correct_answer_text': 'Correct answer is required for non-MCQ questions.'})
+
+        return attrs
+
 
 class QuizQuestionPublicSerializer(serializers.ModelSerializer):
     options = QuizOptionPublicSerializer(many=True, read_only=True)
@@ -50,7 +84,25 @@ class QuizSerializer(serializers.ModelSerializer):
             'created_by', 'created_by_name', 'question_count', 'last_attempt',
             'questions'
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at', 'created_by']
+        read_only_fields = ['id', 'created_at', 'updated_at', 'created_by', 'is_published']
+
+    def validate(self, attrs):
+        title = str(attrs.get('title', '')).strip()
+        if not title:
+            raise serializers.ValidationError({'title': 'This field is required.'})
+
+        if attrs.get('subject') is None:
+            raise serializers.ValidationError({'subject': 'This field is required.'})
+
+        time_limit = attrs.get('time_limit_minutes')
+        if time_limit is None or time_limit <= 0:
+            raise serializers.ValidationError({'time_limit_minutes': 'Time limit must be greater than zero.'})
+
+        total_marks = attrs.get('total_marks')
+        if total_marks is None or total_marks <= 0:
+            raise serializers.ValidationError({'total_marks': 'Total marks must be greater than zero.'})
+
+        return attrs
         
     def get_question_count(self, obj):
         return obj.questions.count()

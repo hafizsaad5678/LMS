@@ -22,6 +22,7 @@ from ..serializers.grading import (
     QuizReviewQuestionSerializer,
     QuizAnswerSerializer
 )
+from ..permissions import IsAdminOrTeacher, IsTeacherOrAdminForWrite
 
 
 def _evaluate_attempt(attempt):
@@ -83,6 +84,13 @@ class QuizViewSet(viewsets.ModelViewSet):
     serializer_class = QuizSerializer
     permission_classes = [permissions.IsAuthenticated]
 
+    def get_permissions(self):
+        if self.action in {'create', 'update', 'partial_update', 'destroy', 'publish'}:
+            permission_classes = [permissions.IsAuthenticated, IsAdminOrTeacher]
+        else:
+            permission_classes = [permissions.IsAuthenticated]
+        return [permission() for permission in permission_classes]
+
     def get_serializer_class(self):
         if self.action == 'retrieve' and hasattr(self.request.user, 'student_profile'):
             return QuizPublicSerializer
@@ -123,6 +131,8 @@ class QuizViewSet(viewsets.ModelViewSet):
         return queryset.distinct().order_by('-created_at', 'id')
 
     def perform_create(self, serializer):
+        if not hasattr(self.request.user, 'teacher_profile'):
+            raise ValidationError('Only teachers can create quizzes.')
         serializer.save(created_by=self.request.user.teacher_profile)
 
     @action(detail=True, methods=['post'])
@@ -199,15 +209,44 @@ class QuizViewSet(viewsets.ModelViewSet):
 
 class QuizQuestionViewSet(viewsets.ModelViewSet):
     serializer_class = QuizQuestionSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, IsAdminOrTeacher]
     queryset = QuizQuestion.objects.all()
 
+    def get_queryset(self):
+        user = self.request.user
+        if not user.is_authenticated:
+            return QuizQuestion.objects.none()
+
+        if user.is_staff or user.is_superuser or hasattr(user, 'admin_profile'):
+            return QuizQuestion.objects.all()
+
+        if hasattr(user, 'teacher_profile'):
+            return QuizQuestion.objects.filter(quiz__created_by=user.teacher_profile)
+
+        return QuizQuestion.objects.none()
+
     def perform_create(self, serializer):
-        # Quiz is now in serializer fields, so it will be in validated_data
+        if not hasattr(self.request.user, 'teacher_profile'):
+            raise ValidationError('Only teachers can create quiz questions.')
+
+        quiz = serializer.validated_data.get('quiz')
+        if quiz is None:
+            raise ValidationError({'quiz': 'Quiz is required.'})
+
+        if quiz.created_by_id != self.request.user.teacher_profile.id:
+            raise ValidationError({'quiz': 'You can only modify questions for your own quizzes.'})
+
         question = serializer.save()
         self._handle_options(question)
 
     def perform_update(self, serializer):
+        if not hasattr(self.request.user, 'teacher_profile'):
+            raise ValidationError('Only teachers can update quiz questions.')
+
+        quiz = serializer.validated_data.get('quiz', serializer.instance.quiz)
+        if quiz.created_by_id != self.request.user.teacher_profile.id:
+            raise ValidationError({'quiz': 'You can only modify questions for your own quizzes.'})
+
         question = serializer.save()
         self._handle_options(question)
 
@@ -215,14 +254,27 @@ class QuizQuestionViewSet(viewsets.ModelViewSet):
         if question.question_type == 'mcq':
             # Get options from raw request data as they are read-only in serializer
             options_data = self.request.data.get('options', [])
-            if options_data:
-                # Clear existing options for this question
-                QuizOption.objects.filter(question=question).delete()
-                # Create new options
-                for opt_data in options_data:
-                    # Remove id if it exists in opt_data to avoid conflicts with UUID primary key
-                    opt_data_clean = {k: v for k, v in opt_data.items() if k != 'id'}
-                    QuizOption.objects.create(question=question, **opt_data_clean)
+            if not isinstance(options_data, list) or len(options_data) < 2:
+                raise ValidationError({'options': 'At least two options are required for MCQ.'})
+
+            normalized_options = []
+            correct_count = 0
+            for opt_data in options_data:
+                text = str((opt_data or {}).get('option_text', '')).strip()
+                if not text:
+                    raise ValidationError({'options': 'Option text cannot be empty.'})
+
+                is_correct = bool((opt_data or {}).get('is_correct'))
+                correct_count += 1 if is_correct else 0
+                normalized_options.append({'option_text': text, 'is_correct': is_correct})
+
+            if correct_count != 1:
+                raise ValidationError({'options': 'Exactly one correct option is required.'})
+
+            # Clear existing options for this question
+            QuizOption.objects.filter(question=question).delete()
+            for opt in normalized_options:
+                QuizOption.objects.create(question=question, **opt)
 
 class QuizAttemptViewSet(viewsets.ModelViewSet):
     serializer_class = QuizAttemptSerializer
@@ -430,7 +482,7 @@ class QuizAttemptViewSet(viewsets.ModelViewSet):
 
 class GradeComponentViewSet(viewsets.ModelViewSet):
     serializer_class = GradeComponentSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, IsTeacherOrAdminForWrite]
 
     def get_queryset(self):
         user = self.request.user
@@ -457,6 +509,8 @@ class GradeComponentViewSet(viewsets.ModelViewSet):
         return queryset.distinct()
 
     def perform_create(self, serializer):
+        if not hasattr(self.request.user, 'teacher_profile'):
+            raise ValidationError('Only teachers can create grade components.')
         serializer.save(created_by=self.request.user.teacher_profile)
 
     @action(detail=True, methods=['get'])
@@ -470,6 +524,9 @@ class GradeComponentViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'])
     def bulk_marks(self, request, pk=None):
         """Bulk update marks for this component"""
+        if not hasattr(request.user, 'teacher_profile'):
+            raise ValidationError('Only teachers can enter marks.')
+
         component = self.get_object()
         serializer = StudentMarkBulkSerializer(data=request.data, many=True)
         serializer.is_valid(raise_exception=True)

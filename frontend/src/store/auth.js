@@ -23,8 +23,10 @@ export const useAuth = defineStore('auth', {
     isAuthenticated: (state) => !!state.access_token,
     getUser: (state) => state.user,
     displayName: (state) => {
-      if (state.userRole === USER_ROLES.ADMIN) return 'Admin'
-      return state.userName || state.user?.full_name || state.user?.username || 'User'
+      const emailFallback = state.userEmail ? state.userEmail.split('@')[0] : null
+      const isPlaceholderAdmin = state.userName === 'Admin'
+      const preferredName = state.user?.full_name || state.user?.username || emailFallback
+      return (!isPlaceholderAdmin && state.userName) || preferredName || 'User'
     }
   },
 
@@ -38,7 +40,9 @@ export const useAuth = defineStore('auth', {
         // Store tokens and user info
         this.access_token = response.data.access
         this.refresh_token = response.data.refresh
-        this.userName = response.data.full_name || response.data.username || 'User'
+        const emailValue = response.data.email || credentials.username || null
+        const emailPrefix = emailValue && emailValue.includes('@') ? emailValue.split('@')[0] : null
+        this.userName = response.data.full_name || response.data.username || credentials.username || emailPrefix || 'User'
         this.user = response.data.user || response.data
 
         const userRole = response.data.role || 'unknown'
@@ -49,7 +53,7 @@ export const useAuth = defineStore('auth', {
         safeStorage.set('refresh_token', response.data.refresh)
         safeStorage.set('username', this.userName)
         safeStorage.set('userRole', userRole)
-        safeStorage.set('userEmail', response.data.email)
+        safeStorage.set('userEmail', emailValue)
 
         // Validate and store user ID
         if (userId && validateUserId(String(userId))) {
@@ -59,7 +63,7 @@ export const useAuth = defineStore('auth', {
 
         // Update state
         this.userRole = userRole
-        this.userEmail = response.data.email
+        this.userEmail = emailValue
 
         // Update axios default headers with new token
         const api = (await import('@/services/shared')).default
@@ -99,9 +103,14 @@ export const useAuth = defineStore('auth', {
 
     async hydrateDisplayName(userRole = this.userRole, userId = this.userId) {
       if (userRole === USER_ROLES.ADMIN) {
-        this.userName = 'Admin'
-        safeStorage.set(STORAGE_KEYS.USERNAME, 'Admin')
-        return 'Admin'
+        const emailFallback = this.userEmail && this.userEmail.includes('@') ? this.userEmail.split('@')[0] : this.userEmail
+        const preferredName = this.user?.full_name || this.user?.username || emailFallback
+        const adminName = this.userName && this.userName !== 'Admin' ? this.userName : preferredName
+        if (adminName) {
+          this.userName = adminName
+          safeStorage.set(STORAGE_KEYS.USERNAME, adminName)
+        }
+        return this.userName
       }
 
       if (!userRole || !userId) return this.userName

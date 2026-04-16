@@ -7,6 +7,7 @@ class BaseProfileSerializer(serializers.ModelSerializer):
     age = serializers.ReadOnlyField()
     age_display = serializers.ReadOnlyField()
     profile_status = serializers.ReadOnlyField()
+    password = serializers.CharField(write_only=True, required=False, min_length=8)
     
     class Meta:
         read_only_fields = [
@@ -14,6 +15,28 @@ class BaseProfileSerializer(serializers.ModelSerializer):
             'age_display', 'profile_status', 'edit_count',
             'verified_at', 'suspended_at', 'last_login_at', 'user'
         ]
+
+    def create(self, validated_data):
+        password = validated_data.pop('password', None)
+        if not password:
+            raise serializers.ValidationError({'password': 'This field is required.'})
+
+        instance = super().create(validated_data)
+
+        # Model save may auto-create user; enforce caller-supplied password after creation.
+        if instance.user:
+            instance.reset_password(password)
+        else:
+            instance.create_user_account(password)
+
+        return instance
+
+    def update(self, instance, validated_data):
+        password = validated_data.pop('password', None)
+        instance = super().update(instance, validated_data)
+        if password:
+            instance.reset_password(password)
+        return instance
 
 
 class StudentSerializer(BaseProfileSerializer):
@@ -84,6 +107,11 @@ class TeacherSerializer(BaseProfileSerializer):
 
 
 class AdminSerializer(BaseProfileSerializer):
+    def validate(self, attrs):
+        if self.instance is None and not str(attrs.get('role', '')).strip():
+            raise serializers.ValidationError({'role': 'This field is required.'})
+        return attrs
+
     class Meta:
         model = Admin
         fields = '__all__'

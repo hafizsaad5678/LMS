@@ -24,9 +24,11 @@
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { useAuth } from '@/store/auth'
 import { AlertMessage, BaseInput, BaseButton } from '@/components/shared/common'
+import { safeStorage } from '@/utils/security'
+import { STORAGE_KEYS } from '@/utils/constants/storage'
 
 const emit = defineEmits(['login-success', 'login-error'])
 
@@ -38,6 +40,17 @@ const form = reactive({
   username: '',
   password: '',
   remember: false
+})
+
+onMounted(() => {
+  const savedEmail = safeStorage.get(STORAGE_KEYS.USER_EMAIL)
+  const savedUsername = safeStorage.get(STORAGE_KEYS.USERNAME)
+  const prefillValue = savedEmail || savedUsername || ''
+
+  if (prefillValue) {
+    form.username = prefillValue
+    form.remember = true
+  }
 })
 
 const handleLogin = async () => {

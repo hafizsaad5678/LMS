@@ -2,6 +2,7 @@ from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.exceptions import ValidationError
 
 from django.db.models import Q
 from .base import BaseViewSet
@@ -129,8 +130,24 @@ class SubmissionHistoryViewSet(BaseViewSet):
         return qs.select_related('student', 'assignment', 'assignment__subject').order_by('-submitted_at')
     
     def perform_create(self, serializer):
-        """Ensure submission is properly created with all required fields"""
-        serializer.save()
+        """Bind submission ownership to authenticated student and validate assignment access."""
+        user = self.request.user
+        if not hasattr(user, 'student_profile'):
+            raise ValidationError('Only students can create submissions.')
+
+        student = user.student_profile
+        assignment = serializer.validated_data.get('assignment')
+        if assignment is None:
+            raise ValidationError({'assignment': 'This field is required.'})
+
+        is_enrolled = StudentSubject.objects.filter(
+            student=student,
+            subject=assignment.subject
+        ).exists()
+        if not is_enrolled:
+            raise ValidationError({'assignment': 'You are not enrolled in this assignment subject.'})
+
+        serializer.save(student=student)
     
     @action(detail=True)
     def grade(self, request, pk=None):

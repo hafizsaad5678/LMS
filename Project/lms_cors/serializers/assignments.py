@@ -2,6 +2,10 @@ from rest_framework import serializers
 from ..models import Assignment, SubmissionHistory, Grade
 
 
+ALLOWED_SUBMISSION_EXTENSIONS = {'.pdf', '.doc', '.docx', '.zip', '.rar'}
+MAX_SUBMISSION_FILE_SIZE = 10 * 1024 * 1024
+
+
 class AssignmentSerializer(serializers.ModelSerializer):
     subject_name = serializers.CharField(source='subject.name', read_only=True)
     subject_code = serializers.CharField(source='subject.code', read_only=True)
@@ -13,6 +17,19 @@ class AssignmentSerializer(serializers.ModelSerializer):
         model = Assignment
         fields = '__all__'
         read_only_fields = ['id', 'created_at', 'updated_at']
+
+    def validate(self, attrs):
+        title = (attrs.get('title') or '').strip()
+        description = (attrs.get('description') or '').strip()
+
+        if not title:
+            raise serializers.ValidationError({'title': 'This field is required.'})
+        if not description:
+            raise serializers.ValidationError({'description': 'This field is required.'})
+        if attrs.get('due_date') is None:
+            raise serializers.ValidationError({'due_date': 'This field is required.'})
+
+        return attrs
 
     def get_submission_count(self, obj):
         return obj.submissions.all().count()
@@ -53,20 +70,41 @@ class StudentAssignmentSerializer(AssignmentSerializer):
 
 
 class SubmissionHistorySerializer(serializers.ModelSerializer):
+    student = serializers.PrimaryKeyRelatedField(read_only=True)
     student_name = serializers.CharField(source='student.full_name', read_only=True)
     student_enrollment = serializers.CharField(source='student.enrollment_number', read_only=True)
     assignment_title = serializers.CharField(source='assignment.title', read_only=True)
     subject_name = serializers.CharField(source='assignment.subject.name', read_only=True, allow_null=True)
     grade = serializers.SerializerMethodField()
     submission_file = serializers.SerializerMethodField()
-    file_upload = serializers.SerializerMethodField()
-    file_url = serializers.SerializerMethodField()
+    file_upload_url = serializers.SerializerMethodField()
+    file_url = serializers.URLField(required=False, allow_blank=True)
     comments = serializers.CharField(source='submission_text', read_only=True, allow_blank=True)
     
     class Meta:
         model = SubmissionHistory
         fields = '__all__'
-        read_only_fields = ['id', 'submitted_at']
+        read_only_fields = ['id', 'submitted_at', 'student']
+
+    def validate(self, attrs):
+        if self.instance is None:
+            assignment = attrs.get('assignment')
+            file_upload = attrs.get('file_upload')
+
+            if assignment is None:
+                raise serializers.ValidationError({'assignment': 'This field is required.'})
+
+            if file_upload is None:
+                raise serializers.ValidationError({'file_upload': 'A submission file is required.'})
+
+            filename = (getattr(file_upload, 'name', '') or '').lower()
+            if not any(filename.endswith(ext) for ext in ALLOWED_SUBMISSION_EXTENSIONS):
+                raise serializers.ValidationError({'file_upload': 'Unsupported file type.'})
+
+            if getattr(file_upload, 'size', 0) > MAX_SUBMISSION_FILE_SIZE:
+                raise serializers.ValidationError({'file_upload': 'File size exceeds 10MB limit.'})
+
+        return attrs
     
     def get_grade(self, obj):
         try:
@@ -94,16 +132,13 @@ class SubmissionHistorySerializer(serializers.ModelSerializer):
             return obj.file_upload.url
         return obj.file_url or None
     
-    def get_file_upload(self, obj):
+    def get_file_upload_url(self, obj):
         if obj.file_upload:
             request = self.context.get('request')
             if request:
                 return request.build_absolute_uri(obj.file_upload.url)
             return obj.file_upload.url
         return None
-    
-    def get_file_url(self, obj):
-        return obj.file_url
 
 
 class GradeSerializer(serializers.ModelSerializer):

@@ -34,15 +34,15 @@ class SubmissionHistory(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     assignment = models.ForeignKey(
         Assignment, on_delete=models.CASCADE, 
-        related_name='submissions', null=True, blank=True
+        related_name='submissions'
     )
     student = models.ForeignKey(
         'lms_cors.Student', on_delete=models.CASCADE, 
-        related_name='submissions', null=True, blank=True
+        related_name='submissions'
     )
     submitted_at = models.DateTimeField(auto_now_add=True)
     file_url = models.URLField(max_length=500, blank=True)
-    file_upload = models.FileField(upload_to='assignments/', blank=True, null=True)
+    file_upload = models.FileField(upload_to='assignments/')
     submission_text = models.TextField(blank=True)
     
     class Meta:

@@ -93,7 +93,7 @@ class Admin(BaseProfile):
     ]
     
     admin_id = models.CharField(max_length=20, unique=True, blank=True)
-    role = models.CharField(max_length=50, default='Administrator')
+    role = models.CharField(max_length=50)
     permissions_level = models.CharField(
         max_length=20, choices=PERMISSION_CHOICES, default='admin'
     )
