@@ -51,7 +51,7 @@
                 placeholder="Select Gender" :required="true" />
             </div>
             <div class="col-md-6">
-              <BaseInput v-model="formData.cnic" label="CNIC" type="text" placeholder="12345-1234567-1" />
+              <BaseInput v-model="cnicModel" label="CNIC" type="text" placeholder="12345-1234567-1" />
             </div>
           </div>
         </div>
@@ -103,14 +103,14 @@
             <!-- Session/Batch Selection -->
             <div class="col-md-6">
               <div class="mb-3">
-                <label class="form-label">Session/Batch</label>
-                <select v-model="formData.session" class="form-select" :disabled="!formData.program">
-                  <option value="">Select Session (Optional)</option>
+                <label class="form-label">Session/Batch <span class="text-danger">*</span></label>
+                <select v-model="formData.session" class="form-select" :disabled="!formData.program" required>
+                  <option value="">Select Session</option>
                   <option v-for="sess in filteredSessions" :key="sess.id" :value="String(sess.id)">
                     {{ sess.session_name }} ({{ sess.start_year }}-{{ sess.end_year }})
                   </option>
                 </select>
-                <small class="text-muted">Optional: Select academic session/batch</small>
+                <small class="text-muted">Step 3: Select academic session/batch</small>
               </div>
             </div>
           </div>
@@ -233,6 +233,20 @@ const emit = defineEmits(['update:modelValue', 'submit', 'cancel'])
 const formData = computed({
   get: () => props.modelValue,
   set: (value) => emit('update:modelValue', value)
+})
+
+const formatCNIC = (value) => {
+  const digits = String(value || '').replace(/\D/g, '').slice(0, 13)
+  if (digits.length <= 5) return digits
+  if (digits.length <= 12) return `${digits.slice(0, 5)}-${digits.slice(5)}`
+  return `${digits.slice(0, 5)}-${digits.slice(5, 12)}-${digits.slice(12)}`
+}
+
+const cnicModel = computed({
+  get: () => formatCNIC(formData.value.cnic),
+  set: (value) => {
+    formData.value.cnic = formatCNIC(value)
+  }
 })
 
 // Use cascading dropdowns with caching

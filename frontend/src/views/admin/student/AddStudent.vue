@@ -113,6 +113,16 @@ const handleSubmit = async () => {
     }
   }
 
+  if (!form.value.program) {
+    showAlert('error', 'Course/Program missing.', 'Error!')
+    return
+  }
+
+  if (!form.value.session) {
+    showAlert('error', 'Session/Batch missing.', 'Error!')
+    return
+  }
+
   submitting.value = true
   try {
     const studentData = {
@@ -143,10 +153,14 @@ const handleSubmit = async () => {
     clearCaches()
     
     showAlert('success', 'Student has been added successfully!', 'Success!')
-    setTimeout(() => router.push(ADMIN_ROUTES.STUDENT_LIST.path), 1500)
+    setTimeout(() => router.push({ path: ADMIN_ROUTES.STUDENT_LIST.path, query: { refresh: Date.now() } }), 1500)
   } catch (error) {
     console.error('Error adding student:', error)
-    const msg = getErrorMessage(error, 'student', 'create')
+    const programError = error.response?.data?.program
+    const sessionError = error.response?.data?.session
+    const firstProgramError = Array.isArray(programError) ? programError[0] : programError
+    const firstSessionError = Array.isArray(sessionError) ? sessionError[0] : sessionError
+    const msg = firstProgramError || firstSessionError || getErrorMessage(error, 'student', 'create')
     showAlert('error', msg, 'Error!')
   } finally {
     submitting.value = false

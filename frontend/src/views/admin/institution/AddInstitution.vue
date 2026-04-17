@@ -88,7 +88,7 @@ const handleSubmit = async () => {
     await institutionService.createInstitution(data)
     clearCaches()
     showAlert('success', 'Institution has been added successfully!', 'Success!')
-    setTimeout(() => router.push(ADMIN_ROUTES.INSTITUTION_LIST.path), 1500)
+    setTimeout(() => router.push({ path: ADMIN_ROUTES.INSTITUTION_LIST.path, query: { refresh: Date.now() } }), 1500)
   } catch (error) {
     const msg = error.response?.data?.detail || error.response?.data?.code?.[0] || 'Failed to add institution.'
     showAlert('error', msg, 'Error!')

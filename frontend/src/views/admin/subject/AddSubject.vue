@@ -34,7 +34,7 @@
           v-model="form"
           :departments="departments"
           :programs="programs"
-          :semesters="semesters"
+          :semesters="activeSemesters"
           :selected-department="selectedDepartment"
           :selected-program="selectedProgram"
           :loading-semesters="loadingSemesters"
@@ -51,7 +51,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { AdminPageTemplate } from '@/components/shared/panels'
 import { AlertMessage, ConfirmDialog } from '@/components/shared/common'
@@ -80,35 +80,61 @@ const { alert, confirmDialog, submitting, showAlert, handleCancel, clearCaches }
   cacheKeys: ['subjects_list']
 })
 
-// Use cascading dropdowns composable
-const { 
-  departments, programs, semesters,
-  selectedDepartment, selectedProgram,
+const {
+  departments,
+  programs,
+  semesters,
+  selectedDepartment,
+  selectedProgram,
   loadingSemesters,
-  loadDepartments, loadPrograms, loadSemesters,
-  onDepartmentChange, onProgramChange
+  loadDepartments,
+  loadPrograms,
+  loadSemesters,
+  onDepartmentChange,
+  onProgramChange
 } = useCascadingDropdowns()
 
 const form = ref({ name: '', code: '', semester: '', credit_hours: 3, description: '' })
 
+const activeSemesters = computed(() => {
+  return (Array.isArray(semesters.value) ? semesters.value : []).filter(
+    (sem) => String(sem?.status || '').toLowerCase() === 'active'
+  )
+})
+
 const handleSubmit = async () => {
+  if (!selectedDepartment.value) {
+    showAlert('error', 'Department missing.', 'Error!')
+    return
+  }
+  if (!selectedProgram.value) {
+    showAlert('error', 'Course/Program missing.', 'Error!')
+    return
+  }
+  if (!form.value.semester) {
+    showAlert('error', 'Semester missing.', 'Error!')
+    return
+  }
+
   submitting.value = true
   try {
-    const data = { ...form.value }
-    if (!data.semester) delete data.semester
-    await subjectService.createSubject(data)
+    await subjectService.createSubject({ ...form.value })
     clearCaches()
     showAlert('success', 'Subject has been added successfully!', 'Success!')
-    setTimeout(() => router.push({ name: ADMIN_ROUTES.SUBJECT_LIST.name }), 1500)
+    setTimeout(() => router.push({ name: ADMIN_ROUTES.SUBJECT_LIST.name, query: { refresh: Date.now() } }), 1500)
   } catch (error) {
-    showAlert('error', error.response?.data?.detail || error.response?.data?.code?.[0] || 'Failed to add subject.', 'Error!')
-  } finally { submitting.value = false }
+    const semesterError = error.response?.data?.semester
+    const firstSemesterError = Array.isArray(semesterError) ? semesterError[0] : semesterError
+    const fallbackMessage = error.response?.data?.detail || error.response?.data?.code?.[0] || 'Failed to add subject.'
+    showAlert('error', firstSemesterError || fallbackMessage, 'Error!')
+  } finally {
+    submitting.value = false
+  }
 }
 
 onMounted(async () => {
   await Promise.all([loadDepartments(), loadPrograms()])
-  
-  // Handle query param for pre-selecting semester
+
   if (route.query.semester) {
     const semId = route.query.semester
     try {
@@ -123,12 +149,14 @@ onMounted(async () => {
           selectedDepartment.value = deptId
           selectedProgram.value = progId
           await loadSemesters(progId)
-          form.value.semester = semId
+          if (String(sem.status || '').toLowerCase() === 'active') {
+            form.value.semester = semId
+          }
         }
       }
-    } catch (e) { console.error('Error auto-filling from semester query:', e) }
+    } catch (e) {
+      console.error('Error auto-filling from semester query:', e)
+    }
   }
 })
 </script>
-
-

@@ -43,7 +43,7 @@
           <h5 class="mb-4 fw-semibold"><i class="bi bi-mortarboard me-2 text-admin"></i>Select Program</h5>
           <div class="mb-3">
             <label class="form-label">Choose a program for this session <span class="text-danger">*</span></label>
-            <select v-model="formData.program" class="form-select form-select-lg" @change="onProgramChange">
+            <select v-model="formData.program" class="form-select session-program-select" @change="onProgramChange">
               <option value="">-- Select Program --</option>
               <option v-for="program in programs" :key="program.id" :value="program.id">
                 {{ program.name }} ({{ program.code }}) - {{ program.program_level_display || program.duration_years + ' Years' }}
@@ -210,18 +210,42 @@ const canProceed = computed(() => {
   }
 })
 
+const normalizeToArray = (payload) => {
+  if (Array.isArray(payload)) return payload
+  if (Array.isArray(payload?.results)) return payload.results
+  if (Array.isArray(payload?.data)) return payload.data
+  return []
+}
+
+const extractApiErrorMessage = (error) => {
+  const data = error?.response?.data
+  if (!data) return 'Failed to create session'
+
+  if (typeof data === 'string') return data
+  if (typeof data?.error === 'string') return data.error
+
+  const firstKey = Object.keys(data)[0]
+  if (!firstKey) return 'Failed to create session'
+
+  const firstValue = data[firstKey]
+  if (Array.isArray(firstValue) && firstValue.length > 0) return firstValue[0]
+  if (typeof firstValue === 'string') return firstValue
+
+  return 'Failed to create session'
+}
+
 
 const loadPrograms = async () => {
   try {
     // Check cache first
     const cached = cacheService.get('programs_list')
     if (cached) {
-      programs.value = cached
+      programs.value = (Array.isArray(cached) ? cached : []).filter(p => p?.is_active !== false)
       return
     }
     
     const data = await programService.getAllPrograms()
-    const result = Array.isArray(data) ? data : (data.results || [])
+    const result = (Array.isArray(data) ? data : (data.results || [])).filter(p => p?.is_active !== false)
     
     // Store in cache
     cacheService.set('programs_list', result)
@@ -281,7 +305,7 @@ watch(() => formData.value.start_year, async (newYear) => {
         // Validation: check if a session with this Start Year already exists
         try {
              const res = await sessionService.getSessionsByProgram(selectedProgram.value.id)
-             const existing = (Array.isArray(res.data) ? res.data : []).find(s => s.start_year === newYear)
+           const existing = normalizeToArray(res).find(s => Number(s.start_year) === Number(newYear))
              if (existing) {
                  showAlert('warning', `A session starting in ${newYear} already exists: ${existing.session_name}`, 'Duplicate Year Warning')
              }
@@ -293,11 +317,32 @@ const nextStep = () => { if (canProceed.value && currentStep.value < 3) currentS
 const previousStep = () => { if (currentStep.value > 1) currentStep.value-- }
 
 const createSession = async () => {
+  if (!formData.value.program) {
+    showAlert('error', 'Course/Program missing.', 'Error!')
+    return
+  }
+
   saving.value = true
   try {
+    const existingRes = await sessionService.getSessionsByProgram(formData.value.program)
+    const existingSessions = normalizeToArray(existingRes)
+    const duplicateSession = existingSessions.find((s) => {
+      const sameCode = String(s.session_code || '').trim().toLowerCase() === String(formData.value.session_code || '').trim().toLowerCase()
+      const sameStartYear = Number(s.start_year) === Number(formData.value.start_year)
+      return sameCode || sameStartYear
+    })
+
+    if (duplicateSession) {
+      const message = duplicateSession.session_code?.toLowerCase() === String(formData.value.session_code || '').trim().toLowerCase()
+        ? `Session code already exists: ${duplicateSession.session_code}`
+        : `A session starting in ${formData.value.start_year} already exists: ${duplicateSession.session_name}`
+      showAlert('error', message, 'Duplicate Session')
+      return
+    }
+
     if (!formData.value.end_year) formData.value.end_year = suggestedEndYear.value
     const response = await sessionService.createSession(formData.value)
-    const sessionId = response.data.id
+    const sessionId = response?.id
     
     // Clear caches to update list view
     cacheService.clear('sessions_list')
@@ -312,10 +357,10 @@ const createSession = async () => {
         console.error('Error setting up semesters:', error)
       }
     }
-    setTimeout(() => router.push({ name: ADMIN_ROUTES.SESSION_LIST.name }), 1500)
+    setTimeout(() => router.push({ name: ADMIN_ROUTES.SESSION_LIST.name, query: { refresh: Date.now() } }), 1500)
   } catch (error) {
     console.error('Error creating session:', error)
-    showAlert('error', error.response?.data?.error || 'Failed to create session', 'Error!')
+    showAlert('error', extractApiErrorMessage(error), 'Error!')
   } finally {
     saving.value = false
   }
@@ -323,5 +368,17 @@ const createSession = async () => {
 
 onMounted(loadPrograms)
 </script>
+
+<style scoped>
+.session-program-select {
+  font-size: 1rem;
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+}
+
+.session-program-select option {
+  font-size: 0.95rem;
+}
+</style>
 
 

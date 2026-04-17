@@ -21,8 +21,8 @@
               <BaseInput v-model="modelValue.code" label="Department Code" type="text" placeholder="e.g., CS" :required="true" />
             </div>
             <div class="col-md-6">
-              <label class="form-label">Institution</label>
-              <select v-model="modelValue.institution" class="form-select">
+              <label class="form-label">Institution <span class="text-danger">*</span></label>
+              <select v-model="modelValue.institution" class="form-select" required>
                 <option value="">Select Institution</option>
                 <option v-for="inst in institutions" :key="inst.id" :value="String(inst.id)">{{ inst.name }}</option>
               </select>

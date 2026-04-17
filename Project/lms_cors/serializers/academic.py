@@ -39,6 +39,14 @@ class DepartmentSerializer(serializers.ModelSerializer):
     def get_student_count(self, obj):
         return Student.objects.filter(program__department=obj).count()
 
+    def validate(self, attrs):
+        institution = attrs.get('institution', getattr(self.instance, 'institution', None))
+        if self.instance is None and not institution:
+            raise serializers.ValidationError({'institution': 'Institution is required to create a department.'})
+        if institution and institution.is_active is False:
+            raise serializers.ValidationError({'institution': 'Selected institution is inactive. Please choose an active institution.'})
+        return attrs
+
 
 class ProgramSerializer(serializers.ModelSerializer):
     department_name = serializers.CharField(source='department.name', read_only=True)
@@ -48,6 +56,16 @@ class ProgramSerializer(serializers.ModelSerializer):
     class Meta:
         model = Program
         fields = '__all__'
+
+    def validate(self, attrs):
+        department = attrs.get('department', getattr(self.instance, 'department', None))
+        if self.instance is None and not department:
+            raise serializers.ValidationError({'department': 'Department is required to create a program/course.'})
+        if department and department.is_active is False:
+            raise serializers.ValidationError({'department': 'Selected department is inactive. Please choose an active department.'})
+        if department and department.institution and department.institution.is_active is False:
+            raise serializers.ValidationError({'department': 'Selected department belongs to an inactive institution.'})
+        return attrs
     
     def get_semester_count(self, obj):
         return obj.semesters_legacy.count()
@@ -87,6 +105,16 @@ class AcademicSessionSerializer(serializers.ModelSerializer):
             return (obj.students.count() / total_capacity) * 100
         return 0
 
+    def validate(self, attrs):
+        program = attrs.get('program', getattr(self.instance, 'program', None))
+        if self.instance is None and not program:
+            raise serializers.ValidationError({'program': 'Program/Course is required to create a session.'})
+        if program and program.department and program.department.is_active is False:
+            raise serializers.ValidationError({'program': 'Selected program belongs to an inactive department.'})
+        if program and program.department and program.department.institution and program.department.institution.is_active is False:
+            raise serializers.ValidationError({'program': 'Selected program belongs to an inactive institution.'})
+        return attrs
+
 
 class SemesterSerializer(serializers.ModelSerializer):
     id = serializers.CharField(read_only=True)
@@ -104,6 +132,30 @@ class SemesterSerializer(serializers.ModelSerializer):
     def get_subject_count(self, obj):
         return obj.subjects.count()
 
+    def validate(self, attrs):
+        program = attrs.get('program', getattr(self.instance, 'program', None))
+        session = attrs.get('session', getattr(self.instance, 'session', None))
+
+        if self.instance is None:
+            if not program:
+                raise serializers.ValidationError({'program': 'Program/Course is required to create a semester.'})
+            if not session:
+                raise serializers.ValidationError({'session': 'Academic session is required to create a semester.'})
+
+        if program and session and session.program_id and session.program_id != program.id:
+            raise serializers.ValidationError({'session': 'Selected session does not belong to the selected program/course.'})
+
+        if program and program.department and program.department.is_active is False:
+            raise serializers.ValidationError({'program': 'Selected program belongs to an inactive department.'})
+
+        if program and program.department and program.department.institution and program.department.institution.is_active is False:
+            raise serializers.ValidationError({'program': 'Selected program belongs to an inactive institution.'})
+
+        if session and getattr(session, 'is_active', True) is False:
+            raise serializers.ValidationError({'session': 'Selected session is inactive.'})
+
+        return attrs
+
 
 class SubjectSerializer(serializers.ModelSerializer):
     semester_name = serializers.CharField(source='semester.name', read_only=True)
@@ -112,6 +164,26 @@ class SubjectSerializer(serializers.ModelSerializer):
     class Meta:
         model = Subject
         fields = '__all__'
+
+    def validate(self, attrs):
+        semester = attrs.get('semester', getattr(self.instance, 'semester', None))
+        if self.instance is None and not semester:
+            raise serializers.ValidationError({'semester': 'Semester is required to create a subject.'})
+
+        if semester and not semester.program_id:
+            raise serializers.ValidationError({'semester': 'Selected semester must be linked to a program/course.'})
+
+        if semester and semester.program and semester.program.department and semester.program.department.is_active is False:
+            raise serializers.ValidationError({'semester': 'Selected semester belongs to an inactive department hierarchy.'})
+
+        if semester and semester.session and getattr(semester.session, 'is_active', True) is False:
+            raise serializers.ValidationError({'semester': 'Selected semester belongs to an inactive session.'})
+
+        semester_changed = self.instance is None or ('semester' in attrs)
+        if semester and semester_changed and str(getattr(semester, 'status', '')).lower() != 'active':
+            raise serializers.ValidationError({'semester': 'Only active semesters can be used to create/assign subjects.'})
+
+        return attrs
 
 
 class SubjectDetailSerializer(SubjectSerializer):
@@ -245,6 +317,11 @@ class DepartmentDetailSerializer(DepartmentSerializer):
     """Department with nested programs and teachers"""
     institution = InstitutionSerializer(read_only=True)
     programs = ProgramSerializer(many=True, read_only=True)
+    teachers = serializers.SerializerMethodField()
+
+    def get_teachers(self, obj):
+        from .people import TeacherSerializer
+        return TeacherSerializer(obj.teachers.all(), many=True).data
 
 
 class ProgramDetailSerializer(ProgramSerializer):

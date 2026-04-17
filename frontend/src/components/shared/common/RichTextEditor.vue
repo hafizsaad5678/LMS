@@ -217,11 +217,3 @@ const updateActiveStates = () => {
   }
 }
 </script>
-
-<style scoped>
-/* Scoped styles can be minimal as we use rte.css */
-.readonly .rte-content {
-  background-color: #f8f9fa;
-  border-radius: 0.5rem;
-}
-</style>

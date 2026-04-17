@@ -1,4 +1,4 @@
-p<template>
+<template>
   <AdminPageTemplate
     title="Academic Sessions"
     subtitle="Manage batches and intakes for all programs"
@@ -53,26 +53,16 @@ p<template>
         v-model:status-value="filters.status"
         search-placeholder="Search sessions..."
         :loading="loading"
+        @search="applyFilters"
+        @update:status-value="applyFilters"
         @refresh="loadSessions"
         @reset="resetFilters"
-      >
-        <template #filters>
-          <div class="col-md-3 col-6">
-            <select v-model="filters.program_level" class="form-select" @change="loadSessions">
-              <option value="">All Levels</option>
-              <option value="bachelor">Bachelor</option>
-              <option value="master">Master</option>
-              <option value="intermediate">Intermediate</option>
-              <option value="phd">PhD</option>
-              <option value="diploma">Diploma</option>
-            </select>
-          </div>
-        </template>
-      </SearchFilter>
+      />
     </template>
 
     <!-- Main Content -->
     <DataTable
+      class="session-list-table"
       :columns="tableColumns"
       :data="sessions"
       :loading="loading"
@@ -82,7 +72,7 @@ p<template>
       empty-subtitle="Create your first session to get started"
     >
       <template #cell-session_name="{ row }">
-        <div class="d-flex align-items-center">
+        <div class="d-flex align-items-center session-cell">
           <div class="avatar-circle avatar-session me-2">{{ row.session_code?.substring(0, 2) || 'AS' }}</div>
           <div>
             <div class="fw-semibold text-dark">{{ row.session_name }}</div>
@@ -92,8 +82,8 @@ p<template>
       </template>
 
       <template #cell-program_name="{ row }">
-        <div>
-          <div>{{ row.program_name }}</div>
+        <div class="program-cell">
+          <div class="program-name">{{ row.program_name }}</div>
           <span :class="getProgramLevelBadgeClass(row.program_level)">{{ row.program_level_display }}</span>
         </div>
       </template>
@@ -104,7 +94,7 @@ p<template>
 
       <template #cell-capacity="{ row }">
         <div class="capacity-indicator">
-          <div class="d-flex justify-content-between mb-1">
+          <div class="d-flex justify-content-between mb-1 capacity-meta">
             <small>{{ row.current_enrollment }}/{{ row.total_capacity }}</small>
             <small>{{ Math.round(row.capacity_percentage) }}%</small>
           </div>
@@ -115,11 +105,11 @@ p<template>
       </template>
 
       <template #cell-semester_count="{ row }">
-        <span class="badge bg-info">{{ row.semester_count }}/{{ row.total_semesters }}</span>
+        <span class="badge bg-info semester-pill">{{ row.semester_count }}/{{ row.total_semesters }}</span>
       </template>
 
       <template #cell-status="{ row }">
-        <span :class="getStatusBadgeClass(row.status)">{{ row.status }}</span>
+        <span :class="getStatusBadgeClass(row.status)" class="status-pill">{{ row.status }}</span>
       </template>
 
       <template #cell-actions="{ row }">
@@ -143,14 +133,15 @@ p<template>
 
 <script setup>
 import { ref, onMounted, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { AdminPageTemplate } from '@/components/shared/panels'
 import { StatCard, DataTable, SearchFilter, ActionButtons, ConfirmDialog, AlertMessage } from '@/components/shared/common'
 import { useEntityList, useAlert } from '@/composables/shared'
-import { sessionService } from '@/services/shared'
+import { sessionService, cacheService } from '@/services/shared'
 import { ADMIN_ROUTES } from '@/utils/constants/routes'
 
 const router = useRouter()
+const route = useRoute()
 
 const breadcrumbs = [
   { name: 'Dashboard', href: ADMIN_ROUTES.DASHBOARD.path },
@@ -183,6 +174,7 @@ const { alert, showAlert } = useAlert()
 // Use composable for list logic
 const {
   loading,
+  data,
   filteredData: sessions,
   filters,
   loadData,
@@ -190,16 +182,14 @@ const {
   resetFilters: baseResetFilters
 } = useEntityList({
   cacheKey: 'sessions_list',
-  searchFields: ['session_name', 'session_code'],
+  searchFields: ['session_name', 'session_code', 'program_name', 'program_level_display'],
   statusField: 'status',
-  defaultFilters: { program_level: '' },
+  defaultFilters: {},
   customFilter: (data, filterValues) => {
     let result = data
-    if (filterValues.program_level) {
-      result = result.filter(s => s.program_level === filterValues.program_level)
-    }
     if (filterValues.status) {
-      result = result.filter(s => s.status === filterValues.status)
+      const selectedStatus = String(filterValues.status).toLowerCase()
+      result = result.filter((s) => String(s.status || '').toLowerCase() === selectedStatus)
     }
     return result
   }
@@ -215,31 +205,13 @@ const loadSessions = async () => {
   loadStats()
 }
 
-const loadStats = async () => {
-  try {
-    const [allSessions, activeSessions, upcomingSessions] = await Promise.all([
-      sessionService.getSessions(),
-      sessionService.getActiveSessions(),
-      sessionService.getUpcomingSessions()
-    ])
-
-    const extractData = (data) => {
-      if (!data) return []
-      return Array.isArray(data) ? data : (data.results || [])
-    }
-
-    const all = extractData(allSessions)
-    const active = extractData(activeSessions)
-    const upcoming = extractData(upcomingSessions)
-
-    stats.value = {
-      total: all.length,
-      active: active.length,
-      upcoming: upcoming.length,
-      completed: all.filter((s) => s.status === 'completed').length
-    }
-  } catch (error) {
-    console.error('Error loading stats:', error)
+const loadStats = () => {
+  const all = Array.isArray(data.value) ? data.value : []
+  stats.value = {
+    total: all.length,
+    active: all.filter((s) => s.status === 'active').length,
+    upcoming: all.filter((s) => s.status === 'upcoming').length,
+    completed: all.filter((s) => s.status === 'completed').length
   }
 }
 
@@ -254,8 +226,9 @@ const setupSemesters = (session) => {
 const confirmSetupSemesters = async () => {
   try {
     await sessionService.setupSemesters(sessionToSetup.value.id)
+    cacheService.clear('sessions_list')
     showAlert('success', `Successfully created semesters for ${sessionToSetup.value.session_name}`)
-    loadSessions()
+    await loadSessions()
   } catch (error) {
     console.error('Error setting up semesters:', error)
     showAlert('error', error.response?.data?.error || 'Failed to setup semesters')
@@ -276,11 +249,12 @@ const confirmDelete = (session) => {
 const confirmDeleteSession = async () => {
   try {
     await sessionService.deleteSession(sessionToDelete.value.id)
+    cacheService.clear('sessions_list')
     showAlert('success', 'Session deleted successfully')
-    loadSessions()
+    await loadSessions()
   } catch (error) {
     console.error('Error deleting session:', error)
-    showAlert('error', 'Failed to delete session')
+    showAlert('error', error.response?.data?.error || 'Failed to delete session')
   } finally {
     showConfirmDialog.value = false
     sessionToDelete.value = null
@@ -296,7 +270,6 @@ const handleConfirm = () => {
 }
 
 const resetFilters = () => {
-  filters.value.program_level = ''
   baseResetFilters()
 }
 
@@ -316,9 +289,21 @@ const getCapacityClass = (percentage) => {
   return 'bg-success'
 }
 
-// Watch custom filters
-watch(() => filters.value.program_level, () => applyFilters())
+// Keep list filtering in sync with search, status, and level filters.
+watch(
+  () => [filters.value.search, filters.value.status],
+  () => applyFilters()
+)
+watch(data, () => loadStats(), { deep: true })
 
-onMounted(loadSessions)
+// Reload list when returning with ?refresh=... to avoid stale cache
+watch(
+  () => route.query.refresh,
+  async () => {
+    cacheService.clear('sessions_list')
+    await loadSessions()
+  },
+  { immediate: true }
+)
 </script>
 

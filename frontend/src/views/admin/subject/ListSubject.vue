@@ -116,9 +116,8 @@ import { computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { AdminPageTemplate } from '@/components/shared/panels'
 import { StatCard, DataTable, SearchFilter, ActionButtons } from '@/components/shared/common'
-import { useEntityList, useAsyncState } from '@/composables/shared'
+import { useEntityList } from '@/composables/shared'
 import { subjectService } from '@/services/shared'
-import adminPanelService from '@/services/admin/adminPanelService'
 import { ADMIN_ROUTES } from '@/utils/constants/routes'
 
 const router = useRouter()
@@ -150,6 +149,7 @@ const fetchSubjects = async () => {
 }
 
 const { loading, data, filteredData, filters, loadData, resetFilters, refresh } = useEntityList({
+  cacheKey: 'subjects_list',
   searchFields: ['name', 'code'],
   defaultFilters: { code: '', credits: '' },
   customFilter: (list, f) => {
@@ -160,7 +160,7 @@ const { loading, data, filteredData, filters, loadData, resetFilters, refresh } 
 })
 
 const totalCredits = computed(() => data.value.reduce((sum, s) => sum + (s.credit_hours || 0), 0))
-const avgCredits = computed(() => data.value.length > 0 ? (totalCredits.value / data.value.length).toFixed(1) : 0)
+const avgCredits = computed(() => data.value.length > 0 ? Math.round(totalCredits.value / data.value.length) : 0)
 const uniqueSemesters = computed(() => new Set(data.value.map(s => s.semester)).size)
 
 const creditOptions = computed(() => {
@@ -173,14 +173,12 @@ const codeOptions = computed(() => {
   return Array.from(codes).sort()
 })
 
-const statsLoader = useAsyncState()
-const totalSubjects = computed(() => statsLoader.data.value?.subjects || data.value.length)
+const totalSubjects = computed(() => data.value.length)
 
 const handleRefresh = () => refresh(fetchSubjects)
 
 onMounted(() => {
   loadData(fetchSubjects)
-  statsLoader.execute(() => adminPanelService.getDashboardStats())
 })
 </script>
 

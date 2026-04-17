@@ -37,13 +37,13 @@
       >
         <template #filters>
           <div class="col-md-3 col-6">
-            <select v-model="filters.subject" class="form-select" @change="loadAssignments">
+            <select v-model="filters.subject" class="form-select" @change="applyFilters">
               <option value="">All Subjects</option>
               <option v-for="subj in subjects" :key="subj.id" :value="subj.id">{{ subj.code }} - {{ subj.name }}</option>
             </select>
           </div>
           <div class="col-md-3 col-6">
-            <select v-model="filters.status" class="form-select" @change="loadAssignments">
+            <select v-model="filters.status" class="form-select" @change="applyFilters">
               <option value="">All Status</option>
               <option v-for="opt in ASSIGNMENT_TIME_STATUS_OPTIONS" :key="opt.value" :value="opt.value">
                 {{ opt.label }}
@@ -120,6 +120,7 @@ import { StatCard, DataTable, SearchFilter, ActionButtons } from '@/components/s
 import { useEntityList } from '@/composables/shared'
 import { assignmentService } from '@/services/shared'
 import { subjectService } from '@/services/shared'
+import { cacheService } from '@/services/shared'
 import { formatDate as formatDateUtil, truncateText } from '@/utils/formatters'
 import { ADMIN_ROUTES } from '@/utils/constants/routes'
 import { ASSIGNMENT_TIME_STATUS_OPTIONS } from '@/utils/constants/options'
@@ -195,9 +196,17 @@ const fetchAssignments = () => assignmentService.getAllAssignments()
 const loadAssignments = () => loadData(fetchAssignments)
 
 const loadSubjects = async () => {
+  const cachedSubjects = cacheService.get('subjects_list')
+  if (cachedSubjects) {
+    subjects.value = cachedSubjects
+    return
+  }
+
   try {
     const response = await subjectService.getAllSubjects()
-    subjects.value = Array.isArray(response) ? response : (response.results || [])
+    const subjectList = Array.isArray(response) ? response : (response.results || [])
+    cacheService.set('subjects_list', subjectList)
+    subjects.value = subjectList
   } catch (error) {
     console.error('Error loading subjects:', error)
   }

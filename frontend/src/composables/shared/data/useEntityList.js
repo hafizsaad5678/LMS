@@ -3,6 +3,7 @@
  * Shared logic for List views across admin panel
  */
 import { ref, computed, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { cacheService, normalizeToArray } from '@/services/shared'
 import { smartSearch } from '@/utils'
 
@@ -19,6 +20,8 @@ export const useEntityList = (options = {}) => {
         statusField = 'is_active',
         debounceMs = 300
     } = options
+
+    const route = useRoute()
 
     // State
     // Optimization: Synchronous cache check during setup to avoid "loading flicker"
@@ -52,14 +55,39 @@ export const useEntityList = (options = {}) => {
      * @param {boolean} useCache - Whether to use cache
      */
     const loadData = async (fetchFn, useCache = true) => {
+        const hasRefreshQuery = !!route.query?.refresh
+
+        if (hasRefreshQuery && cacheKey) {
+            cacheService.clear(cacheKey)
+        }
+
         // Check cache first
-        if (useCache && cacheKey) {
+        if (useCache && cacheKey && !hasRefreshQuery) {
             const cached = cacheService.get(cacheKey)
             if (cached) {
-                data.value = cached
+                const normalizedCached = normalizeToArray(cached)
+                data.value = normalizedCached
                 applyFilters()
                 loading.value = false
-                return cached
+
+                // Stale-while-revalidate: keep UI fast, then update with latest server data.
+                if (options.revalidateOnLoad !== false) {
+                    void (async () => {
+                        try {
+                            const response = await fetchFn()
+                            const freshResult = normalizeToArray(response)
+                            if (cacheKey) {
+                                cacheService.set(cacheKey, freshResult)
+                            }
+                            data.value = freshResult
+                            applyFilters()
+                        } catch (revalidateError) {
+                            console.warn('Background revalidation failed:', revalidateError)
+                        }
+                    })()
+                }
+
+                return normalizedCached
             }
         }
 

@@ -1,4 +1,5 @@
 from collections import defaultdict
+from django.db.models import Q
 
 from rest_framework import status
 from rest_framework.decorators import action, api_view, permission_classes
@@ -282,7 +283,11 @@ def teacher_class_students(request, class_id):
 
 
 class StudentViewSet(BaseProfileViewSet):
-    queryset = Student.objects.all()
+    queryset = Student.objects.select_related('program', 'program__department', 'program__department__institution', 'session').filter(
+        program__isnull=False,
+        program__department__is_active=True,
+        program__department__institution__is_active=True
+    ).filter(Q(session__isnull=True) | Q(session__is_active=True))
     serializer_class = StudentSerializer
     permission_classes = [IsAuthenticated, CanManageStudents]
     search_fields = ['full_name', 'email', 'enrollment_number', 'phone', 'cnic']
@@ -596,7 +601,11 @@ class StudentViewSet(BaseProfileViewSet):
 
 
 class TeacherViewSet(BaseProfileViewSet):
-    queryset = Teacher.objects.all()
+    queryset = Teacher.objects.select_related('department', 'department__institution').filter(
+        department__isnull=False,
+        department__is_active=True,
+        department__institution__is_active=True
+    )
     serializer_class = TeacherSerializer
     permission_classes = [IsAuthenticated, IsAdminOrTeacher]
     search_fields = ['full_name', 'email', 'employee_id', 'phone', 'cnic', 
@@ -640,7 +649,16 @@ class AdminViewSet(BaseProfileViewSet):
 
 
 class TeacherSubjectViewSet(BaseViewSet):
-    queryset = TeacherSubject.objects.all()
+    queryset = TeacherSubject.objects.select_related(
+        'teacher', 'teacher__department', 'teacher__department__institution',
+        'subject', 'subject__semester', 'subject__semester__session', 'subject__semester__program',
+        'subject__semester__program__department', 'subject__semester__program__department__institution'
+    ).filter(
+        teacher__department__is_active=True,
+        teacher__department__institution__is_active=True,
+        subject__semester__program__department__is_active=True,
+        subject__semester__program__department__institution__is_active=True
+    ).filter(Q(subject__semester__session__isnull=True) | Q(subject__semester__session__is_active=True))
     serializer_class = TeacherSubjectSerializer
     permission_classes = [IsAuthenticated, IsAdminOrTeacher]
     filterset_fields = ['teacher', 'subject', 'subject__semester', 'subject__semester__program']
@@ -648,7 +666,21 @@ class TeacherSubjectViewSet(BaseViewSet):
 
 
 class StudentSubjectViewSet(BaseViewSet):
-    queryset = StudentSubject.objects.all()
+    queryset = StudentSubject.objects.select_related(
+        'student', 'student__program', 'student__program__department', 'student__program__department__institution', 'student__session',
+        'subject', 'subject__semester', 'subject__semester__session', 'subject__semester__program',
+        'subject__semester__program__department', 'subject__semester__program__department__institution',
+        'semester', 'semester__session'
+    ).filter(
+        student__program__department__is_active=True,
+        student__program__department__institution__is_active=True,
+        subject__semester__program__department__is_active=True,
+        subject__semester__program__department__institution__is_active=True
+    ).filter(
+        Q(student__session__isnull=True) | Q(student__session__is_active=True)
+    ).filter(
+        Q(subject__semester__session__isnull=True) | Q(subject__semester__session__is_active=True)
+    )
     serializer_class = StudentSubjectSerializer
     permission_classes = [IsAuthenticated, IsAdminOrTeacher]
     filterset_fields = ['student', 'subject', 'semester', 'semester__program']

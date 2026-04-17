@@ -35,6 +35,24 @@ export const useEntityDelete = (options) => {
         alert.value = { show: true, type, title, message }
     }
 
+    const getListRouteWithRefresh = () => {
+        if (typeof listRoute === 'string') {
+            return { path: listRoute, query: { refresh: Date.now() } }
+        }
+
+        if (listRoute && typeof listRoute === 'object') {
+            return {
+                ...listRoute,
+                query: {
+                    ...(listRoute.query || {}),
+                    refresh: Date.now()
+                }
+            }
+        }
+
+        return listRoute
+    }
+
     const loadEntity = async () => {
         if (!entityId.value) {
             loading.value = false
@@ -45,7 +63,7 @@ export const useEntityDelete = (options) => {
             entity.value = await service.get(entityId.value)
         } catch {
             showAlert('error', `Failed to load ${entityName} details`, 'Error')
-            setTimeout(() => router.push(listRoute), 2000)
+            setTimeout(() => router.push(getListRouteWithRefresh()), 2000)
         } finally {
             loading.value = false
         }
@@ -66,7 +84,7 @@ export const useEntityDelete = (options) => {
             })
 
             showAlert('success', `${entityName} deleted successfully`, 'Success')
-            setTimeout(() => router.push(listRoute), 1500)
+            setTimeout(() => router.push(getListRouteWithRefresh()), 1500)
         } catch {
             showAlert('error', `Failed to delete ${entityName}`, 'Error')
         } finally {
@@ -74,7 +92,7 @@ export const useEntityDelete = (options) => {
         }
     }
 
-    const handleCancel = () => router.push(listRoute)
+    const handleCancel = () => router.push(getListRouteWithRefresh())
 
     // Watch for route param changes
     watch(() => route.params.id, (newId) => {

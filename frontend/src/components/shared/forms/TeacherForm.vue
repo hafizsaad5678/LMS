@@ -47,7 +47,7 @@
                 placeholder="Select Gender" :required="true" />
             </div>
             <div class="col-md-6">
-              <BaseInput v-model="formData.cnic" label="CNIC" type="text" placeholder="12345-1234567-1" />
+              <BaseInput v-model="cnicModel" label="CNIC" type="text" placeholder="12345-1234567-1" />
             </div>
           </div>
         </div>
@@ -192,6 +192,20 @@ const emit = defineEmits(['update:modelValue', 'submit', 'cancel'])
 const formData = computed({
   get: () => props.modelValue,
   set: (value) => emit('update:modelValue', value)
+})
+
+const formatCNIC = (value) => {
+  const digits = String(value || '').replace(/\D/g, '').slice(0, 13)
+  if (digits.length <= 5) return digits
+  if (digits.length <= 12) return `${digits.slice(0, 5)}-${digits.slice(5)}`
+  return `${digits.slice(0, 5)}-${digits.slice(5, 12)}-${digits.slice(12)}`
+}
+
+const cnicModel = computed({
+  get: () => formatCNIC(formData.value.cnic),
+  set: (value) => {
+    formData.value.cnic = formatCNIC(value)
+  }
 })
 
 // Use cascading dropdowns with caching

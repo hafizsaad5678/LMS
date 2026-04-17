@@ -35,7 +35,7 @@
 
         <div class="col-lg-6">
           <InfoCard title="Description" icon="bi bi-text-paragraph" icon-color="success"
-            :items="[{ label: 'Description', value: entity.description || 'No description available' }]" />
+            :items="[{ label: 'Description', value: entity.description || 'No description available', multiline: true }]" />
         </div>
 
         <div class="col-12">
@@ -156,16 +156,12 @@ const actions = [
   { label: 'Back to List', icon: 'bi bi-arrow-left', variant: 'btn-admin-outline', onClick: () => router.push({ name: ADMIN_ROUTES.DEPARTMENT_LIST.name }) }
 ]
 
-const { entityId, loading, entity, subData } = useProfileLoader({
-  fetchMain: (id) => departmentService.getDepartmentById(id),
-  subResources: [
-    { key: 'programs', fetch: (id) => departmentService.getDepartmentPrograms(id) },
-    { key: 'teachers', fetch: (id) => departmentService.getDepartmentTeachers(id) }
-  ]
+const { entityId, loading, entity } = useProfileLoader({
+  fetchMain: (id) => departmentService.getDepartmentById(id)
 })
 
-const programs = computed(() => subData.value.programs)
-const teachers = computed(() => subData.value.teachers)
+const programs = computed(() => Array.isArray(entity.value.programs) ? entity.value.programs : [])
+const teachers = computed(() => Array.isArray(entity.value.teachers) ? entity.value.teachers : [])
 
 const profileBadges = computed(() => {
   const badges = []

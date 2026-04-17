@@ -5,14 +5,13 @@
 import { ADMIN_ROUTES } from '@/utils/constants/routes'
 import { USER_ROLES } from '@/utils/constants/config'
 import AdminLayout from '../../layouts/AdminLayout.vue'
-import AdminDashboard from '../../views/admin/dashboard/AdminDashboard.vue'
 
 export const adminRoutes = {
     path: ADMIN_ROUTES.DASHBOARD.path,
     component: AdminLayout,
     meta: { requiresAuth: true, role: USER_ROLES.ADMIN },
     children: [
-        { path: '', name: 'AdminDashboard', component: AdminDashboard },
+        { path: '', name: 'AdminDashboard', component: () => import('../../views/admin/dashboard/AdminDashboard.vue') },
 
         // Student routes
         { path: 'students', name: 'ListStudent', component: () => import('../../views/admin/student/ListStudent.vue') },

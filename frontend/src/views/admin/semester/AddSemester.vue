@@ -205,12 +205,12 @@ onMounted(async () => {
     // Check cache first
     const cached = cacheService.get('programs_list')
     if (cached) {
-      programs.value = cached
+      programs.value = (Array.isArray(cached) ? cached : []).filter(p => p?.is_active !== false)
       return
     }
     
     const res = await api.get('/programs/')
-    const result = Array.isArray(res.data) ? res.data : (res.data.results || res.data)
+    const result = (Array.isArray(res.data) ? res.data : (res.data.results || res.data)).filter(p => p?.is_active !== false)
     
     // Store in cache
     cacheService.set('programs_list', result)
@@ -369,10 +369,14 @@ const submitForm = async () => {
     }
 
     showAlert('success', 'Semester(s) created successfully!', 'Success!')
-    setTimeout(() => router.push({ name: ADMIN_ROUTES.SEMESTER_LIST.name }), 1500)
+    setTimeout(() => router.push({ name: ADMIN_ROUTES.SEMESTER_LIST.name, query: { refresh: Date.now() } }), 1500)
   } catch (e) {
     console.error('Error creating semester:', e.response?.data || e.message)
-    const msg = e.response?.data?.detail || e.response?.data?.non_field_errors?.[0] || 'Failed to create semester'
+    const programError = e.response?.data?.program
+    const sessionError = e.response?.data?.session
+    const firstProgramError = Array.isArray(programError) ? programError[0] : programError
+    const firstSessionError = Array.isArray(sessionError) ? sessionError[0] : sessionError
+    const msg = firstProgramError || firstSessionError || e.response?.data?.detail || e.response?.data?.non_field_errors?.[0] || 'Failed to create semester'
     showAlert('error', msg, 'Error!')
   } finally {
     submitting.value = false

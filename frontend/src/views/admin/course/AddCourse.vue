@@ -77,16 +77,23 @@ const { departments, loadDepartments } = useCascadingDropdowns()
 const form = ref({ name: '', code: '', department: '', duration_years: 4, description: '' })
 
 const handleSubmit = async () => {
+  if (!form.value.department) {
+    showAlert('error', 'Department missing.', 'Error!')
+    return
+  }
+
   submitting.value = true
   try {
     const data = { ...form.value }
-    if (!data.department) delete data.department
     await programService.createProgram(data)
     clearCaches()
     showAlert('success', 'Course has been added successfully!', 'Success!')
-    setTimeout(() => router.push(ADMIN_ROUTES.COURSE_LIST.path), 1500)
+    setTimeout(() => router.push({ path: ADMIN_ROUTES.COURSE_LIST.path, query: { refresh: Date.now() } }), 1500)
   } catch (error) {
-    showAlert('error', error.response?.data?.detail || error.response?.data?.code?.[0] || 'Failed to add course.', 'Error!')
+    const departmentError = error.response?.data?.department
+    const firstDepartmentError = Array.isArray(departmentError) ? departmentError[0] : departmentError
+    const fallbackMessage = error.response?.data?.detail || error.response?.data?.code?.[0] || 'Failed to add course.'
+    showAlert('error', firstDepartmentError || fallbackMessage, 'Error!')
   } finally { submitting.value = false }
 }
 

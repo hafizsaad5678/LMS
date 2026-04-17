@@ -105,6 +105,14 @@ const form = ref({
   city: ''
 })
 
+const generateTemporaryPassword = (length = 16) => {
+  let result = ''
+  for (let i = 0; i < length; i += 1) {
+    result += Math.floor(Math.random() * 10)
+  }
+  return result
+}
+
 const handleSubmit = async () => {
   // Validate CNIC if provided
   if (form.value.cnic && form.value.cnic.trim()) {
@@ -113,11 +121,19 @@ const handleSubmit = async () => {
     }
   }
 
+  if (!form.value.department) {
+    showAlert('error', 'Department missing.', 'Error!')
+    return
+  }
+
   submitting.value = true
   try {
+    const temporaryPassword = generateTemporaryPassword(16)
+
     const teacherData = {
       full_name: form.value.full_name,
       email: form.value.email.trim(),
+      password: temporaryPassword,
       phone: form.value.phone,
       date_of_birth: form.value.date_of_birth || null,
       gender: form.value.gender,
@@ -142,11 +158,19 @@ const handleSubmit = async () => {
     // Clear caches to update list view
     clearCaches()
     
-    showAlert('success', 'Teacher has been added successfully!', 'Success!')
-    setTimeout(() => router.push(ADMIN_ROUTES.TEACHER_LIST.path), 1500)
+    showAlert(
+      'success',
+      'Teacher has been added. A temporary 16-digit password has been sent to the provided email. Please ask the teacher to update their password after first login.',
+      'Success!'
+    )
+    setTimeout(() => router.push({ path: ADMIN_ROUTES.TEACHER_LIST.path, query: { refresh: Date.now() } }), 1500)
   } catch (error) {
     console.error('Error adding teacher:', error)
-    const msg = getErrorMessage(error, 'teacher', 'create')
+    const departmentError = error.response?.data?.department
+    const passwordError = error.response?.data?.password
+    const firstDepartmentError = Array.isArray(departmentError) ? departmentError[0] : departmentError
+    const firstPasswordError = Array.isArray(passwordError) ? passwordError[0] : passwordError
+    const msg = firstPasswordError || firstDepartmentError || getErrorMessage(error, 'teacher', 'create')
     showAlert('error', msg, 'Error!')
   } finally {
     submitting.value = false

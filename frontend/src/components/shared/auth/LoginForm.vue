@@ -1,10 +1,19 @@
 <template>
-  <form @submit.prevent="handleLogin" class="space-y-4">
+  <form @submit.prevent="handleLogin" class="login-form">
+    <div class="mb-4">
+      <h2 class="h4 fw-bold text-dark mb-2">Sign in to your account</h2>
+      <p class="text-muted small mb-0">Use your registered email and password.</p>
+    </div>
+
     <AlertMessage v-if="error" type="error" :message="error" @close="error = ''" />
 
-    <BaseInput v-model="form.username" type="email" label="Email" placeholder="Enter your email" required />
+    <div class="mb-3">
+      <BaseInput v-model="form.username" type="email" label="Email" placeholder="Enter your email" required />
+    </div>
 
-    <BaseInput v-model="form.password" type="password" label="Password" placeholder="Enter your password" required />
+    <div class="mb-3">
+      <BaseInput v-model="form.password" type="password" label="Password" placeholder="Enter your password" required />
+    </div>
 
     <div class="d-flex justify-content-between align-items-center mb-4">
       <div class="form-check">
@@ -13,13 +22,20 @@
           Remember me
         </label>
       </div>
-      <router-link :to="{ name: 'ForgotPassword' }" class="text-decoration-none small fw-semibold">
+      <router-link :to="{ name: 'ForgotPassword' }" class="text-decoration-none small fw-semibold login-forgot-link">
         Forgot password?
       </router-link>
     </div>
 
-    <BaseButton type="submit" label="Login" variant="primary" :loading="loading" :disabled="loading"
-      loadingText="Signing in..." />
+    <div class="login-assist-text mb-3">
+      <i class="bi bi-info-circle me-2"></i>
+      Use the Forgot password option if you cannot access your account.
+    </div>
+
+    <div class="d-grid">
+      <BaseButton type="submit" label="Login" variant="primary" :loading="loading" :disabled="loading"
+        loadingText="Signing in..." />
+    </div>
   </form>
 </template>
 

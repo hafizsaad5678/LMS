@@ -31,16 +31,18 @@ const router = createRouter({
   }
 })
 
-const AUTH_CHECK_TTL_MS = 10 * 1000
+const AUTH_CHECK_TTL_MS = 60 * 1000
 let lastAuthCheckAt = 0
 let lastAuthCheckKey = ''
+let pendingAuthCheck = null
+let pendingAuthCheckKey = ''
 
 const getAuthProbeUrl = (userRole, userId) => {
   if (userRole === USER_ROLES.ADMIN) {
-    return `${API_BASE_URL}/admins/`
+    return userId ? `${API_BASE_URL}/admins/${userId}/` : `${API_BASE_URL}/admins/?page=1`
   }
   if (userRole === USER_ROLES.TEACHER) {
-    return `${API_BASE_URL}/teacher/my-classes/`
+    return userId ? `${API_BASE_URL}/teachers/${userId}/` : `${API_BASE_URL}/teacher/my-classes/`
   }
   if (userRole === USER_ROLES.STUDENT && userId) {
     return `${API_BASE_URL}/students/${userId}/`
@@ -60,24 +62,36 @@ const verifyTokenWithBackend = async (token, userRole) => {
     return true
   }
 
-  try {
-    const response = await fetch(probeUrl, {
-      method: 'GET',
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    })
-
-    if (!response.ok) {
-      return false
-    }
-
-    lastAuthCheckAt = now
-    lastAuthCheckKey = cacheKey
-    return true
-  } catch {
-    return false
+  if (pendingAuthCheck && pendingAuthCheckKey === cacheKey) {
+    return pendingAuthCheck
   }
+
+  pendingAuthCheckKey = cacheKey
+  pendingAuthCheck = (async () => {
+    try {
+      const response = await fetch(probeUrl, {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+
+      if (!response.ok) {
+        return false
+      }
+
+      lastAuthCheckAt = Date.now()
+      lastAuthCheckKey = cacheKey
+      return true
+    } catch {
+      return false
+    } finally {
+      pendingAuthCheck = null
+      pendingAuthCheckKey = ''
+    }
+  })()
+
+  return pendingAuthCheck
 }
 
 // Auth guard with role-based protection

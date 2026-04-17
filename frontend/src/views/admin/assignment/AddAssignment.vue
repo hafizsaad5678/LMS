@@ -210,7 +210,7 @@ const handleSubmit = async () => {
     cacheService.clearPattern('assignment')
     
     showAlert('success', 'Assignment created successfully!', 'Success!')
-    setTimeout(() => router.push(ADMIN_ROUTES.ASSIGNMENTS.path), 1500)
+    setTimeout(() => router.push({ path: ADMIN_ROUTES.ASSIGNMENTS.path, query: { refresh: Date.now() } }), 1500)
   } catch (error) {
     const msg = error.response?.data?.detail || 'Failed to create assignment.'
     showAlert('error', msg, 'Error!')

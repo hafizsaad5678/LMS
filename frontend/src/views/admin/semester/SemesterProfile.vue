@@ -22,7 +22,7 @@
       <ProfileHeader
         :name="entity.name"
         :identifier="`Semester ${entity.number}`"
-        :is-active="entity.is_active"
+        :is-active="semesterIsActive"
         :badges="profileBadges"
         theme="admin"
         @edit="router.push({ name: ADMIN_ROUTES.SEMESTER_EDIT.name, params: { id: entity.id } })"
@@ -141,6 +141,8 @@ const profileBadges = computed(() => {
   return badges
 })
 
+const semesterIsActive = computed(() => String(entity.value.status || '').toLowerCase() === 'active')
+
 const basicInfoItems = computed(() => [
   { label: 'Name', value: entity.value.name },
   { label: 'Semester Number', value: entity.value.number?.toString() },
@@ -153,7 +155,7 @@ const timelineItems = computed(() => [
   { label: 'Start Date', value: formatDate(entity.value.start_date) },
   { label: 'End Date', value: formatDate(entity.value.end_date) },
   { label: 'Duration', value: getDuration(entity.value.start_date, entity.value.end_date) },
-  { label: 'Is Active', value: entity.value.is_active ? 'Yes' : 'No' }
+  { label: 'Is Active', value: semesterIsActive.value ? 'Yes' : 'No' }
 ])
 
 const statsData = computed(() => [

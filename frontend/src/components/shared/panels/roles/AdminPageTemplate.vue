@@ -24,7 +24,7 @@
     <template #default>
       <slot></slot>
     </template>
-    <template v-if="$slots.footer" #footer>
+    <template v-if="$slots.footer && showFooter" #footer>
       <slot name="footer"></slot>
     </template>
   </BasePageTemplate>
@@ -42,7 +42,8 @@ defineProps({
   actions: { type: Array, default: () => [] },
   showContentCard: { type: Boolean, default: true },
   contentTitle: { type: String, default: '' },
-  contentClass: { type: String, default: '' }
+  contentClass: { type: String, default: '' },
+  showFooter: { type: Boolean, default: false }
 })
 
 defineEmits(['action-click'])

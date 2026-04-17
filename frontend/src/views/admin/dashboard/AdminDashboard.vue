@@ -110,7 +110,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuth } from '@/store/auth'
 import { ActivityFeed, QuickActionCard, StatCard, AlertMessage } from '@/components/shared/common'
@@ -127,6 +127,7 @@ const loadingSearch = ref(false)
 const cachedStats = adminPanelService.getCachedStats()
 const loading = ref(!cachedStats)
 const loadingActivities = ref(true)
+let dashboardRefreshTimer = null
 
 const stats = ref({
   students: cachedStats?.students || 0,
@@ -141,7 +142,7 @@ const stats = ref({
 const statsRow1 = computed(() => [
   { value: stats.value.students, title: 'Total Students', icon: 'bi bi-people', type: 'student', variant: 'glass', route: { name: ADMIN_ROUTES.STUDENT_LIST.name } },
   { value: stats.value.teachers, title: 'Total Teachers', icon: 'bi bi-person-badge', type: 'teacher', variant: 'glass', route: { name: ADMIN_ROUTES.TEACHER_LIST.name } },
-  { value: stats.value.sessions, title: 'Active Sessions', icon: 'bi bi-calendar-event', type: 'finance', variant: 'glass', route: { name: ADMIN_ROUTES.SESSION_LIST.name } }, // Use finance/greenish for sessions
+  { value: stats.value.sessions, title: 'Total Sessions', icon: 'bi bi-calendar-event', type: 'finance', variant: 'glass', route: { name: ADMIN_ROUTES.SESSION_LIST.name } },
   { value: `${CURRENCY} ${Number(stats.value.revenue).toLocaleString()}`, title: 'Total Revenue', icon: 'bi bi-currency-dollar', type: 'finance', variant: 'glass', route: { name: ADMIN_ROUTES.FEES.name } }
 ])
 
@@ -153,7 +154,7 @@ const statsRow2 = computed(() => [
 
 const recentActivities = ref([])
 
-const loadDashboard = async () => {
+const loadDashboard = async (forceRefresh = false) => {
   if (!authStore.isAuthenticated) {
     router.push({ name: 'Login' })
     return
@@ -161,12 +162,12 @@ const loadDashboard = async () => {
 
   try {
     if (!cachedStats) loading.value = true
-    const dashboardStats = await adminPanelService.getDashboardStats()
+    const dashboardStats = await adminPanelService.getDashboardStats(forceRefresh)
     stats.value = dashboardStats
     loading.value = false
 
     // Load activities in parallel (no setTimeout needed)
-    loadActivities()
+    loadActivities(forceRefresh)
   } catch (error) {
     console.error('Dashboard error:', error)
     loading.value = false
@@ -174,14 +175,24 @@ const loadDashboard = async () => {
   }
 }
 
-const loadActivities = async () => {
+const loadActivities = async (forceRefresh = false) => {
   try {
-    recentActivities.value = await adminPanelService.getRecentActivities()
+    recentActivities.value = await adminPanelService.getRecentActivities(forceRefresh)
   } catch (error) {
     console.error('Activities error:', error)
   } finally {
     loadingActivities.value = false
   }
+}
+
+const handleVisibilityRefresh = () => {
+  if (document.visibilityState === 'visible') {
+    loadDashboard(true)
+  }
+}
+
+const handleWindowFocus = () => {
+  loadDashboard(true)
 }
 
 const handleSearch = async () => {
@@ -206,5 +217,25 @@ const handleSearch = async () => {
   finally { loadingSearch.value = false }
 }
 
-onMounted(() => loadDashboard())
+onMounted(() => {
+  loadDashboard()
+
+  document.addEventListener('visibilitychange', handleVisibilityRefresh)
+  window.addEventListener('focus', handleWindowFocus)
+
+  dashboardRefreshTimer = setInterval(() => {
+    if (document.visibilityState === 'visible') {
+      loadDashboard(true)
+    }
+  }, 30000)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('visibilitychange', handleVisibilityRefresh)
+  window.removeEventListener('focus', handleWindowFocus)
+  if (dashboardRefreshTimer) {
+    clearInterval(dashboardRefreshTimer)
+    dashboardRefreshTimer = null
+  }
+})
 </script>

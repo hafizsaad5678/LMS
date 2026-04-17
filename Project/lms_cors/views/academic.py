@@ -1,6 +1,7 @@
 from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from django.db.models import Q
 
 from .base import BaseViewSet
 from ..models import (
@@ -75,7 +76,10 @@ class InstitutionViewSet(BaseViewSet):
 
 
 class DepartmentViewSet(BaseViewSet):
-    queryset = Department.objects.all()
+    queryset = Department.objects.select_related('institution').prefetch_related('programs', 'teachers').filter(
+        institution__isnull=False,
+        institution__is_active=True
+    )
     serializer_class = DepartmentSerializer
     search_fields = ['name', 'code', 'description', 'head_of_department']
     filterset_fields = ['institution', 'is_active']
@@ -94,7 +98,11 @@ class DepartmentViewSet(BaseViewSet):
 
 
 class ProgramViewSet(BaseViewSet):
-    queryset = Program.objects.all()
+    queryset = Program.objects.select_related('department', 'department__institution').filter(
+        department__isnull=False,
+        department__is_active=True,
+        department__institution__is_active=True
+    )
     serializer_class = ProgramSerializer
     search_fields = ['name', 'code', 'description']
     filterset_fields = ['department', 'program_level', 'academic_system']
@@ -118,7 +126,11 @@ class ProgramViewSet(BaseViewSet):
 
 class AcademicSessionViewSet(BaseViewSet):
     """ViewSet for Academic Session (Batch/Intake) management."""
-    queryset = AcademicSession.objects.all()
+    queryset = AcademicSession.objects.select_related('program', 'program__department', 'program__department__institution').filter(
+        program__isnull=False,
+        program__department__is_active=True,
+        program__department__institution__is_active=True
+    )
     serializer_class = AcademicSessionSerializer
     search_fields = ['session_name', 'session_code', 'program__name', 'program__code']
     filterset_fields = ['program', 'start_year', 'end_year', 'status', 'is_active', 
@@ -236,7 +248,11 @@ class AcademicSessionViewSet(BaseViewSet):
 
 
 class SemesterViewSet(BaseViewSet):
-    queryset = Semester.objects.all()
+    queryset = Semester.objects.select_related('program', 'program__department', 'program__department__institution', 'session').filter(
+        program__isnull=False,
+        program__department__is_active=True,
+        program__department__institution__is_active=True
+    ).filter(Q(session__isnull=True) | Q(session__is_active=True))
     serializer_class = SemesterSerializer
     search_fields = ['name', 'program__name', 'program__code']
     filterset_fields = ['program', 'program__department']
@@ -259,7 +275,11 @@ class SemesterViewSet(BaseViewSet):
 
 
 class SubjectViewSet(BaseViewSet):
-    queryset = Subject.objects.all()
+    queryset = Subject.objects.select_related('semester', 'semester__program', 'semester__session', 'semester__program__department', 'semester__program__department__institution').filter(
+        semester__isnull=False,
+        semester__program__department__is_active=True,
+        semester__program__department__institution__is_active=True
+    ).filter(Q(semester__session__isnull=True) | Q(semester__session__is_active=True))
     serializer_class = SubjectSerializer
     search_fields = ['name', 'code', 'description']
     filterset_fields = ['semester', 'semester__program', 'semester__program__department']

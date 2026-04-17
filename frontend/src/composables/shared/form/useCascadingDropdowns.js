@@ -37,17 +37,21 @@ export const useCascadingDropdowns = (options = {}) => {
 
     // Helper to normalize API response
     const normalize = (data) => Array.isArray(data) ? data : (data?.results || [])
+    const activeOnly = (items) => normalize(items).filter(item => item?.is_active !== false)
 
     // Load Institutions
     const loadInstitutions = async () => {
         if (cacheEnabled) {
             const cached = cacheService.get('institutions_dropdown')
-            if (cached) { institutions.value = cached; return cached }
+            if (cached) {
+                institutions.value = activeOnly(cached)
+                return institutions.value
+            }
         }
         loadingInstitutions.value = true
         try {
-            const response = await api.get('/institutions/')
-            institutions.value = normalize(response.data)
+            const response = await api.get('/institutions/', { params: { is_active: true } })
+            institutions.value = activeOnly(response.data)
             if (cacheEnabled) cacheService.set('institutions_dropdown', institutions.value)
             return institutions.value
         } catch (error) {
@@ -62,12 +66,15 @@ export const useCascadingDropdowns = (options = {}) => {
     const loadDepartments = async () => {
         if (cacheEnabled) {
             const cached = cacheService.get('departments_dropdown')
-            if (cached) { departments.value = cached; return cached }
+            if (cached) {
+                departments.value = activeOnly(cached)
+                return departments.value
+            }
         }
         loadingDepartments.value = true
         try {
-            const response = await api.get('/departments/')
-            departments.value = normalize(response.data)
+            const response = await api.get('/departments/', { params: { is_active: true } })
+            departments.value = activeOnly(response.data)
             if (cacheEnabled) cacheService.set('departments_dropdown', departments.value)
             return departments.value
         } catch (error) {
@@ -82,12 +89,15 @@ export const useCascadingDropdowns = (options = {}) => {
     const loadPrograms = async () => {
         if (cacheEnabled) {
             const cached = cacheService.get('programs_dropdown')
-            if (cached) { programs.value = cached; return cached }
+            if (cached) {
+                programs.value = activeOnly(cached)
+                return programs.value
+            }
         }
         loadingPrograms.value = true
         try {
-            const response = await api.get('/programs/')
-            programs.value = normalize(response.data)
+            const response = await api.get('/programs/', { params: { is_active: true } })
+            programs.value = activeOnly(response.data)
             if (cacheEnabled) cacheService.set('programs_dropdown', programs.value)
             return programs.value
         } catch (error) {
@@ -125,13 +135,16 @@ export const useCascadingDropdowns = (options = {}) => {
     const loadSessions = async (programId = null) => {
         if (cacheEnabled && !programId) {
             const cached = cacheService.get('sessions_dropdown')
-            if (cached) { sessions.value = cached; return cached }
+            if (cached) {
+                sessions.value = activeOnly(cached)
+                return sessions.value
+            }
         }
         loadingSessions.value = true
         try {
-            const params = programId ? { program: programId } : {}
+            const params = programId ? { program: programId, is_active: true } : { is_active: true }
             const response = await api.get('/academic-sessions/', { params })
-            sessions.value = normalize(response.data)
+            sessions.value = activeOnly(response.data)
             if (cacheEnabled && !programId) cacheService.set('sessions_dropdown', sessions.value)
             return sessions.value
         } catch (error) {

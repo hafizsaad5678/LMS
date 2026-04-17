@@ -126,7 +126,7 @@ const props = defineProps({
   },
   showFooter: {
     type: Boolean,
-    default: true
+    default: false
   }
 })
 

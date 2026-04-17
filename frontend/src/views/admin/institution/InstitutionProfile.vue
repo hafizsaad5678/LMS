@@ -35,7 +35,7 @@
 
         <div class="col-lg-6">
           <InfoCard title="Description & Vision" icon="bi bi-text-paragraph" icon-color="success"
-            :items="[{ label: 'Description', value: entity.description || 'No description available' }]" />
+            :items="[{ label: 'Description', value: entity.description || 'No description available', multiline: true }]" />
         </div>
 
         <div class="col-12">
@@ -49,7 +49,7 @@
               <h6 class="mb-0 fw-semibold"><i class="bi bi-building me-2 text-admin"></i>Departments</h6>
               <div>
                 <span class="badge bg-admin me-2">{{ departments.length }} Departments</span>
-                <button @click="router.push({ name: ADMIN_ROUTES.DEPARTMENT_ADD.name, query: { institution: entity.id } })" 
+                <button @click="router.push({ name: ADMIN_ROUTES.DEPARTMENT_ADD.name, query: { institution: entity.id, source: 'institution-profile' } })" 
                         class="btn btn-sm btn-outline-primary py-0" title="Add Department">
                   <i class="bi bi-plus-lg"></i>
                 </button>

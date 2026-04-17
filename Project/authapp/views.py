@@ -113,15 +113,21 @@ def forgot_password(request):
     serializer = ForgotPasswordSerializer(data=request.data)
     if serializer.is_valid():
         email = serializer.validated_data['email']
+        generic_response = {
+            "message": "If an account with this email exists, a password reset link has been sent."
+        }
         try:
             user = User.objects.get(email=email)
         except User.DoesNotExist:
-            return Response({"error": "User with this email does not exist"}, status=status.HTTP_404_NOT_FOUND)
+            return Response(generic_response)
         
         token = default_token_generator.make_token(user)
-        send_password_reset_email(user, token, user.pk)
+        try:
+            send_password_reset_email(user, token, user.pk)
+        except Exception:
+            return Response({"error": "Unable to send reset email at the moment. Please try again shortly."}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
-        return Response({"message": "Password reset email sent!", "uid": user.pk, "token": token})
+        return Response(generic_response)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 

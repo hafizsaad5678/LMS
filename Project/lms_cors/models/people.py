@@ -38,7 +38,7 @@ class Student(BaseProfile):
                 'program', self.program
             )
         
-        if not self.user:
+        if not self.user and not getattr(self, '_skip_auto_user_creation', False):
             self.create_user_account()
         
         super().save(*args, **kwargs)
@@ -75,7 +75,7 @@ class Teacher(BaseProfile):
                 'department', self.department
             )
         
-        if not self.user:
+        if not self.user and not getattr(self, '_skip_auto_user_creation', False):
             self.create_user_account()
         
         super().save(*args, **kwargs)
@@ -108,7 +108,7 @@ class Admin(BaseProfile):
         if not self.admin_id:
             self.admin_id = generate_sequential_id(Admin, 'admin_id', "ADM")
         
-        if not self.user:
+        if not self.user and not getattr(self, '_skip_auto_user_creation', False):
             self.create_user_account()
         
         super().save(*args, **kwargs)

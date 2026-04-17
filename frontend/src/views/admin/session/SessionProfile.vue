@@ -87,7 +87,7 @@
             <div class="card-header bg-white border-bottom">
               <h6 class="mb-0 fw-semibold"><i class="bi bi-info-circle me-2 text-admin"></i>Session Information</h6>
             </div>
-            <div class="card-body">
+            <div class="card-body info-card">
               <div class="info-row">
                 <span class="info-label">Session Code</span>
                 <span class="info-value">{{ session.session_code || 'N/A' }}</span>
@@ -124,7 +124,7 @@
                 <span class="info-label">Created At</span>
                 <span class="info-value">{{ formatDate(session.created_at) }}</span>
               </div>
-              <div class="info-row" v-if="session.description">
+              <div class="info-row info-row-multiline" v-if="session.description">
                 <span class="info-label">Description</span>
                 <span class="info-value">{{ session.description }}</span>
               </div>
@@ -256,8 +256,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { AdminPageTemplate } from '@/components/shared/panels'
-import sessionService from '@/services/shared'
-import { semesterService } from '@/services/shared'
+import { sessionService, semesterService } from '@/services/shared'
 import { ConfirmDialog, LoadingSpinner, AlertMessage } from '@/components/shared/common'
 import { useAlert } from '@/composables/shared'
 import { formatDate as formatDateUtil } from '@/utils/formatters'

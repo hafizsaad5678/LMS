@@ -61,7 +61,7 @@
         <template #filters>
           <div class="col-md-4 col-6">
             <label class="form-label small fw-semibold text-dark">Program</label>
-            <select v-model="filters.program" class="form-select" @change="loadSemesters">
+            <select v-model="filters.program" class="form-select" @change="applyFilters">
               <option value="">All Programs</option>
               <option v-for="prog in programs" :key="prog.id" :value="prog.id">{{ prog.name }}</option>
             </select>
@@ -196,7 +196,9 @@ const stats = computed(() => ({
 }))
 
 const loadSemesters = async () => {
-  // Load programs first
+  const semestersPromise = loadData(() => semesterService.getAll())
+
+  // Load programs in parallel
   const cachedProg = cacheService.get('programs_list')
   if (cachedProg) {
     programs.value = cachedProg
@@ -210,9 +212,8 @@ const loadSemesters = async () => {
       console.error('Error loading programs:', e)
     }
   }
-  
-  // Load semesters using composable
-  await loadData(() => semesterService.getAll())
+
+  await semestersPromise
 }
 
 const getProgramName = (programId) => {

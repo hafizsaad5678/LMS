@@ -23,7 +23,7 @@ const CACHE_KEYS = {
     TEACHERS_COUNT: 'admin:teachers:count',
     DEPARTMENTS_COUNT: 'admin:departments:count',
     FEES_STATS: 'admin:fees:stats',
-    SESSIONS_ACTIVE: 'admin:sessions:active',
+    SESSIONS_COUNT: 'admin:sessions:count',
     PROGRAMS_COUNT: 'admin:programs:count',
     SUBJECTS_COUNT: 'admin:subjects:count',
     ACTIVITIES_RECENT: 'admin:activities:recent'
@@ -33,20 +33,28 @@ export const adminPanelService = {
     /**
      * Get dashboard statistics with caching
      */
-    async getDashboardStats() {
-        const cached = cacheService.get(CACHE_KEYS.DASHBOARD_STATS)
+    async getDashboardStats(forceRefresh = false) {
+        const cached = forceRefresh ? null : cacheService.get(CACHE_KEYS.DASHBOARD_STATS)
         if (cached) return cached
 
         try {
-            const [students, teachers, depts, feeStats, sessions, programs, subjects] = await Promise.all([
-                this.getStudentCount(),
-                this.getTeacherCount(),
-                this.getDepartmentCount(),
-                this.getFeeStatistics(),
-                this.getActiveSessions(),
-                this.getProgramCount(),
-                this.getSubjectCount()
+            const [studentsRes, teachersRes, deptsRes, feeStatsRes, sessionsRes, programsRes, subjectsRes] = await Promise.allSettled([
+                this.getStudentCount(forceRefresh),
+                this.getTeacherCount(forceRefresh),
+                this.getDepartmentCount(forceRefresh),
+                this.getFeeStatistics(forceRefresh),
+                this.getSessionCount(forceRefresh),
+                this.getProgramCount(forceRefresh),
+                this.getSubjectCount(forceRefresh)
             ])
+
+            const students = studentsRes.status === 'fulfilled' ? studentsRes.value : 0
+            const teachers = teachersRes.status === 'fulfilled' ? teachersRes.value : 0
+            const depts = deptsRes.status === 'fulfilled' ? deptsRes.value : 0
+            const feeStats = feeStatsRes.status === 'fulfilled' ? feeStatsRes.value : { total_collected: 0 }
+            const sessions = sessionsRes.status === 'fulfilled' ? sessionsRes.value : 0
+            const programs = programsRes.status === 'fulfilled' ? programsRes.value : 0
+            const subjects = subjectsRes.status === 'fulfilled' ? subjectsRes.value : 0
 
             const stats = {
                 students,
@@ -76,8 +84,8 @@ export const adminPanelService = {
         return cacheService.get(CACHE_KEYS.DASHBOARD_STATS)
     },
 
-    async getStudentCount() {
-        const cached = cacheService.get(CACHE_KEYS.STUDENTS_COUNT)
+    async getStudentCount(forceRefresh = false) {
+        const cached = forceRefresh ? null : cacheService.get(CACHE_KEYS.STUDENTS_COUNT)
         if (cached !== null) return cached
 
         const res = await studentService.getAllStudents({ page_size: 1 })
@@ -86,8 +94,8 @@ export const adminPanelService = {
         return count
     },
 
-    async getTeacherCount() {
-        const cached = cacheService.get(CACHE_KEYS.TEACHERS_COUNT)
+    async getTeacherCount(forceRefresh = false) {
+        const cached = forceRefresh ? null : cacheService.get(CACHE_KEYS.TEACHERS_COUNT)
         if (cached !== null) return cached
 
         const res = await teacherService.getAllTeachers({ page_size: 1 })
@@ -96,8 +104,8 @@ export const adminPanelService = {
         return count
     },
 
-    async getDepartmentCount() {
-        const cached = cacheService.get(CACHE_KEYS.DEPARTMENTS_COUNT)
+    async getDepartmentCount(forceRefresh = false) {
+        const cached = forceRefresh ? null : cacheService.get(CACHE_KEYS.DEPARTMENTS_COUNT)
         if (cached !== null) return cached
 
         const res = await departmentService.getAllDepartments({ page_size: 1 })
@@ -106,8 +114,8 @@ export const adminPanelService = {
         return count
     },
 
-    async getFeeStatistics() {
-        const cached = cacheService.get(CACHE_KEYS.FEES_STATS)
+    async getFeeStatistics(forceRefresh = false) {
+        const cached = forceRefresh ? null : cacheService.get(CACHE_KEYS.FEES_STATS)
         if (cached) return cached
 
         try {
@@ -120,22 +128,22 @@ export const adminPanelService = {
         }
     },
 
-    async getActiveSessions() {
-        const cached = cacheService.get(CACHE_KEYS.SESSIONS_ACTIVE)
+    async getSessionCount(forceRefresh = false) {
+        const cached = forceRefresh ? null : cacheService.get(CACHE_KEYS.SESSIONS_COUNT)
         if (cached !== null) return cached
 
         try {
-            const data = await sessionService.getSessions({ status: 'active' })
-            const count = normalizeToArray(data).length
-            cacheService.set(CACHE_KEYS.SESSIONS_ACTIVE, count)
+            const data = await sessionService.getSessions({ page_size: 1 })
+            const count = data?.count ?? normalizeToArray(data).length
+            cacheService.set(CACHE_KEYS.SESSIONS_COUNT, count)
             return count
         } catch {
             return 0
         }
     },
 
-    async getProgramCount() {
-        const cached = cacheService.get(CACHE_KEYS.PROGRAMS_COUNT)
+    async getProgramCount(forceRefresh = false) {
+        const cached = forceRefresh ? null : cacheService.get(CACHE_KEYS.PROGRAMS_COUNT)
         if (cached !== null) return cached
 
         const res = await programService.getAllPrograms({ page_size: 1 })
@@ -144,8 +152,8 @@ export const adminPanelService = {
         return count
     },
 
-    async getSubjectCount() {
-        const cached = cacheService.get(CACHE_KEYS.SUBJECTS_COUNT)
+    async getSubjectCount(forceRefresh = false) {
+        const cached = forceRefresh ? null : cacheService.get(CACHE_KEYS.SUBJECTS_COUNT)
         if (cached !== null) return cached
 
         const res = await subjectService.getAllSubjects({ page_size: 1 })
@@ -157,56 +165,163 @@ export const adminPanelService = {
     /**
      * Get recent activities for dashboard
      */
-    async getRecentActivities() {
-        const cached = cacheService.get(CACHE_KEYS.ACTIVITIES_RECENT)
+    async getRecentActivities(forceRefresh = false) {
+        const cached = forceRefresh ? null : cacheService.get(CACHE_KEYS.ACTIVITIES_RECENT)
         if (cached) return cached
 
         try {
-            const [recentStudents, recentFees, recentAssignments] = await Promise.all([
-                studentService.getAllStudents({ ordering: '-created_at', page_size: 3 }),
-                feeService.getAll({ ordering: '-created_at', page_size: 3 }),
-                assignmentService.getAllAssignments({ ordering: '-created_at', page_size: 3 })
+            const [
+                recentStudentsRes,
+                recentTeachersRes,
+                recentDepartmentsRes,
+                recentProgramsRes,
+                recentSessionsRes,
+                recentSubjectsRes,
+                recentFeesRes,
+                recentAssignmentsRes
+            ] = await Promise.allSettled([
+                studentService.getAllStudents({ ordering: '-updated_at', page_size: 5 }),
+                teacherService.getAllTeachers({ ordering: '-updated_at', page_size: 5 }),
+                departmentService.getAllDepartments({ ordering: '-updated_at', page_size: 5 }),
+                programService.getAllPrograms({ ordering: '-updated_at', page_size: 5 }),
+                sessionService.getSessions({ ordering: '-updated_at', page_size: 5 }),
+                subjectService.getAllSubjects({ ordering: '-updated_at', page_size: 5 }),
+                feeService.getAll({ ordering: '-updated_at', page_size: 5 }),
+                assignmentService.getAllAssignments({ ordering: '-updated_at', page_size: 5 })
             ])
+
+            const safeArray = (result, extractor = (v) => v) => {
+                if (!result || result.status !== 'fulfilled') return []
+                return normalizeToArray(extractor(result.value))
+            }
+
+            const toDate = (value) => {
+                const date = value ? new Date(value) : null
+                return date && !Number.isNaN(date.getTime()) ? date : null
+            }
+
+            const getEntityTimestamp = (item) => {
+                return (
+                    toDate(item.updated_at) ||
+                    toDate(item.created_at) ||
+                    toDate(item.payment_date) ||
+                    null
+                )
+            }
+
+            const activityAction = (item) => {
+                const editCount = Number(item.edit_count || 0)
+                const createdAt = toDate(item.created_at)
+                const updatedAt = toDate(item.updated_at)
+                if (editCount > 0) return 'updated'
+                if (createdAt && updatedAt && updatedAt.getTime() - createdAt.getTime() > 1500) return 'updated'
+                return 'created'
+            }
 
             const activities = []
 
-            // Student enrollments
-            const students = normalizeToArray(recentStudents)
-            students.forEach(s => {
+            const addEntityActivities = ({ items, type, label, nameFields, icon, color }) => {
+                items.forEach((item) => {
+                    const timestamp = getEntityTimestamp(item)
+                    if (!timestamp) return
+
+                    const action = activityAction(item)
+                    const displayName = nameFields
+                        .map((field) => item?.[field])
+                        .find((v) => typeof v === 'string' && v.trim().length > 0) || `#${item?.id || 'N/A'}`
+
+                    activities.push({
+                        id: `${type}-${item.id}-${action}`,
+                        message: `${label} ${action}: ${displayName}`,
+                        time: getTimeAgo(timestamp.toISOString()),
+                        timestamp,
+                        type,
+                        icon,
+                        color
+                    })
+                })
+            }
+
+            addEntityActivities({
+                items: safeArray(recentStudentsRes),
+                type: 'student',
+                label: 'Student',
+                nameFields: ['full_name', 'enrollment_number'],
+                icon: 'bi bi-person-plus',
+                color: 'text-success'
+            })
+
+            addEntityActivities({
+                items: safeArray(recentTeachersRes),
+                type: 'teacher',
+                label: 'Teacher',
+                nameFields: ['full_name', 'employee_id'],
+                icon: 'bi bi-person-badge',
+                color: 'text-primary'
+            })
+
+            addEntityActivities({
+                items: safeArray(recentDepartmentsRes),
+                type: 'department',
+                label: 'Department',
+                nameFields: ['name', 'code'],
+                icon: 'bi bi-building',
+                color: 'text-info'
+            })
+
+            addEntityActivities({
+                items: safeArray(recentProgramsRes),
+                type: 'program',
+                label: 'Program',
+                nameFields: ['name', 'code'],
+                icon: 'bi bi-mortarboard',
+                color: 'text-secondary'
+            })
+
+            addEntityActivities({
+                items: safeArray(recentSessionsRes),
+                type: 'session',
+                label: 'Session',
+                nameFields: ['session_name', 'session_code'],
+                icon: 'bi bi-calendar-event',
+                color: 'text-warning'
+            })
+
+            addEntityActivities({
+                items: safeArray(recentSubjectsRes),
+                type: 'subject',
+                label: 'Subject',
+                nameFields: ['name', 'code'],
+                icon: 'bi bi-book',
+                color: 'text-dark'
+            })
+
+            // Fee payments are useful admin actions; keep explicit status-based message.
+            const fees = safeArray(recentFeesRes, (v) => v?.data)
+            fees.filter(f => f.status === 'paid').forEach((f) => {
+                const timestamp = getEntityTimestamp(f)
+                if (!timestamp) return
                 activities.push({
-                    id: `student-${s.id}`,
-                    message: `New student enrolled: ${s.full_name}`,
-                    time: getTimeAgo(s.created_at),
-                    timestamp: new Date(s.created_at),
-                    type: 'student'
+                    id: `fee-${f.id}-paid`,
+                    message: `Fee payment received: ${f.student_name || 'Student'}`,
+                    time: getTimeAgo(timestamp.toISOString()),
+                    timestamp,
+                    type: 'fee',
+                    icon: 'bi bi-cash-coin',
+                    color: 'text-success'
                 })
             })
 
-            // Fee payments
-            const fees = normalizeToArray(recentFees.data)
-            fees.filter(f => f.status === 'paid').forEach(f => {
-                activities.push({
-                    id: `fee-${f.id}`,
-                    message: `Fee payment received from ${f.student_name}`,
-                    time: getTimeAgo(f.payment_date || f.updated_at),
-                    timestamp: new Date(f.payment_date || f.updated_at),
-                    type: 'fee'
-                })
+            addEntityActivities({
+                items: safeArray(recentAssignmentsRes),
+                type: 'assignment',
+                label: 'Assignment',
+                nameFields: ['title'],
+                icon: 'bi bi-journal-check',
+                color: 'text-primary'
             })
 
-            // Assignments
-            const assignments = normalizeToArray(recentAssignments)
-            assignments.forEach(a => {
-                activities.push({
-                    id: `assign-${a.id}`,
-                    message: `New assignment created: ${a.title}`,
-                    time: getTimeAgo(a.created_at),
-                    timestamp: new Date(a.created_at),
-                    type: 'assignment'
-                })
-            })
-
-            const sorted = activities.sort((a, b) => b.timestamp - a.timestamp).slice(0, 5)
+            const sorted = activities.sort((a, b) => b.timestamp - a.timestamp).slice(0, 8)
             cacheService.set(CACHE_KEYS.ACTIVITIES_RECENT, sorted)
             return sorted
         } catch (error) {

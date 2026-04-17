@@ -42,6 +42,16 @@
             :items="[{ label: 'Description', value: entity.description || 'No description available' }]" />
         </div>
 
+        <!-- Assigned Teacher Info -->
+        <div class="col-12">
+          <InfoCard
+            title="Assigned Teacher Info"
+            icon="bi bi-person-badge"
+            icon-color="success"
+            :items="teacherInfoItems"
+          />
+        </div>
+
         <!-- Stats Cards -->
         <div class="col-12">
           <StatsGrid :stats="statsData" :columns="4" />
@@ -146,9 +156,38 @@ const { entityId, loading, entity, subData } = useProfileLoader({
 })
 
 // Convenient aliases for sub-resource data
-const enrolledStudents = computed(() => subData.value.students)
-const assignedTeachers = computed(() => subData.value.teachers)
-const assignments = computed(() => subData.value.assignments)
+const enrolledStudents = computed(() => Array.isArray(subData.value.students) ? subData.value.students : [])
+const assignedTeachers = computed(() => Array.isArray(subData.value.teachers) ? subData.value.teachers : [])
+const assignments = computed(() => Array.isArray(subData.value.assignments) ? subData.value.assignments : [])
+
+const primaryAssignedTeacher = computed(() => {
+  return assignedTeachers.value.length > 0 ? assignedTeachers.value[0] : null
+})
+
+const teacherInfoItems = computed(() => {
+  if (!primaryAssignedTeacher.value) {
+    return [
+      { label: 'Teacher', value: 'Not assigned yet' },
+      { label: 'Designation', value: 'Will appear once assigned' },
+      { label: 'Notes', value: 'You can assign a teacher from subject-teacher assignment flow.' }
+    ]
+  }
+
+  return [
+    {
+      label: 'Teacher',
+      value: primaryAssignedTeacher.value.teacher_name || primaryAssignedTeacher.value.full_name || 'Assigned'
+    },
+    {
+      label: 'Designation',
+      value: primaryAssignedTeacher.value.designation || 'Teacher'
+    },
+    {
+      label: 'Total Assigned Teachers',
+      value: String(assignedTeachers.value.length)
+    }
+  ]
+})
 
 // Profile badges for ProfileHeader
 const profileBadges = computed(() => {

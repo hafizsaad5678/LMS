@@ -126,7 +126,6 @@ import { api } from '@/services/shared'
 import { cacheService } from '@/services/shared'
 import { ADMIN_ROUTES } from '@/utils/constants/routes'
 import { getActiveBadgeClass, getActiveStatusText } from '@/utils/badgeHelpers'
-import adminPanelService from '@/services/admin/adminPanelService'
 
 const router = useRouter()
 
@@ -181,15 +180,7 @@ const {
   }
 })
 
-const totalTeachers = ref(0)
-const loadTeacherStats = async () => {
-    try {
-        const dashboardStats = await adminPanelService.getDashboardStats()
-        totalTeachers.value = dashboardStats.teachers || 0
-    } catch (error) {
-        console.error('Failed to load teacher stats:', error)
-    }
-}
+const totalTeachers = computed(() => stats.value.total)
 
 const activeTeachers = computed(() => filteredData.value.filter(t => t.is_active).length)
 const inactiveTeachers = computed(() => filteredData.value.filter(t => !t.is_active).length)
@@ -235,7 +226,6 @@ const handleToggle = async (teacher) => {
 onMounted(() => {
   loadData(fetchTeachers)
   loadDepartments()
-  loadTeacherStats()
 })
 </script>
 

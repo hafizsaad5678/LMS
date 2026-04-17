@@ -21,13 +21,12 @@ class BaseProfileSerializer(serializers.ModelSerializer):
         if not password:
             raise serializers.ValidationError({'password': 'This field is required.'})
 
-        instance = super().create(validated_data)
-
-        # Model save may auto-create user; enforce caller-supplied password after creation.
-        if instance.user:
-            instance.reset_password(password)
-        else:
-            instance.create_user_account(password)
+        # Avoid model auto-user creation so credentials email uses the provided password.
+        model_class = self.Meta.model
+        instance = model_class(**validated_data)
+        instance._skip_auto_user_creation = True
+        instance.save()
+        instance.create_user_account(password)
 
         return instance
 
@@ -52,6 +51,30 @@ class StudentSerializer(BaseProfileSerializer):
         model = Student
         fields = '__all__'
         read_only_fields = BaseProfileSerializer.Meta.read_only_fields + ['enrollment_number']
+
+    def validate(self, attrs):
+        program = attrs.get('program', getattr(self.instance, 'program', None))
+        session = attrs.get('session', getattr(self.instance, 'session', None))
+
+        if self.instance is None:
+            if not program:
+                raise serializers.ValidationError({'program': 'Program/Course is required to create a student.'})
+            if not session:
+                raise serializers.ValidationError({'session': 'Academic session is required to create a student.'})
+
+        if program and session and session.program_id and session.program_id != program.id:
+            raise serializers.ValidationError({'session': 'Selected session does not belong to the selected program/course.'})
+
+        if program and program.department and program.department.is_active is False:
+            raise serializers.ValidationError({'program': 'Selected program belongs to an inactive department.'})
+
+        if program and program.department and program.department.institution and program.department.institution.is_active is False:
+            raise serializers.ValidationError({'program': 'Selected program belongs to an inactive institution.'})
+
+        if session and getattr(session, 'is_active', True) is False:
+            raise serializers.ValidationError({'session': 'Selected session is inactive.'})
+
+        return attrs
     
     def get_current_semester_name(self, obj):
         if obj.current_semester:
@@ -105,6 +128,16 @@ class TeacherSerializer(BaseProfileSerializer):
         fields = '__all__'
         read_only_fields = BaseProfileSerializer.Meta.read_only_fields + ['employee_id']
 
+    def validate(self, attrs):
+        department = attrs.get('department', getattr(self.instance, 'department', None))
+        if self.instance is None and not department:
+            raise serializers.ValidationError({'department': 'Department is required to create a teacher.'})
+        if department and department.is_active is False:
+            raise serializers.ValidationError({'department': 'Selected department is inactive.'})
+        if department and department.institution and department.institution.is_active is False:
+            raise serializers.ValidationError({'department': 'Selected department belongs to an inactive institution.'})
+        return attrs
+
 
 class AdminSerializer(BaseProfileSerializer):
     def validate(self, attrs):
@@ -130,6 +163,22 @@ class TeacherSubjectSerializer(serializers.ModelSerializer):
         model = TeacherSubject
         fields = '__all__'
 
+    def validate(self, attrs):
+        teacher = attrs.get('teacher')
+        subject = attrs.get('subject')
+
+        if self.instance is None:
+            if not teacher:
+                raise serializers.ValidationError({'teacher': 'Teacher is required for subject assignment.'})
+            if not subject:
+                raise serializers.ValidationError({'subject': 'Subject is required for teacher assignment.'})
+
+        if teacher and subject and subject.semester and subject.semester.program and subject.semester.program.department and teacher.department:
+            if teacher.department_id != subject.semester.program.department_id:
+                raise serializers.ValidationError({'teacher': 'Teacher department must match subject program department.'})
+
+        return attrs
+
     def get_student_count(self, obj):
         if obj.subject:
             return obj.subject.enrolled_students.count()
@@ -149,6 +198,43 @@ class StudentSubjectSerializer(serializers.ModelSerializer):
     class Meta:
         model = StudentSubject
         fields = '__all__'
+
+    def validate(self, attrs):
+        student = attrs.get('student', getattr(self.instance, 'student', None))
+        subject = attrs.get('subject', getattr(self.instance, 'subject', None))
+        semester = attrs.get('semester', getattr(self.instance, 'semester', None))
+
+        if self.instance is None:
+            if not student:
+                raise serializers.ValidationError({'student': 'Student is required for enrollment.'})
+            if not subject:
+                raise serializers.ValidationError({'subject': 'Subject is required for enrollment.'})
+
+        subject_semester = subject.semester if subject else None
+        effective_semester = semester or subject_semester
+
+        if self.instance is None and not effective_semester:
+            raise serializers.ValidationError({'semester': 'Semester is required for enrollment (directly or through selected subject).'})
+
+        if semester and subject_semester and semester.id != subject_semester.id:
+            raise serializers.ValidationError({'semester': 'Selected semester does not match the subject semester.'})
+
+        if student and subject_semester and subject_semester.program and student.program_id and student.program_id != subject_semester.program_id:
+            raise serializers.ValidationError({'student': 'Student program does not match subject program.'})
+
+        if student and student.session_id and subject_semester and subject_semester.session_id and student.session_id != subject_semester.session_id:
+            raise serializers.ValidationError({'student': 'Student session does not match subject semester session.'})
+
+        if student and student.program and student.program.department and student.program.department.is_active is False:
+            raise serializers.ValidationError({'student': 'Selected student belongs to an inactive department hierarchy.'})
+
+        if student and student.session and getattr(student.session, 'is_active', True) is False:
+            raise serializers.ValidationError({'student': 'Selected student belongs to an inactive session.'})
+
+        if subject and subject.semester and subject.semester.session and getattr(subject.semester.session, 'is_active', True) is False:
+            raise serializers.ValidationError({'subject': 'Selected subject belongs to an inactive session.'})
+
+        return attrs
         
     def get_teacher_name(self, obj):
         if obj.subject:
