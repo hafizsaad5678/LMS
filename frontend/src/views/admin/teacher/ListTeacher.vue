@@ -37,22 +37,34 @@
     <template #filters>
       <SearchFilter
         v-model="filters.search"
-        v-model:status-value="filters.status"
         search-placeholder="Search by name, email, or ID..."
-        search-col-size="col-md-4 col-12"
-        actions-col-size="col-md-2 col-6"
+        preset="admin-list"
+        :show-status-filter="false"
         :loading="loading"
         @refresh="handleRefresh"
         @reset="handleReset"
       >
         <template #filters>
-          <div class="col-md-3 col-6">
-            <label class="form-label small fw-semibold text-dark">Department</label>
-            <select v-model="filters.department" class="form-select" @change="applyFilters">
-              <option value="">All Departments</option>
-              <option v-for="dept in departments" :key="dept.id" :value="dept.name">{{ dept.name }}</option>
-            </select>
-          </div>
+          <SelectInput
+            v-model="filters.department"
+            label="Department"
+            placeholder="All Departments"
+            :options="departments"
+            option-value-key="name"
+            option-label-key="name"
+            col-class="col-md-3 col-6"
+            :no-margin="true"
+            label-class="small fw-semibold text-dark"
+          />
+          <SelectInput
+            v-model="filters.designation"
+            label="Designation"
+            placeholder="All Designations"
+            :options="designationOptions"
+            col-class="col-md-3 col-6"
+            :no-margin="true"
+            label-class="small fw-semibold text-dark"
+          />
         </template>
       </SearchFilter>
     </template>
@@ -116,11 +128,11 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { AdminPageTemplate } from '@/components/shared/panels'
-import { StatCard, DataTable, SearchFilter, ActionButtons, AlertMessage } from '@/components/shared/common'
-import { useEntityList, useAlert } from '@/composables/shared'
+import { StatCard, DataTable, SearchFilter, SelectInput, ActionButtons, AlertMessage } from '@/components/shared/common'
+import { useEntityList, useAlert, useFilterOptions, useListStats } from '@/composables/shared'
 import { teacherService } from '@/services/shared'
 import { api } from '@/services/shared'
 import { cacheService } from '@/services/shared'
@@ -149,7 +161,6 @@ const tableColumns = [
   { key: 'qualification', label: 'Qualification', hideOnMobile: true, default: 'N/A' },
   { key: 'is_active', label: 'Status' },
   { key: 'edit_count', label: 'Edits', hideOnMobile: true },
-  { key: 'created_at', label: 'Joined', type: 'date', hideOnMobile: true },
   { key: 'actions', label: 'Actions', center: true }
 ]
 
@@ -159,11 +170,11 @@ const departments = ref([])
 // Use composable with custom filter
 const {
   loading,
+  data,
   filteredData,
   filters,
   stats,
   loadData,
-  applyFilters,
   resetFilters,
   refresh,
   toggleStatus
@@ -171,22 +182,31 @@ const {
   cacheKey: 'teachers_list',
   searchFields: ['full_name', 'email', 'employee_id', 'department_name', 'qualification'],
   statusField: 'is_active',
-  defaultFilters: { department: '' },
-  customFilter: (data, filters) => {
-    if (filters.department) {
-      return data.filter(t => t.department_name === filters.department)
+  defaultFilters: { department: '', designation: '' },
+  filterSchema: [
+    {
+      key: 'department',
+      itemValue: 'department_name',
+      normalize: value => String(value || '').trim()
+    },
+    {
+      key: 'designation',
+      itemValue: 'designation',
+      normalize: value => String(value || '').trim()
     }
-    return data
-  }
+  ]
 })
 
 const totalTeachers = computed(() => stats.value.total)
 
-const activeTeachers = computed(() => filteredData.value.filter(t => t.is_active).length)
-const inactiveTeachers = computed(() => filteredData.value.filter(t => !t.is_active).length)
+const listStats = useListStats(filteredData)
 
-// Watch department filter
-watch(() => filters.value.department, () => applyFilters())
+const activeTeachers = listStats.count((teacher) => teacher.is_active)
+const inactiveTeachers = listStats.count((teacher) => !teacher.is_active)
+
+const { createPrimitiveOptions } = useFilterOptions(data)
+
+const designationOptions = createPrimitiveOptions({ value: 'designation' })
 
 // Methods
 const fetchTeachers = () => teacherService.getAllTeachers()
@@ -209,10 +229,7 @@ const loadDepartments = async () => {
 
 const handleRefresh = () => refresh(fetchTeachers)
 
-const handleReset = () => {
-  filters.value.department = ''
-  resetFilters()
-}
+const handleReset = () => resetFilters()
 
 const handleToggle = async (teacher) => {
   try {

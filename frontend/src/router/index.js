@@ -54,7 +54,8 @@ const verifyTokenWithBackend = async (token, userRole) => {
   const userId = safeStorage.get('userId') || safeStorage.get('student_id')
   const probeUrl = getAuthProbeUrl(userRole, userId)
 
-  if (!probeUrl) return false
+  // Missing probe target should not hard-logout users during client reload/hydration.
+  if (!probeUrl) return true
 
   const cacheKey = `${token}:${userRole}:${userId || ''}`
   const now = Date.now()
@@ -76,15 +77,22 @@ const verifyTokenWithBackend = async (token, userRole) => {
         },
       })
 
-      if (!response.ok) {
+      // Only explicit auth failures should invalidate the session.
+      if (response.status === 401 || response.status === 403) {
         return false
+      }
+
+      // For transient server/network states (5xx, startup lag), keep the session.
+      if (!response.ok) {
+        return true
       }
 
       lastAuthCheckAt = Date.now()
       lastAuthCheckKey = cacheKey
       return true
     } catch {
-      return false
+      // Dev reloads or temporary network issues should not force logout.
+      return true
     } finally {
       pendingAuthCheck = null
       pendingAuthCheckKey = ''

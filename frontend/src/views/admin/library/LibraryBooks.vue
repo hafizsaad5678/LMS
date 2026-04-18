@@ -32,115 +32,114 @@
       <SearchFilter
         v-model="filters.search"
         search-placeholder="Search books by title, author, ISBN..."
+        preset="admin-list"
         :show-status-filter="false"
-        search-col-size="col-md-5 col-12"
-        actions-col-size="col-md-3 col-6"
         :loading="loading"
-        @refresh="() => refresh(fetchBooks)"
+        @refresh="handleRefresh"
         @reset="resetFilters"
       >
         <template #filters>
-          <div class="col-md-4 col-6">
-            <label class="form-label small fw-semibold text-dark">Category</label>
-            <select v-model="filters.category" class="form-select">
-              <option value="">All Categories</option>
-              <option value="science">Science</option>
-              <option value="technology">Technology</option>
-              <option value="arts">Arts</option>
-              <option value="literature">Literature</option>
-              <option value="history">History</option>
-            </select>
-          </div>
+          <SelectInput
+            v-model="filters.category"
+            label="Category"
+            placeholder="All Categories"
+            :options="BOOK_CATEGORY_OPTIONS"
+            col-class="col-md-4 col-6"
+            :no-margin="true"
+            label-class="small fw-semibold text-dark"
+          />
         </template>
       </SearchFilter>
     </template>
 
-    <!-- Main Content -->
-    <DataTable :columns="tableColumns" :data="filteredData" :loading="loading" loading-text="Loading books..." empty-icon="bi bi-book" empty-title="No books found" empty-subtitle="Add your first book to get started">
-      <template #cell-title="{ row }">
-        <div class="d-flex align-items-center">
-          <div class="avatar-circle avatar-book me-2"><i class="bi bi-book"></i></div>
-          <div>
-            <div class="fw-semibold text-dark">{{ row.title }}</div>
-            <small class="text-muted">{{ row.publisher }}</small>
+    <!-- Books Grid (same pattern as Accounts) -->
+    <LoadingSpinner v-if="loading" theme="admin" />
+    <div v-else-if="filteredData.length === 0" class="text-center py-5">
+      <i class="bi bi-book display-1 text-muted"></i>
+      <h5 class="text-muted mt-3">No Books Found</h5>
+      <button @click="openCreateModal()" class="btn btn-admin-primary mt-3"><i class="bi bi-plus-circle me-2"></i>Add Book</button>
+    </div>
+    <div v-else class="row g-4">
+      <div v-for="book in filteredData" :key="book.id" class="col-md-6 col-lg-4">
+        <div class="card border-0 shadow-sm h-100">
+          <div class="card-body">
+            <div class="d-flex justify-content-between align-items-start mb-3">
+              <div class="d-flex align-items-center">
+                <div class="avatar-circle avatar-book me-3"><i class="bi bi-book"></i></div>
+                <div>
+                  <h6 class="mb-0 fw-semibold">{{ book.title }}</h6>
+                  <small class="text-muted">{{ book.author }}</small>
+                </div>
+              </div>
+              <span :class="['badge', book.copies_available > 0 ? 'bg-success' : 'bg-danger']">
+                {{ book.copies_available > 0 ? 'Available' : 'Unavailable' }}
+              </span>
+            </div>
+
+            <div class="mb-2"><small class="text-muted">ISBN</small><div class="fw-medium"><code>{{ book.isbn || '-' }}</code></div></div>
+            <div class="mb-2"><small class="text-muted">Publisher</small><div class="fw-medium">{{ book.publisher || 'N/A' }}</div></div>
+            <div class="mb-2"><small class="text-muted">Category</small><div class="fw-medium text-capitalize">{{ book.category || 'N/A' }}</div></div>
+
+            <div class="border-top pt-3">
+              <small class="text-muted">Copies</small>
+              <h5 class="mb-0 fw-bold">{{ book.copies_available || 0 }} / {{ book.copies_total || 0 }}</h5>
+            </div>
           </div>
-        </div>
-      </template>
 
-      <template #cell-category="{ value }">
-        <span class="badge bg-info">{{ value }}</span>
-      </template>
-
-      <template #cell-isbn="{ value }">
-        <code>{{ value || '-' }}</code>
-      </template>
-
-      <template #cell-copies="{ row }">
-        {{ row.copies_available || 0 }} / {{ row.copies_total || 0 }}
-      </template>
-
-      <template #cell-status="{ row }">
-        <span :class="['badge', row.copies_available > 0 ? 'bg-success' : 'bg-danger']">
-          {{ row.copies_available > 0 ? 'Available' : 'Unavailable' }}
-        </span>
-      </template>
-
-      <template #cell-actions="{ row }">
-        <ActionButtons :item="row" :show-view="false" @edit="openEditModal(row)" @delete="confirmDelete(row)" />
-      </template>
-    </DataTable>
-
-    <!-- Add/Edit Book Modal -->
-    <div v-if="showModal" class="modal show d-block modal-backdrop-custom" tabindex="-1">
-      <div class="modal-dialog modal-dialog-centered modal-lg">
-        <div class="modal-content">
-          <div class="modal-header"><h5 class="modal-title">{{ editMode ? 'Edit Book' : 'Add Book' }}</h5><button type="button" class="btn-close" @click="closeModal"></button></div>
-          <div class="modal-body">
-            <form @submit.prevent="handleSubmit">
-              <div class="row">
-                <div class="col-md-8 mb-3"><label class="form-label">Title <span class="text-danger">*</span></label><input v-model="form.title" type="text" class="form-control" required></div>
-                <div class="col-md-4 mb-3"><label class="form-label">ISBN</label><input v-model="form.isbn" type="text" class="form-control"></div>
-              </div>
-              <div class="row">
-                <div class="col-md-6 mb-3"><label class="form-label">Author <span class="text-danger">*</span></label><input v-model="form.author" type="text" class="form-control" required></div>
-                <div class="col-md-6 mb-3"><label class="form-label">Publisher</label><input v-model="form.publisher" type="text" class="form-control"></div>
-              </div>
-              <div class="row">
-                <div class="col-md-4 mb-3"><label class="form-label">Category</label><select v-model="form.category" class="form-select"><option value="science">Science</option><option value="technology">Technology</option><option value="arts">Arts</option><option value="literature">Literature</option><option value="history">History</option></select></div>
-                <div class="col-md-4 mb-3"><label class="form-label">Total Copies</label><input v-model.number="form.copies_total" type="number" class="form-control"></div>
-                <div class="col-md-4 mb-3"><label class="form-label">Available</label><input v-model.number="form.copies_available" type="number" class="form-control"></div>
-              </div>
-              <div class="d-flex gap-2 justify-content-end">
-                <button type="button" @click="closeModal" class="btn btn-secondary">Cancel</button>
-                <button type="submit" class="btn btn-admin-primary" :disabled="submitting">{{ editMode ? 'Update' : 'Add' }} Book</button>
-              </div>
-            </form>
+          <div class="card-footer bg-transparent border-top-0">
+            <div class="d-flex gap-2">
+              <button @click="openEditModal(book)" class="btn btn-sm btn-outline-warning flex-grow-1"><i class="bi bi-pencil me-1"></i>Edit</button>
+              <button @click="confirmDelete(book)" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+            </div>
           </div>
         </div>
       </div>
     </div>
   </AdminPageTemplate>
+
+  <EntityFormModal
+    v-model="showModal"
+    :title="editMode ? 'Edit Book' : 'Add Book'"
+    icon="bi bi-book"
+    :loading="submitting"
+    :confirm-text="editMode ? 'Update Book' : 'Add Book'"
+    confirm-variant="btn-admin-primary"
+    @confirm="handleSubmit()"
+    @close="closeModal"
+  >
+    <form @submit.prevent="handleSubmit()">
+      <div class="row">
+        <div class="col-md-8 mb-3"><label class="form-label">Title <span class="text-danger">*</span></label><input v-model="form.title" type="text" class="form-control" required></div>
+        <div class="col-md-4 mb-3"><label class="form-label">ISBN</label><input v-model="form.isbn" type="text" class="form-control"></div>
+      </div>
+      <div class="row">
+        <div class="col-md-6 mb-3"><label class="form-label">Author <span class="text-danger">*</span></label><input v-model="form.author" type="text" class="form-control" required></div>
+        <div class="col-md-6 mb-3"><label class="form-label">Publisher</label><input v-model="form.publisher" type="text" class="form-control"></div>
+      </div>
+      <div class="row">
+        <div class="col-md-4 mb-3">
+          <label class="form-label">Category</label>
+          <select v-model="form.category" class="form-select">
+            <option v-for="opt in BOOK_CATEGORY_OPTIONS" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+          </select>
+        </div>
+        <div class="col-md-4 mb-3"><label class="form-label">Total Copies</label><input v-model.number="form.copies_total" type="number" min="0" class="form-control"></div>
+        <div class="col-md-4 mb-3"><label class="form-label">Available</label><input v-model.number="form.copies_available" type="number" min="0" class="form-control"></div>
+      </div>
+    </form>
+  </EntityFormModal>
 </template>
 
 <script setup>
 import { computed, onMounted } from 'vue'
 import { AdminPageTemplate } from '@/components/shared/panels'
-import { StatCard, DataTable, SearchFilter, ActionButtons, AlertMessage, ConfirmDialog } from '@/components/shared/common'
-import { useEntityList, useCrudModal } from '@/composables/shared'
+import { StatCard, SearchFilter, SelectInput, AlertMessage, ConfirmDialog, EntityFormModal, LoadingSpinner } from '@/components/shared/common'
+import { useEntityList, useCrudModal, useListStats } from '@/composables/shared'
 import { libraryBookService } from '@/services/admin/managementService'
 import { ADMIN_ROUTES } from '@/utils/constants/routes'
+import { BOOK_CATEGORY_OPTIONS } from '@/utils/constants/options'
 
 const breadcrumbs = [{ name: 'Dashboard', href: ADMIN_ROUTES.DASHBOARD.path }, { name: 'Library', href: ADMIN_ROUTES.LIBRARY_BOOKS.path }, { name: 'Books' }]
-
-const tableColumns = [
-  { key: 'title', label: 'Book' },
-  { key: 'author', label: 'Author', hideOnMobile: true },
-  { key: 'category', label: 'Category', hideOnMobile: true },
-  { key: 'isbn', label: 'ISBN', hideOnMobile: true },
-  { key: 'copies', label: 'Copies' },
-  { key: 'status', label: 'Status' },
-  { key: 'actions', label: 'Actions', center: true }
-]
 
 const defaultForm = { title: '', author: '', isbn: '', publisher: '', category: 'science', copies_total: 1, copies_available: 1 }
 
@@ -152,10 +151,13 @@ const fetchBooks = async () => {
 const { loading, data, filteredData, filters, loadData, resetFilters, refresh } = useEntityList({
   searchFields: ['title', 'author', 'isbn'],
   defaultFilters: { category: '' },
-  customFilter: (list, f) => {
-    if (f.category) list = list.filter(b => b.category === f.category)
-    return list.sort((a, b) => (a.title || '').localeCompare(b.title || ''))
-  }
+  filterSchema: [
+    {
+      key: 'category',
+      itemValue: 'category'
+    }
+  ],
+  customFilter: (list) => list.sort((a, b) => (a.title || '').localeCompare(b.title || ''))
 })
 
 const { alert, showModal, showDeleteModal, editMode, submitting, form, selectedItem, openCreateModal, openEditModal, closeModal, handleSubmit, confirmDelete, handleDelete } = useCrudModal({
@@ -169,8 +171,11 @@ const { alert, showModal, showDeleteModal, editMode, submitting, form, selectedI
 
 const actions = [{ label: 'Add Book', icon: 'bi bi-plus-circle', variant: 'btn-admin-primary', onClick: openCreateModal }]
 
-const availableCount = computed(() => data.value.filter(b => b.copies_available > 0).length)
-const totalCopies = computed(() => data.value.reduce((sum, b) => sum + (b.copies_total || 0), 0))
+const listStats = useListStats(data)
+const availableCount = listStats.count((book) => book.copies_available > 0)
+const totalCopies = listStats.sum((book) => book.copies_total)
+
+const handleRefresh = () => refresh(fetchBooks)
 
 onMounted(() => loadData(fetchBooks))
 </script>

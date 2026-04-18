@@ -11,6 +11,8 @@ export { useAsyncState } from './data/useAsyncState'
 export { useCachedData, useCachedDataMultiple } from './data/useCachedData'
 export { useCrudModal } from './data/useCrudModal'
 export { useProfileLoader } from './data/useProfileLoader'
+export { useFilterOptions } from './data/useFilterOptions'
+export { useListStats } from './data/useListStats'
 
 // Form Logic & Validation
 export { useEntityForm } from './form/useEntityForm'

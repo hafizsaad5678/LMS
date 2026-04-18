@@ -117,6 +117,7 @@
                             model-type="yyyy-MM-dd"
                             format="yyyy-MM-dd"
                             auto-apply
+                            :text-input="false"
                             :state="null"
                             :teleport="false"
                             input-class-name="form-control form-control-sm"
@@ -129,6 +130,7 @@
                             model-type="yyyy-MM-dd"
                             format="yyyy-MM-dd"
                             auto-apply
+                            :text-input="false"
                             :state="null"
                             :teleport="false"
                             input-class-name="form-control form-control-sm"

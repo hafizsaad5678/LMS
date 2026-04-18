@@ -68,9 +68,12 @@ export const adminRoutes = {
         { path: 'sessions/edit/:id', name: 'EditSession', component: () => import('../../views/admin/session/EditSession.vue'), props: true },
         { path: 'sessions/profile', name: 'SessionProfileSelect', component: () => import('../../views/admin/session/SessionProfile.vue') },
         { path: 'sessions/profile/:id', name: 'SessionProfile', component: () => import('../../views/admin/session/SessionProfile.vue'), props: true },
+        { path: 'sessions/promotion', name: 'SemesterPromotion', component: () => import('../../views/admin/session/SemesterPromotion.vue') },
 
         // Assignment routes
         { path: 'assignments', name: 'ListAssignment', component: () => import('../../views/admin/assignment/ListAssignment.vue') },
+        { path: 'assignments/view', name: 'ViewAssignmentSelect', component: () => import('../../views/admin/assignment/ViewAssignment.vue') },
+        { path: 'assignments/view/:id', name: 'ViewAssignment', component: () => import('../../views/admin/assignment/ViewAssignment.vue'), props: true },
         { path: 'assignments/add', name: 'AddAssignment', component: () => import('../../views/admin/assignment/AddAssignment.vue') },
         { path: 'assignments/edit/:id?', name: 'EditAssignment', component: () => import('../../views/admin/assignment/EditAssignment.vue') },
         { path: 'assignments/delete/:id?', name: 'DeleteAssignment', component: () => import('../../views/admin/assignment/DeleteAssignment.vue') },

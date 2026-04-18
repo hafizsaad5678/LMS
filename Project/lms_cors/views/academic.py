@@ -1,12 +1,14 @@
 from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from django.db import transaction
+from django.db import IntegrityError
 from django.db.models import Q
 
 from .base import BaseViewSet
 from ..models import (
     Institution, Department, Program, AcademicSession, Semester, Subject,
-    Student, Teacher, TeacherSubject
+    Student, StudentSemesterHistory, StudentSubject, Teacher, TeacherSubject
 )
 from ..serializers import (
     InstitutionSerializer, InstitutionDetailSerializer,
@@ -146,26 +148,39 @@ class AcademicSessionViewSet(BaseViewSet):
         instance = serializer.save()
         instance.edit_count += 1
         instance.save(update_fields=['edit_count'])
+
+    def _get_promotion_semesters(self, session):
+        semesters = session.semesters.all().order_by('number')
+        active_semester = semesters.filter(status='active').first()
+        next_semester = None
+
+        if active_semester:
+            next_semester = semesters.filter(number__gt=active_semester.number).first()
+
+        return semesters, active_semester, next_semester
     
     @action(detail=True)
     def semesters(self, request, pk=None):
         session = self.get_object()
         semesters = session.semesters.all().order_by('number')
-        if not semesters.exists() and session.program:
-            semesters = session.program.semesters_legacy.all().order_by('number')
         return Response(SemesterSerializer(semesters, many=True).data)
     
     @action(detail=True)
     def students(self, request, pk=None):
         session = self.get_object()
         students = session.students.all()
-        if not students.exists() and session.program:
-            students = session.program.students_legacy.all()
         return Response(StudentSerializer(students, many=True).data)
     
     @action(detail=True, methods=['post'])
     def setup_semesters(self, request, pk=None):
         session = self.get_object()
+
+        if session.status != 'active' or not session.is_active:
+            return Response(
+                {'error': 'Semesters can only be generated for active sessions. Please activate this session first.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         if session.semesters.exists():
             return Response(
                 {'error': f'Semesters already exist for {session.session_name}'},
@@ -177,6 +192,11 @@ class AcademicSessionViewSet(BaseViewSet):
                 'message': f'Successfully created {len(semesters)} semesters for {session.session_name}',
                 'semesters': SemesterSerializer(semesters, many=True).data
             }, status=status.HTTP_201_CREATED)
+        except IntegrityError as e:
+            return Response(
+                {'error': f'Failed to create semesters due to a uniqueness conflict: {str(e)}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
         except Exception as e:
             return Response(
                 {'error': f'Failed to create semesters: {str(e)}'},
@@ -215,6 +235,189 @@ class AcademicSessionViewSet(BaseViewSet):
             'status': session.status
         })
         return Response(stats)
+
+    @action(detail=True, methods=['get'])
+    def promotion_overview(self, request, pk=None):
+        session = self.get_object()
+        semesters, active_semester, next_semester = self._get_promotion_semesters(session)
+
+        if not semesters.exists():
+            return Response(
+                {'error': 'No semesters found for this session. Run semester setup first.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        current_semester_students = session.students.filter(
+            is_active=True,
+            current_semester=active_semester.number if active_semester else None
+        )
+
+        return Response({
+            'session': {
+                'id': str(session.id),
+                'name': session.session_name,
+                'code': session.session_code,
+                'status': session.status,
+            },
+            'active_semester': {
+                'id': str(active_semester.id),
+                'name': active_semester.name,
+                'number': active_semester.number,
+                'start_date': active_semester.start_date,
+                'end_date': active_semester.end_date,
+            } if active_semester else None,
+            'next_semester': {
+                'id': str(next_semester.id),
+                'name': next_semester.name,
+                'number': next_semester.number,
+                'start_date': next_semester.start_date,
+                'end_date': next_semester.end_date,
+            } if next_semester else None,
+            'eligible_students_count': current_semester_students.count(),
+            'total_students_in_session': session.students.filter(is_active=True).count(),
+            'semesters_count': semesters.count(),
+            'next_semester_subjects_count': Subject.objects.filter(semester=next_semester).count() if next_semester else 0,
+        })
+
+    @action(detail=True, methods=['post'])
+    def promote_semester(self, request, pk=None):
+        session = self.get_object()
+        _, active_semester, next_semester = self._get_promotion_semesters(session)
+
+        if not active_semester:
+            return Response(
+                {'error': 'No active semester found for this session.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if not next_semester:
+            return Response(
+                {'error': 'No next semester available. This may be the final semester.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        hold_student_ids = request.data.get('hold_student_ids') or []
+        hold_student_ids = {str(student_id) for student_id in hold_student_ids}
+        promotion_note = request.data.get('note', '').strip() or None
+
+        base_students_qs = session.students.filter(is_active=True, current_semester=active_semester.number)
+        held_students_qs = base_students_qs.filter(id__in=hold_student_ids)
+        promoted_students_qs = base_students_qs.exclude(id__in=hold_student_ids)
+
+        promoted_students = list(promoted_students_qs)
+        held_students = list(held_students_qs)
+
+        with transaction.atomic():
+            Semester.objects.filter(session=session, status='active').exclude(id=active_semester.id).update(status='completed')
+
+            active_semester.status = 'completed'
+            active_semester.save(update_fields=['status', 'updated_at'])
+
+            next_semester.status = 'active'
+            next_semester.save(update_fields=['status', 'updated_at'])
+
+            if promoted_students:
+                Student.objects.filter(id__in=[student.id for student in promoted_students]).update(
+                    current_semester=next_semester.number
+                )
+
+                # Sync promoted students to next semester subjects.
+                next_semester_subjects = list(
+                    Subject.objects.filter(semester=next_semester).only('id')
+                )
+                if next_semester_subjects:
+                    promoted_student_ids = [student.id for student in promoted_students]
+
+                    existing_pairs = set(
+                        StudentSubject.objects.filter(
+                            student_id__in=promoted_student_ids,
+                            semester=next_semester,
+                            subject_id__in=[subject.id for subject in next_semester_subjects]
+                        ).values_list('student_id', 'subject_id')
+                    )
+
+                    new_enrollments = []
+                    for student in promoted_students:
+                        for subject in next_semester_subjects:
+                            pair = (student.id, subject.id)
+                            if pair in existing_pairs:
+                                continue
+                            new_enrollments.append(StudentSubject(
+                                student_id=student.id,
+                                subject_id=subject.id,
+                                semester=next_semester
+                            ))
+
+                    if new_enrollments:
+                        StudentSubject.objects.bulk_create(new_enrollments, ignore_conflicts=True)
+
+            history_entries = []
+            for student in promoted_students:
+                history_entries.append(StudentSemesterHistory(
+                    student=student,
+                    session=session,
+                    from_semester=active_semester,
+                    to_semester=next_semester,
+                    action='promoted',
+                    notes=promotion_note,
+                ))
+
+            for student in held_students:
+                history_entries.append(StudentSemesterHistory(
+                    student=student,
+                    session=session,
+                    from_semester=active_semester,
+                    to_semester=active_semester,
+                    action='held',
+                    notes=promotion_note,
+                ))
+
+            if history_entries:
+                StudentSemesterHistory.objects.bulk_create(history_entries)
+
+        return Response({
+            'message': f'Semester promotion completed for {session.session_name}.',
+            'session_id': str(session.id),
+            'from_semester': {
+                'id': str(active_semester.id),
+                'name': active_semester.name,
+                'number': active_semester.number,
+            },
+            'to_semester': {
+                'id': str(next_semester.id),
+                'name': next_semester.name,
+                'number': next_semester.number,
+            },
+            'promoted_count': len(promoted_students),
+            'held_count': len(held_students),
+            'next_semester_subjects_count': Subject.objects.filter(semester=next_semester).count(),
+            'subject_enrollment_links_count': StudentSubject.objects.filter(
+                student_id__in=[student.id for student in promoted_students],
+                semester=next_semester
+            ).count(),
+        })
+
+    @action(detail=True, methods=['get'])
+    def promotion_history(self, request, pk=None):
+        session = self.get_object()
+        history_qs = StudentSemesterHistory.objects.filter(session=session).select_related(
+            'student', 'from_semester', 'to_semester'
+        ).order_by('-created_at')[:200]
+
+        return Response([
+            {
+                'id': str(entry.id),
+                'student_id': str(entry.student.id),
+                'student_name': entry.student.full_name,
+                'enrollment_number': entry.student.enrollment_number,
+                'from_semester': entry.from_semester.number if entry.from_semester else None,
+                'to_semester': entry.to_semester.number if entry.to_semester else None,
+                'action': entry.action,
+                'notes': entry.notes,
+                'created_at': entry.created_at,
+            }
+            for entry in history_qs
+        ])
     
     @action(detail=True, methods=['post'])
     def activate(self, request, pk=None):
@@ -248,14 +451,11 @@ class AcademicSessionViewSet(BaseViewSet):
 
 
 class SemesterViewSet(BaseViewSet):
-    queryset = Semester.objects.select_related('program', 'program__department', 'program__department__institution', 'session').filter(
-        program__isnull=False,
-        program__department__is_active=True,
-        program__department__institution__is_active=True
-    ).filter(Q(session__isnull=True) | Q(session__is_active=True))
+    queryset = Semester.objects.select_related('program', 'session').all()
     serializer_class = SemesterSerializer
+    pagination_class = None  # Ensure all semesters load for frontend table
     search_fields = ['name', 'program__name', 'program__code']
-    filterset_fields = ['program', 'program__department']
+    filterset_fields = ['program', 'program__department', 'status']
     ordering_fields = ['number', 'name']
 
     @action(detail=False, methods=['post'])

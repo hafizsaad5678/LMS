@@ -1,5 +1,5 @@
 <template>
-  <div :class="noMargin ? '' : 'mb-3'">
+  <div :class="wrapperClass">
     <label v-if="label" :for="inputId" class="form-label" :class="labelClass">
       {{ label }}
       <span v-if="required" class="text-danger">*</span>
@@ -15,11 +15,11 @@
     >
       <option value="">{{ placeholder }}</option>
       <option 
-        v-for="option in options" 
-        :key="option.value" 
-        :value="option.value"
+        v-for="(option, index) in normalizedOptions" 
+        :key="getOptionKey(option, index)" 
+        :value="getOptionValue(option)"
       >
-        {{ option.label }}
+        {{ getOptionLabel(option) }}
       </option>
     </select>
     <div v-if="error" class="invalid-feedback">{{ error }}</div>
@@ -41,8 +41,15 @@ const props = defineProps({
   },
   options: {
     type: Array,
-    required: true,
-    validator: (value) => value.every(opt => 'value' in opt && 'label' in opt)
+    required: true
+  },
+  optionValueKey: {
+    type: String,
+    default: 'value'
+  },
+  optionLabelKey: {
+    type: String,
+    default: 'label'
   },
   placeholder: {
     type: String,
@@ -75,6 +82,10 @@ const props = defineProps({
   labelClass: {
     type: String,
     default: ''
+  },
+  colClass: {
+    type: String,
+    default: ''
   }
 })
 
@@ -86,4 +97,29 @@ const modelValue = computed({
 })
 
 const inputId = computed(() => props.id || `select-${Math.random().toString(36).slice(2, 11)}`)
+
+const wrapperClass = computed(() => {
+  if (props.colClass && props.noMargin) return props.colClass
+  if (props.colClass) return `${props.colClass} mb-3`
+  return props.noMargin ? '' : 'mb-3'
+})
+
+const normalizedOptions = computed(() => Array.isArray(props.options) ? props.options : [])
+
+const isObjectOption = (option) => option !== null && typeof option === 'object'
+
+const getOptionValue = (option) => {
+  if (!isObjectOption(option)) return option
+  return option[props.optionValueKey] ?? ''
+}
+
+const getOptionLabel = (option) => {
+  if (!isObjectOption(option)) return option
+  return option[props.optionLabelKey] ?? ''
+}
+
+const getOptionKey = (option, index) => {
+  const value = getOptionValue(option)
+  return value !== '' && value != null ? String(value) : `opt-${index}`
+}
 </script>

@@ -172,14 +172,15 @@ export const EVENT_TYPE_OPTIONS = [
 
 // Blood group options
 export const BLOOD_GROUP_OPTIONS = [
-    { value: 'A+', label: 'A+' },
-    { value: 'A-', label: 'A-' },
-    { value: 'B+', label: 'B+' },
-    { value: 'B-', label: 'B-' },
-    { value: 'AB+', label: 'AB+' },
-    { value: 'AB-', label: 'AB-' },
-    { value: 'O+', label: 'O+' },
-    { value: 'O-', label: 'O-' }
+    { value: 'a+', label: 'A+' },
+    { value: 'a-', label: 'A-' },
+    { value: 'b+', label: 'B+' },
+    { value: 'b-', label: 'B-' },
+    { value: 'ab+', label: 'AB+' },
+    { value: 'ab-', label: 'AB-' },
+    { value: 'o+', label: 'O+' },
+    { value: 'o-', label: 'O-' },
+    { value: 'unknown', label: 'Unknown' }
 ]
 
 // Account type options
@@ -198,6 +199,49 @@ export const EXPENSE_CATEGORY_OPTIONS = [
     { value: 'equipment', label: 'Equipment' },
     { value: 'supplies', label: 'Supplies' },
     { value: 'other', label: 'Other' }
+]
+
+// Expense approval status options
+export const EXPENSE_APPROVAL_OPTIONS = [
+    { value: 'approved', label: 'Approved' },
+    { value: 'pending', label: 'Pending' }
+]
+
+// Fee payment status options
+export const FEE_STATUS_OPTIONS = [
+    { value: 'paid', label: 'Paid' },
+    { value: 'pending', label: 'Pending' },
+    { value: 'overdue', label: 'Overdue' }
+]
+
+// Common semester quick options
+export const SEMESTER_NUMBER_OPTIONS = [
+    { value: '1', label: 'Semester 1' },
+    { value: '2', label: 'Semester 2' }
+]
+
+// Library catalog category options
+export const BOOK_CATEGORY_OPTIONS = [
+    { value: 'science', label: 'Science' },
+    { value: 'technology', label: 'Technology' },
+    { value: 'arts', label: 'Arts' },
+    { value: 'literature', label: 'Literature' },
+    { value: 'history', label: 'History' }
+]
+
+// Library borrowing status options
+export const BORROWING_STATUS_OPTIONS = [
+    { value: 'borrowed', label: 'Borrowed' },
+    { value: 'returned', label: 'Returned' },
+    { value: 'overdue', label: 'Overdue' }
+]
+
+// Course duration filter options
+export const COURSE_DURATION_OPTIONS = [
+    { value: '2', label: '2 Years' },
+    { value: '3', label: '3 Years' },
+    { value: '4', label: '4 Years' },
+    { value: '5', label: '5 Years' }
 ]
 
 // Material type options
@@ -271,6 +315,12 @@ export default {
     BLOOD_GROUP_OPTIONS,
     ACCOUNT_TYPE_OPTIONS,
     EXPENSE_CATEGORY_OPTIONS,
+    EXPENSE_APPROVAL_OPTIONS,
+    FEE_STATUS_OPTIONS,
+    SEMESTER_NUMBER_OPTIONS,
+    BOOK_CATEGORY_OPTIONS,
+    BORROWING_STATUS_OPTIONS,
+    COURSE_DURATION_OPTIONS,
     MATERIAL_TYPE_OPTIONS,
     COUNTRY_OPTIONS,
     HOLIDAY_TYPE_OPTIONS,

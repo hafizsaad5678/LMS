@@ -9,7 +9,7 @@
     <div v-if="type === 'date'" class="custom-datepicker-wrapper">
       <VueDatePicker :uid="inputId" v-model="proxyModel" :enable-time-picker="false" model-type="yyyy-MM-dd"
         format="yyyy-MM-dd" auto-apply :placeholder="placeholder" :disabled="disabled" :required="required"
-        :state="error ? false : null" text-input :teleport="true" position="left">
+        :state="error ? false : null" :text-input="false" :teleport="true" position="left">
         <template #input-icon>
           <i class="bi bi-calendar-event input-icon-slot"></i>
         </template>
@@ -20,7 +20,7 @@
     <div v-else-if="type === 'time'" class="custom-datepicker-wrapper">
       <VueDatePicker :uid="inputId" v-model="proxyModel" time-picker model-type="HH:mm" format="HH:mm" auto-apply
         :placeholder="placeholder" :disabled="disabled" :required="required" :state="error ? false : null"
-        :teleport="true" position="left">
+        :text-input="false" :teleport="true" position="left">
         <template #input-icon>
           <i class="bi bi-clock input-icon-slot"></i>
         </template>
@@ -31,7 +31,7 @@
     <div v-else-if="type === 'datetime-local'" class="custom-datepicker-wrapper">
       <VueDatePicker :uid="inputId" v-model="proxyModel" model-type="yyyy-MM-dd HH:mm"
         format="yyyy-MM-dd HH:mm" :placeholder="placeholder" :disabled="disabled" :required="required"
-        :state="error ? false : null" :teleport="true" position="left">
+        :state="error ? false : null" :text-input="false" :teleport="true" position="left">
         <template #input-icon>
           <i class="bi bi-calendar-check input-icon-slot"></i>
         </template>

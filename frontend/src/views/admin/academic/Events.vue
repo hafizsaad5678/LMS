@@ -33,36 +33,39 @@
     <!-- Filters Section -->
     <template #filters>
       <SearchFilter
-        v-model="searchQuery"
+        v-model="filters.search"
         search-placeholder="Search events..."
+        preset="admin-list"
         :show-status-filter="false"
         :loading="loading"
-        @refresh="loadEvents"
+        @refresh="handleRefresh"
         @reset="resetFilters"
       >
         <template #filters>
-          <div class="col-md-3 col-6">
-            <select v-model="typeFilter" class="form-select" @change="loadEvents">
-              <option value="">All Types</option>
-              <option v-for="opt in EVENT_TYPE_OPTIONS" :key="opt.value" :value="opt.value">
-                {{ opt.label }}
-              </option>
-            </select>
-          </div>
-          <div class="col-md-3 col-6">
-            <select v-model="statusFilter" class="form-select" @change="loadEvents">
-              <option value="">All Status</option>
-              <option v-for="opt in EVENT_TIME_STATUS_OPTIONS" :key="opt.value" :value="opt.value">
-                {{ opt.label }}
-              </option>
-            </select>
-          </div>
+          <SelectInput
+            v-model="filters.type"
+            label="Type"
+            placeholder="All Types"
+            :options="EVENT_TYPE_OPTIONS"
+            col-class="col-md-3 col-6"
+            :no-margin="true"
+            label-class="small fw-semibold text-dark"
+          />
+          <SelectInput
+            v-model="filters.status"
+            label="Status"
+            placeholder="All Status"
+            :options="EVENT_TIME_STATUS_OPTIONS"
+            col-class="col-md-3 col-6"
+            :no-margin="true"
+            label-class="small fw-semibold text-dark"
+          />
         </template>
       </SearchFilter>
     </template>
 
     <!-- Main Content -->
-    <DataTable :columns="tableColumns" :data="filteredEvents" :loading="loading" loading-text="Loading events..." empty-icon="bi bi-calendar-event" empty-title="No events found" empty-subtitle="Add your first event to get started">
+    <DataTable :columns="tableColumns" :data="events" :loading="loading" loading-text="Loading events..." empty-icon="bi bi-calendar-event" empty-title="No events found" empty-subtitle="Add your first event to get started">
       <template #cell-title="{ row }">
         <div class="d-flex align-items-center">
           <div class="avatar-circle avatar-event me-2"><i class="bi bi-calendar-event"></i></div>
@@ -98,6 +101,7 @@
       icon="bi bi-calendar-event"
       :loading="saving"
       :confirm-text="editingEvent ? 'Update Event' : 'Add Event'"
+      confirm-variant="btn-admin-primary"
       @confirm="saveEvent"
       @close="closeModal"
     >
@@ -126,15 +130,14 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, onMounted } from 'vue'
 import { AdminPageTemplate } from '@/components/shared/panels'
 import { StatCard, DataTable, SearchFilter, ActionButtons, AlertMessage, BaseInput, ConfirmDialog, EntityFormModal, SelectInput } from '@/components/shared/common'
-import { useAlert } from '@/composables/shared'
+import { useAlert, useEntityList, useListStats } from '@/composables/shared'
 import { eventService } from '@/services/admin/managementService'
 import { formatDate as formatDateUtil, truncateText } from '@/utils/formatters'
 import { ADMIN_ROUTES } from '@/utils/constants/routes'
 import { EVENT_TYPE_OPTIONS, EVENT_TIME_STATUS_OPTIONS } from '@/utils/constants/options'
-import { smartSearch } from '@/utils'
 import { generateBreadcrumbs } from '@/utils/navigation'
 
 const breadcrumbs = generateBreadcrumbs('admin', 'Events')
@@ -151,34 +154,48 @@ const tableColumns = [
 
 // Use shared alert composable
 const { alert, showAlert } = useAlert()
-const loading = ref(false)
 const saving = ref(false)
-const events = ref([])
-const searchQuery = ref('')
-const typeFilter = ref('')
-const statusFilter = ref('')
 const showAddModal = ref(false)
 const editingEvent = ref(null)
 const showConfirmDialog = ref(false)
 const eventToDelete = ref(null)
 const eventForm = ref({ title: '', description: '', event_date: '', event_time: '', event_type: 'academic', location: '' })
 
-const upcomingCount = computed(() => events.value.filter(e => new Date(e.event_date) > new Date()).length)
-const todayCount = computed(() => events.value.filter(e => new Date(e.event_date).toDateString() === new Date().toDateString()).length)
-const pastCount = computed(() => events.value.filter(e => new Date(e.event_date) < new Date()).length)
-
-const filteredEvents = computed(() => {
-  let list = events.value
-  if (searchQuery.value) {
-    const searchFields = ['title', 'description', 'location', 'event_type']
-    list = list.filter(e => smartSearch(e, searchQuery.value, searchFields))
-  }
-  if (typeFilter.value) list = list.filter(e => e.event_type === typeFilter.value)
-  if (statusFilter.value === 'upcoming') list = list.filter(e => new Date(e.event_date) > new Date())
-  else if (statusFilter.value === 'today') list = list.filter(e => new Date(e.event_date).toDateString() === new Date().toDateString())
-  else if (statusFilter.value === 'past') list = list.filter(e => new Date(e.event_date) < new Date())
-  return list.sort((a, b) => new Date(b.event_date) - new Date(a.event_date))
+const {
+  loading,
+  data,
+  filteredData: events,
+  filters,
+  loadData,
+  resetFilters,
+  refresh
+} = useEntityList({
+  searchFields: ['title', 'description', 'location', 'event_type'],
+  defaultFilters: { type: '', status: '' },
+  filterSchema: [
+    {
+      key: 'type',
+      itemValue: 'event_type'
+    },
+    {
+      key: 'status',
+      predicate: (event, value) => {
+        const eventDate = new Date(event.event_date)
+        const now = new Date()
+        if (value === 'upcoming') return eventDate > now
+        if (value === 'today') return eventDate.toDateString() === now.toDateString()
+        if (value === 'past') return eventDate < now
+        return true
+      }
+    }
+  ],
+  customFilter: (list) => list.sort((a, b) => new Date(b.event_date) - new Date(a.event_date))
 })
+
+const listStats = useListStats(data)
+const upcomingCount = listStats.count((event) => new Date(event.event_date) > new Date())
+const todayCount = listStats.count((event) => new Date(event.event_date).toDateString() === new Date().toDateString())
+const pastCount = listStats.count((event) => new Date(event.event_date) < new Date())
 
 // Use shared formatDate utility
 const formatDate = (date) => formatDateUtil(date)
@@ -189,24 +206,21 @@ const truncate = (text, length) => truncateText(text, length)
 const getStatus = (date) => new Date(date).toDateString() === new Date().toDateString() ? 'Today' : new Date(date) > new Date() ? 'Upcoming' : 'Past'
 const getStatusBadge = (date) => getStatus(date) === 'Today' ? 'bg-info' : getStatus(date) === 'Upcoming' ? 'bg-success' : 'bg-secondary'
 
+const fetchEvents = async () => {
+  const response = await eventService.getAll()
+  return response.data?.results || response.data || []
+}
+
 const loadEvents = async () => {
-  loading.value = true
   try {
-    const response = await eventService.getAll()
-    events.value = response.data.results || response.data
+    await loadData(fetchEvents)
   } catch (error) {
     console.error('Error loading events:', error)
     showAlert('error', 'Failed to load events', 'Error')
-  } finally {
-    loading.value = false
   }
 }
 
-const resetFilters = () => {
-  searchQuery.value = ''
-  typeFilter.value = ''
-  statusFilter.value = ''
-}
+const handleRefresh = () => refresh(fetchEvents)
 
 const editEvent = (event) => {
   editingEvent.value = event
@@ -222,7 +236,7 @@ const deleteEvent = (event) => {
 const confirmDeleteEvent = async () => {
   try {
     await eventService.delete(eventToDelete.value.id)
-    events.value = events.value.filter(e => e.id !== eventToDelete.value.id)
+    await refresh(fetchEvents)
     showAlert('success', 'Event deleted successfully', 'Success')
   } catch (error) {
     console.error('Error deleting event:', error)
@@ -244,7 +258,7 @@ const saveEvent = async () => {
       showAlert('success', 'Event added successfully', 'Success')
     }
     closeModal()
-    loadEvents()
+    await refresh(fetchEvents)
   } catch (error) {
     console.error('Error saving event:', error)
     showAlert('error', 'Failed to save event', 'Error')
@@ -258,11 +272,6 @@ const closeModal = () => {
   editingEvent.value = null
   eventForm.value = { title: '', description: '', event_date: '', event_time: '', event_type: 'academic', location: '' }
 }
-
-let searchTimeout
-watch(searchQuery, () => {
-  // Local filtering only
-})
 
 onMounted(loadEvents)
 </script>

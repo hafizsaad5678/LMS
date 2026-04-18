@@ -27,16 +27,76 @@ export const useEntityList = (options = {}) => {
     // Optimization: Synchronous cache check during setup to avoid "loading flicker"
     const cachedData = cacheKey ? cacheService.get(cacheKey) : null
     const initialData = cachedData ? normalizeToArray(cachedData) : []
+    let hasLoadedOnce = false
 
     const loading = ref(!cachedData)
     const error = ref(null)
     const data = ref(initialData)
     const filteredData = ref([])
-    const filters = ref({
+    const buildDefaultFilters = () => ({
         search: '',
         status: '',
-        ...options.defaultFilters
+        ...options.defaultFilters,
+        ...options.resetToDefaults
     })
+
+    const filters = ref(buildDefaultFilters())
+    const compareValues = (left, right, operator = 'eq') => {
+        switch (operator) {
+        case 'contains':
+            return String(left || '').toLowerCase().includes(String(right || '').toLowerCase())
+        case 'in':
+            return Array.isArray(right) && right.includes(left)
+        case 'gte':
+            return Number(left) >= Number(right)
+        case 'lte':
+            return Number(left) <= Number(right)
+        case 'dateGte':
+            return new Date(left).getTime() >= new Date(right).getTime()
+        case 'dateLt':
+            return new Date(left).getTime() < new Date(right).getTime()
+        case 'eq':
+        default:
+            return String(left) === String(right)
+        }
+    }
+
+    const applySchemaFilters = (source, schema, activeFilters) => {
+        if (!Array.isArray(schema) || schema.length === 0) return source
+
+        return schema.reduce((result, rule) => {
+            if (!rule || !rule.key) return result
+
+            const rawFilterValue = activeFilters[rule.key]
+            const isRuleActive = typeof rule.isActive === 'function'
+                ? rule.isActive(rawFilterValue, activeFilters)
+                : rawFilterValue !== '' && rawFilterValue !== null && rawFilterValue !== undefined
+
+            if (!isRuleActive) return result
+
+            return result.filter((item) => {
+                if (typeof rule.predicate === 'function') {
+                    return rule.predicate(item, rawFilterValue, activeFilters)
+                }
+
+                const itemValue = typeof rule.itemValue === 'function'
+                    ? rule.itemValue(item, activeFilters)
+                    : getNestedValue(item, rule.itemValue || rule.key)
+
+                const filterValue = typeof rule.filterValue === 'function'
+                    ? rule.filterValue(rawFilterValue, activeFilters)
+                    : rawFilterValue
+
+                const normalize = rule.normalize || ((value) => value)
+                return compareValues(
+                    normalize(itemValue, item, activeFilters),
+                    normalize(filterValue, item, activeFilters),
+                    rule.operator || 'eq'
+                )
+            })
+        }, source)
+    }
+
 
     // Stats computed
     const stats = computed(() => {
@@ -56,19 +116,23 @@ export const useEntityList = (options = {}) => {
      */
     const loadData = async (fetchFn, useCache = true) => {
         const hasRefreshQuery = !!route.query?.refresh
+        const forceFreshFirstLoad = options.forceFreshOnMount && !hasLoadedOnce
 
-        if (hasRefreshQuery && cacheKey) {
+        if ((hasRefreshQuery || forceFreshFirstLoad) && cacheKey) {
             cacheService.clear(cacheKey)
         }
 
+        const shouldUseCache = useCache && !forceFreshFirstLoad
+
         // Check cache first
-        if (useCache && cacheKey && !hasRefreshQuery) {
+        if (shouldUseCache && cacheKey && !hasRefreshQuery) {
             const cached = cacheService.get(cacheKey)
             if (cached) {
                 const normalizedCached = normalizeToArray(cached)
                 data.value = normalizedCached
                 applyFilters()
                 loading.value = false
+                hasLoadedOnce = true
 
                 // Stale-while-revalidate: keep UI fast, then update with latest server data.
                 if (options.revalidateOnLoad !== false) {
@@ -104,6 +168,7 @@ export const useEntityList = (options = {}) => {
 
             data.value = result
             applyFilters()
+            hasLoadedOnce = true
             return result
         } catch (err) {
             console.error('Error loading data:', err)
@@ -129,7 +194,8 @@ export const useEntityList = (options = {}) => {
      * @param {Array} sourceData - Optional source data (defaults to loaded data)
      */
     const applyFilters = (sourceData = null) => {
-        const source = sourceData || data.value
+        // Ignore DOM Events passed accidentally via @change="applyFilters"
+        const source = Array.isArray(sourceData) ? sourceData : data.value
 
         // Ensure source is an array
         if (!Array.isArray(source)) {
@@ -145,15 +211,23 @@ export const useEntityList = (options = {}) => {
             result = result.filter(item => smartSearch(item, query, searchFields))
         }
 
-        // Custom filters - Handle ALL other filtering logic (status, category, etc.)
+        // Schema-based filter engine for common list filtering patterns.
+        if (options.filterSchema) {
+            result = applySchemaFilters(result, options.filterSchema, filters.value)
+        }
+
+        // Custom filters for special-case rules.
         if (options.customFilter) {
             result = options.customFilter(result, filters.value)
         } else if (filters.value.status) {
             // Fallback for simple active/inactive status if no custom filter provided
-            const isActive = filters.value.status === 'active'
-            const isInactive = filters.value.status === 'inactive'
-            if (isActive || isInactive) {
-                result = result.filter(item => !!item[statusField] === isActive)
+            const isHandledBySchema = Array.isArray(options.filterSchema) && options.filterSchema.some(f => f.key === 'status')
+            if (!isHandledBySchema) {
+                const isActive = filters.value.status === 'active'
+                const isInactive = filters.value.status === 'inactive'
+                if (isActive || isInactive) {
+                    result = result.filter(item => !!item[statusField] === isActive)
+                }
             }
         }
 
@@ -169,23 +243,27 @@ export const useEntityList = (options = {}) => {
      * Reset all filters
      */
     const resetFilters = () => {
-        filters.value = {
-            search: '',
-            status: '',
-            ...options.defaultFilters
-        }
+        filters.value = buildDefaultFilters()
         applyFilters()
     }
 
     /**
      * Clear cache and reload
      */
-    const refresh = async (fetchFn) => {
+    const refresh = async (fetchFn, refreshOptions = {}) => {
+        const shouldReset = refreshOptions.reset ?? options.refreshResetsFilters ?? false
+
+        if (shouldReset) {
+            resetFilters()
+        }
+
         if (cacheKey) {
             cacheService.clear(cacheKey)
         }
         return loadData(fetchFn, false)
     }
+
+    const refreshAndReset = async (fetchFn) => refresh(fetchFn, { reset: true })
 
     /**
      * Toggle item status
@@ -245,6 +323,7 @@ export const useEntityList = (options = {}) => {
         applyFilters,
         resetFilters,
         refresh,
+        refreshAndReset,
         toggleStatus,
         normalizeResponse: normalizeToArray // Alias for backward compatibility
     }

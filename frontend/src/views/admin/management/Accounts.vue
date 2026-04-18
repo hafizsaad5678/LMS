@@ -22,21 +22,22 @@
       <SearchFilter
         v-model="searchQuery"
         search-placeholder="Search accounts..."
+        preset="admin-list"
         :show-status-filter="false"
-        search-col-size="col-md-5 col-12"
-        actions-col-size="col-md-3 col-6"
         :loading="loading"
         @refresh="loadAccounts"
         @reset="resetFilters"
       >
         <template #filters>
-          <div class="col-md-4 col-6">
-            <label class="form-label small fw-semibold text-dark">Type</label>
-            <select v-model="typeFilter" class="form-select" @change="loadAccounts">
-              <option value="">All Types</option>
-              <option v-for="opt in ACCOUNT_TYPE_OPTIONS" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-            </select>
-          </div>
+          <SelectInput
+            v-model="typeFilter"
+            label="Type"
+            placeholder="All Types"
+            :options="ACCOUNT_TYPE_OPTIONS"
+            col-class="col-md-4 col-6"
+            :no-margin="true"
+            label-class="small fw-semibold text-dark"
+          />
         </template>
       </SearchFilter>
     </template>
@@ -87,6 +88,7 @@
     icon="bi bi-bank"
     :loading="submitting"
     :confirm-text="editMode ? 'Update Account' : 'Add Account'"
+    confirm-variant="btn-admin-primary"
     @confirm="handleSubmit()"
     @close="closeModal"
   >
@@ -117,10 +119,9 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
-import { smartSearch } from '@/utils'
+import { ref, computed, onMounted } from 'vue'
 import { AdminPageTemplate } from '@/components/shared/panels'
-import { StatCard, SearchFilter, AlertMessage, EntityFormModal, ConfirmDialog, LoadingSpinner } from '@/components/shared/common'
+import { StatCard, SearchFilter, SelectInput, AlertMessage, EntityFormModal, ConfirmDialog, LoadingSpinner } from '@/components/shared/common'
 import { useCrudModal, useAsyncState } from '@/composables/shared'
 import { accountService } from '@/services/admin/managementService'
 import { ADMIN_ROUTES } from '@/utils/constants/routes'
@@ -195,11 +196,6 @@ const resetFilters = () => {
   searchQuery.value = ''
   typeFilter.value = ''
 }
-
-let searchTimeout
-watch(searchQuery, () => {
-  // Local filtering only - removed API call to avoid performance issues
-})
 
 onMounted(loadAccounts)
 </script>

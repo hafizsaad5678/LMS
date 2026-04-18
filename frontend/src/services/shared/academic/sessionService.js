@@ -132,6 +132,37 @@ export default {
         return response.data
     },
 
+    /**
+     * Get promotion readiness overview for a session
+     * @param {String} sessionId - Session UUID
+     * @returns {Promise<Object>}
+     */
+    async getPromotionOverview(sessionId) {
+        const response = await api.get(`/academic-sessions/${sessionId}/promotion_overview/`)
+        return response.data
+    },
+
+    /**
+     * Promote the current active semester to the next semester
+     * @param {String} sessionId - Session UUID
+     * @param {Object} payload - Optional promotion payload
+     * @returns {Promise<Object>}
+     */
+    async promoteSemester(sessionId, payload = {}) {
+        const response = await api.post(`/academic-sessions/${sessionId}/promote_semester/`, payload)
+        return response.data
+    },
+
+    /**
+     * Get semester promotion history entries for a session
+     * @param {String} sessionId - Session UUID
+     * @returns {Promise<Object>}
+     */
+    async getPromotionHistory(sessionId) {
+        const response = await api.get(`/academic-sessions/${sessionId}/promotion_history/`)
+        return response.data
+    },
+
     // ==================== SESSION LIFECYCLE ====================
 
     /**

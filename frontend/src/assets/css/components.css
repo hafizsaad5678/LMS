@@ -287,9 +287,56 @@
     color: white;
 }
 
+/* ==================== SEMESTER PROMOTION ==================== */
+.semester-promotion-page .metric-card {
+    border: 1px solid #e5e7eb;
+    border-radius: 0.85rem;
+    background: linear-gradient(145deg, #ffffff 0%, #f5f7fb 100%);
+    padding: 1rem;
+}
+
+.semester-promotion-page .metric-label {
+    color: #6b7280;
+    font-size: 0.8rem;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+}
+
+.semester-promotion-page .metric-value {
+    margin-top: 0.35rem;
+    color: #0f172a;
+    font-size: 1.15rem;
+    font-weight: 700;
+    line-height: 1.25;
+}
+
+.semester-promotion-page .promote-card {
+    border-left: 4px solid #0d6efd;
+}
+
 /* ==================== AUTH FORMS ==================== */
 .forgot-form {
     background: #ffffff;
+}
+
+/* ==================== ADD SESSION WIZARD ==================== */
+.session-wizard-card {
+    width: 100%;
+    max-width: 980px;
+    margin: 0 auto;
+}
+
+.session-program-select {
+    width: 100%;
+    max-width: 760px;
+    font-size: 1rem;
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+}
+
+.session-program-select option {
+    font-size: 0.95rem;
 }
 
 .login-page {
@@ -2852,6 +2899,19 @@ body.modal-open {
 .stat-card:hover {
   transform: translateY(-2px);
   box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.stats-grid-col {
+    display: flex;
+}
+
+.stats-grid-col .stat-card {
+    width: 100%;
+    min-height: 132px;
+}
+
+.stats-grid-col .stat-content p {
+    min-height: 2.4rem;
 }
 /* ==================== AI CHATBOT (STUDENT PANEL) ==================== */
 .student-ai-chatbot {

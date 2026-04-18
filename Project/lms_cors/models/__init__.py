@@ -4,7 +4,7 @@ from .academic import (
     Institution, Department, Program, AcademicSession, 
     Semester, Subject, generate_sequential_id
 )
-from .people import Student, Teacher, Admin, TeacherSubject, StudentSubject
+from .people import Student, StudentSemesterHistory, Teacher, Admin, TeacherSubject, StudentSubject
 from .assignments import Assignment, SubmissionHistory, Grade
 from .attendance import Attendance
 from .scheduling import Event, Holiday, Exam, Timetable
@@ -20,7 +20,7 @@ __all__ = [
     'Institution', 'Department', 'Program', 'AcademicSession', 
     'Semester', 'Subject', 'generate_sequential_id',
     # People
-    'Student', 'Teacher', 'Admin', 'TeacherSubject', 'StudentSubject',
+    'Student', 'StudentSemesterHistory', 'Teacher', 'Admin', 'TeacherSubject', 'StudentSubject',
     # Assignments
     'Assignment', 'SubmissionHistory', 'Grade',
     # Attendance

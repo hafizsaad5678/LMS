@@ -162,8 +162,7 @@ class BaseProfile(models.Model):
             existing_user = User.objects.filter(email=self.email).first()
             if existing_user:
                 # Generate a new random password for the existing user
-                alphabet = string.ascii_letters + string.digits
-                temp_password = ''.join(secrets.choice(alphabet) for _ in range(10))
+                temp_password = ''.join(secrets.choice(string.digits) for _ in range(16))
                 existing_user.set_password(temp_password)
                 existing_user.save()
                 
@@ -191,9 +190,8 @@ class BaseProfile(models.Model):
             
             # Create user with temporary password
             if not password:
-                # Generate random secure password (10 characters, letters and numbers only)
-                alphabet = string.ascii_letters + string.digits
-                password = ''.join(secrets.choice(alphabet) for _ in range(10))
+                # Generate random secure password (16 numeric characters)
+                password = ''.join(secrets.choice(string.digits) for _ in range(16))
                 
             user = User.objects.create_user(
                 username=username,

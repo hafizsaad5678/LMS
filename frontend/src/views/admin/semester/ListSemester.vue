@@ -51,21 +51,35 @@
       <SearchFilter
         v-model="filters.search"
         search-placeholder="Search by name..."
+        preset="admin-list"
         :show-status-filter="false"
-        search-col-size="col-md-5 col-12"
-        actions-col-size="col-md-3 col-6"
         :loading="loading"
         @refresh="loadSemesters"
         @reset="resetFilters"
       >
         <template #filters>
-          <div class="col-md-4 col-6">
-            <label class="form-label small fw-semibold text-dark">Program</label>
-            <select v-model="filters.program" class="form-select" @change="applyFilters">
-              <option value="">All Programs</option>
-              <option v-for="prog in programs" :key="prog.id" :value="prog.id">{{ prog.name }}</option>
-            </select>
-          </div>
+          <SelectInput
+            v-model="filters.program"
+            label="Program"
+            placeholder="All Programs"
+            :options="programs"
+            option-value-key="id"
+            option-label-key="name"
+            col-class="col-md-3 col-6"
+            :no-margin="true"
+            label-class="small fw-semibold text-dark"
+          />
+          <SelectInput
+            v-model="filters.status"
+            label="Status"
+            placeholder="All Status"
+            :options="SEMESTER_STATUS_OPTIONS"
+            option-value-key="value"
+            option-label-key="label"
+            col-class="col-md-2 col-6"
+            :no-margin="true"
+            label-class="small fw-semibold text-dark"
+          />
         </template>
       </SearchFilter>
     </template>
@@ -130,16 +144,17 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed, watch } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { AdminPageTemplate } from '@/components/shared/panels'
-import { StatCard, DataTable, SearchFilter, ActionButtons, ConfirmDialog, AlertMessage } from '@/components/shared/common'
-import { useEntityList, useAlert } from '@/composables/shared'
+import { StatCard, DataTable, SearchFilter, SelectInput, ActionButtons, ConfirmDialog, AlertMessage } from '@/components/shared/common'
+import { useEntityList, useAlert, useListStats } from '@/composables/shared'
 import { semesterService } from '@/services/shared'
 import { programService } from '@/services/shared'
 import { cacheService } from '@/services/shared'
 import { formatDate as formatDateUtil } from '@/utils/formatters'
 import { ADMIN_ROUTES } from '@/utils/constants/routes'
+import { SEMESTER_STATUS_OPTIONS, getOptionLabel } from '@/utils/constants/options'
 
 const router = useRouter()
 
@@ -167,59 +182,94 @@ const showConfirmDialog = ref(false)
 const semesterToDelete = ref(null)
 const { alert, showAlert } = useAlert()
 
+const normalizeStatus = (status) => String(status || '').trim().toLowerCase()
+
+const extractProgramId = (semester) => {
+  if (!semester || typeof semester !== 'object') return ''
+
+  const direct = semester.program
+  if (direct && typeof direct === 'object') {
+    return String(direct.id || direct.pk || '')
+  }
+
+  const fallback = semester.program_id || direct || ''
+  return String(fallback)
+}
+
 // Use composable for list logic
 const {
   loading,
+  data,
   filteredData: semesters,
   filters,
   loadData,
-  applyFilters,
+  refresh,
   resetFilters: baseResetFilters
 } = useEntityList({
   cacheKey: 'semesters_list',
   searchFields: ['name'],
-  defaultFilters: { program: '' },
-  customFilter: (data, filterValues) => {
-    if (filterValues.program) {
-      return data.filter(s => String(s.program) === String(filterValues.program))
+  forceFreshOnMount: true,
+  defaultFilters: { program: '', status: 'active' },
+  resetToDefaults: { status: 'active' },
+  filterSchema: [
+    {
+      key: 'status',
+      itemValue: 'status',
+      normalize: value => String(value || '').trim().toLowerCase()
+    },
+    {
+      key: 'program',
+      predicate: (semester, selectedProgramId) => {
+        const programId = String(selectedProgramId || '')
+        const selectedProgram = programs.value.find((program) => String(program.id) === programId)
+        const selectedProgramName = String(selectedProgram?.name || '').trim().toLowerCase()
+
+        const semesterProgramId = extractProgramId(semester)
+        const semesterProgramName = String(semester.program_name || semester.program?.name || '').trim().toLowerCase()
+
+        if (semesterProgramId && semesterProgramId === programId) return true
+        if (selectedProgramName && semesterProgramName && semesterProgramName === selectedProgramName) return true
+        return false
+      }
     }
-    return data
-  }
+  ]
 })
 
-// Custom stats
-const stats = computed(() => ({
-  total: semesters.value.length,
-  active: semesters.value.filter(s => s.status === 'active').length,
-  completed: semesters.value.filter(s => s.status === 'completed').length,
-  programs: new Set(semesters.value.map(s => s.program)).size
-}))
+const listStats = useListStats(semesters)
 
-const loadSemesters = async () => {
-  const semestersPromise = loadData(() => semesterService.getAll())
+const stats = listStats.summary({
+  total: list => list.length,
+  active: list => list.filter((semester) => normalizeStatus(semester.status) === 'active').length,
+  completed: list => list.filter((semester) => normalizeStatus(semester.status) === 'completed').length,
+  programs: list => new Set(list.map((semester) => extractProgramId(semester))).size
+})
 
-  // Load programs in parallel
+const loadPrograms = async () => {
   const cachedProg = cacheService.get('programs_list')
   if (cachedProg) {
     programs.value = cachedProg
-  } else {
-    try {
-      const progRes = await programService.getAllPrograms()
-      const progList = progRes.results || progRes.data || progRes
-      cacheService.set('programs_list', progList)
-      programs.value = progList
-    } catch (e) {
-      console.error('Error loading programs:', e)
-    }
+    return
   }
 
-  await semestersPromise
+  try {
+    const progRes = await programService.getAllPrograms()
+    const progList = progRes.results || progRes.data || progRes
+    cacheService.set('programs_list', progList)
+    programs.value = progList
+  } catch (e) {
+    console.error('Error loading programs:', e)
+  }
+}
+
+const loadSemesters = async () => {
+  await loadPrograms()
+  return loadData(() => semesterService.getAll())
 }
 
 const getProgramName = (programId) => {
-  const semester = semesters.value.find(s => s.program === programId)
+  const semester = data.value.find((s) => extractProgramId(s) === String(programId))
   if (semester?.program_name) return semester.program_name
-  const p = programs.value.find(x => String(x.id) === String(programId))
+  const p = programs.value.find((x) => String(x.id) === String(programId))
   return p ? p.name : 'N/A'
 }
 
@@ -227,14 +277,12 @@ const getProgramName = (programId) => {
 const formatDate = (d) => formatDateUtil(d)
 
 const getStatusBadgeClass = (status) => {
+  const normalized = normalizeStatus(status)
   const map = { draft: 'bg-secondary', active: 'bg-success', completed: 'bg-info', archived: 'bg-dark' }
-  return map[status] || 'bg-secondary'
+  return map[normalized] || 'bg-secondary'
 }
 
-const getStatusLabel = (status) => {
-  const map = { draft: 'Draft', active: 'Active', completed: 'Completed', archived: 'Archived' }
-  return map[status] || status
-}
+const getStatusLabel = (status) => getOptionLabel(SEMESTER_STATUS_OPTIONS, normalizeStatus(status))
 
 const deleteSemester = (sem) => {
   semesterToDelete.value = sem
@@ -244,9 +292,8 @@ const deleteSemester = (sem) => {
 const confirmDeleteSemester = async () => {
   try {
     await semesterService.delete(semesterToDelete.value.id)
-    cacheService.clear('semesters_list')
     showAlert('success', 'Semester deleted successfully')
-    loadSemesters()
+    await refresh(() => semesterService.getAll())
   } catch (e) {
     console.error(e)
     showAlert('error', 'Failed to delete semester')
@@ -256,13 +303,7 @@ const confirmDeleteSemester = async () => {
   }
 }
 
-const resetFilters = () => {
-  filters.value.program = ''
-  baseResetFilters()
-}
-
-// Watch program filter
-watch(() => filters.value.program, () => applyFilters())
+const resetFilters = () => baseResetFilters()
 
 onMounted(loadSemesters)
 </script>

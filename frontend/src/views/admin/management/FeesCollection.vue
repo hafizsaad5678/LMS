@@ -25,27 +25,31 @@
       <SearchFilter
         v-model="filters.search"
         search-placeholder="Search student..."
+        preset="admin-list"
         :show-status-filter="false"
         :loading="loading"
-        @refresh="() => loadData(fetchFees, false)"
+        @refresh="handleRefresh"
         @reset="resetFilters"
       >
         <template #filters>
-          <div class="col-md-3 col-6">
-            <select v-model="filters.statusType" class="form-select">
-              <option value="">All Status</option>
-              <option value="paid">Paid</option>
-              <option value="pending">Pending</option>
-              <option value="overdue">Overdue</option>
-            </select>
-          </div>
-          <div class="col-md-3 col-6">
-            <select v-model="filters.semester" class="form-select">
-              <option value="">All Semesters</option>
-              <option value="1">Semester 1</option>
-              <option value="2">Semester 2</option>
-            </select>
-          </div>
+          <SelectInput
+            v-model="filters.statusType"
+            label="Status"
+            placeholder="All Status"
+            :options="FEE_STATUS_OPTIONS"
+            col-class="col-md-3 col-6"
+            :no-margin="true"
+            label-class="small fw-semibold text-dark"
+          />
+          <SelectInput
+            v-model="filters.semester"
+            label="Semester"
+            placeholder="All Semesters"
+            :options="SEMESTER_NUMBER_OPTIONS"
+            col-class="col-md-3 col-6"
+            :no-margin="true"
+            label-class="small fw-semibold text-dark"
+          />
         </template>
       </SearchFilter>
     </template>
@@ -93,13 +97,14 @@
 <script setup>
 import { computed, onMounted } from 'vue'
 import { AdminPageTemplate } from '@/components/shared/panels'
-import { StatCard, DataTable, SearchFilter, AlertMessage } from '@/components/shared/common'
-import { useEntityList, useAlert } from '@/composables/shared'
+import { StatCard, DataTable, SearchFilter, SelectInput, AlertMessage } from '@/components/shared/common'
+import { useEntityList, useAlert, useListStats } from '@/composables/shared'
 import { feeService } from '@/services/admin/managementService'
 import { formatDate as formatDateUtil } from '@/utils/formatters'
 import { ADMIN_ROUTES } from '@/utils/constants/routes'
 import { getStatusBadgeClass } from '@/utils/badgeHelpers'
 import { CURRENCY } from '@/utils/constants/config'
+import { FEE_STATUS_OPTIONS, SEMESTER_NUMBER_OPTIONS } from '@/utils/constants/options'
 import { generateBreadcrumbs } from '@/utils/navigation'
 
 const breadcrumbs = generateBreadcrumbs('admin', 'Fees Collection')
@@ -120,22 +125,43 @@ const fetchFees = async () => {
   return res.data?.results || res.data || []
 }
 
-const { loading, data, filteredData, filters, loadData, resetFilters } = useEntityList({
+const { loading, data, filteredData, filters, loadData, resetFilters, refresh } = useEntityList({
   searchFields: ['student_name', 'student_enrollment', 'semester_name'],
   defaultFilters: { statusType: '', semester: '' },
-  customFilter: (list, f) => {
-    if (f.statusType) list = list.filter(fee => fee.status === f.statusType)
-    if (f.semester) list = list.filter(fee => fee.semester_name === f.semester)
-    return list
-  }
+  filterSchema: [
+    {
+      key: 'statusType',
+      itemValue: 'status'
+    },
+    {
+      key: 'semester',
+      predicate: (fee, selectedSemester) => {
+        const selected = String(selectedSemester || '').trim()
+        const semesterName = String(fee.semester_name || fee.semester || '').trim()
+        if (!selected) return true
+        if (semesterName === selected) return true
+        return semesterName.toLowerCase().endsWith(` ${selected}`)
+      }
+    }
+  ]
 })
 
 const formatDate = (date) => formatDateUtil(date)
 const getStatusBadge = (status) => getStatusBadgeClass(status)
 
-const totalCollected = computed(() => data.value.filter(f => f.status === 'paid').reduce((sum, f) => sum + parseFloat(f.paid_amount || 0), 0))
-const totalPending = computed(() => data.value.filter(f => f.status === 'pending').reduce((sum, f) => sum + parseFloat(f.amount || 0), 0))
-const overdueCount = computed(() => data.value.filter(f => f.status === 'overdue').length)
+const listStats = useListStats(data)
+
+const totalCollected = computed(() => data.value
+  .filter((fee) => fee.status === 'paid')
+  .reduce((sum, fee) => sum + parseFloat(fee.paid_amount || 0), 0))
+
+const totalPending = computed(() => data.value
+  .filter((fee) => fee.status === 'pending')
+  .reduce((sum, fee) => sum + parseFloat(fee.amount || 0), 0))
+
+const overdueCount = listStats.count((fee) => fee.status === 'overdue')
+
+const handleRefresh = () => refresh(fetchFees)
 
 const markPaid = async (fee) => {
   try {

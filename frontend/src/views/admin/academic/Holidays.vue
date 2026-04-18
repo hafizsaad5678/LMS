@@ -83,6 +83,7 @@
     icon="bi bi-calendar-x"
     :loading="saving"
     :confirm-text="editingHoliday ? 'Update Holiday' : 'Add Holiday'"
+    confirm-variant="btn-admin-primary"
     @confirm="saveHoliday"
     @close="closeModal"
   >

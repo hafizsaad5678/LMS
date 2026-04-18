@@ -51,9 +51,8 @@
         v-model="filters.search"
         v-model:status-value="filters.status"
         search-placeholder="Search by name, code, or city..."
+        preset="admin-list"
         :show-status-filter="true"
-        search-col-size="col-md-5 col-12"
-        actions-col-size="col-md-4 col-12"
         :loading="loading"
         @refresh="loadInstitutions"
         @reset="resetFilters"
@@ -118,7 +117,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { AdminPageTemplate } from '@/components/shared/panels'
 import { StatCard, DataTable, SearchFilter, ActionButtons, AlertMessage, ConfirmDialog } from '@/components/shared/common'
-import { useEntityList, useAlert } from '@/composables/shared'
+import { useEntityList, useAlert, useListStats } from '@/composables/shared'
 import { institutionService } from '@/services/shared'
 import { ADMIN_ROUTES } from '@/utils/constants/routes'
 import { getActiveBadgeClass, getActiveStatusText } from '@/utils/badgeHelpers'
@@ -162,13 +161,14 @@ const {
   statusField: 'is_active'
 })
 
-// Custom stats
-const stats = computed(() => ({
-  total: institutions.value.length,
-  active: institutions.value.filter(i => i.is_active).length,
-  totalDepartments: institutions.value.reduce((sum, i) => sum + (i.department_count || 0), 0),
-  uniqueCities: new Set(institutions.value.map(i => i.city).filter(Boolean)).size
-}))
+const listStats = useListStats(institutions)
+
+const stats = listStats.summary({
+  total: list => list.length,
+  active: list => list.filter((institution) => institution.is_active).length,
+  totalDepartments: list => list.reduce((sum, institution) => sum + (institution.department_count || 0), 0),
+  uniqueCities: list => new Set(list.map((institution) => institution.city).filter(Boolean)).size
+})
 
 const fetchInstitutions = () => institutionService.getAllInstitutions()
 

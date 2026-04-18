@@ -30,32 +30,31 @@
       <SearchFilter
         v-model="filters.search"
         search-placeholder="Search by name or code..."
+        preset="admin-list"
         :show-status-filter="false"
-        search-col-size="col-md-3 col-12"
-        actions-col-size="col-md-3 col-6"
         :loading="loading"
         @refresh="handleRefresh"
         @reset="resetFilters"
       >
         <template #filters>
-          <div class="col-md-3 col-6">
-            <label class="form-label small fw-semibold text-dark">Subject Code</label>
-            <select v-model="filters.code" class="form-select">
-              <option value="">All Codes</option>
-              <option v-for="code in codeOptions" :key="code" :value="code">
-                {{ code }}
-              </option>
-            </select>
-          </div>
-          <div class="col-md-3 col-6">
-            <label class="form-label small fw-semibold text-dark">Credit Hours</label>
-            <select v-model="filters.credits" class="form-select">
-              <option value="">All Credits</option>
-              <option v-for="credit in creditOptions" :key="credit" :value="credit">
-                {{ credit }} {{ credit === 1 ? 'Credit' : 'Credits' }}
-              </option>
-            </select>
-          </div>
+          <SelectInput
+            v-model="filters.program"
+            label="Program"
+            placeholder="All Programs"
+            :options="programOptions"
+            col-class="col-md-3 col-6"
+            :no-margin="true"
+            label-class="small fw-semibold text-dark"
+          />
+          <SelectInput
+            v-model="filters.credits"
+            label="Credit Hours"
+            placeholder="All Credits"
+            :options="creditOptions"
+            col-class="col-md-3 col-6"
+            :no-margin="true"
+            label-class="small fw-semibold text-dark"
+          />
         </template>
       </SearchFilter>
     </template>
@@ -115,8 +114,8 @@
 import { computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { AdminPageTemplate } from '@/components/shared/panels'
-import { StatCard, DataTable, SearchFilter, ActionButtons } from '@/components/shared/common'
-import { useEntityList } from '@/composables/shared'
+import { StatCard, DataTable, SearchFilter, SelectInput, ActionButtons } from '@/components/shared/common'
+import { useEntityList, useFilterOptions, useListStats } from '@/composables/shared'
 import { subjectService } from '@/services/shared'
 import { ADMIN_ROUTES } from '@/utils/constants/routes'
 
@@ -151,29 +150,38 @@ const fetchSubjects = async () => {
 const { loading, data, filteredData, filters, loadData, resetFilters, refresh } = useEntityList({
   cacheKey: 'subjects_list',
   searchFields: ['name', 'code'],
-  defaultFilters: { code: '', credits: '' },
-  customFilter: (list, f) => {
-    if (f.code) list = list.filter(s => s.code === f.code)
-    if (f.credits) list = list.filter(s => s.credit_hours === parseInt(f.credits))
-    return list
-  }
+  defaultFilters: { program: '', credits: '' },
+  filterSchema: [
+    {
+      key: 'program',
+      itemValue: 'program_name',
+      normalize: value => String(value || '').trim()
+    },
+    {
+      key: 'credits',
+      itemValue: 'credit_hours',
+      normalize: value => Number(value || 0)
+    }
+  ]
 })
 
-const totalCredits = computed(() => data.value.reduce((sum, s) => sum + (s.credit_hours || 0), 0))
-const avgCredits = computed(() => data.value.length > 0 ? Math.round(totalCredits.value / data.value.length) : 0)
-const uniqueSemesters = computed(() => new Set(data.value.map(s => s.semester)).size)
+const scopedSubjects = computed(() => filteredData.value)
 
-const creditOptions = computed(() => {
-  const credits = new Set(data.value.map(s => s.credit_hours).filter(c => c != null))
-  return Array.from(credits).sort((a, b) => a - b)
+const listStats = useListStats(scopedSubjects)
+
+const totalCredits = listStats.sum((subject) => subject.credit_hours)
+const avgCredits = listStats.average((subject) => subject.credit_hours)
+const uniqueSemesters = listStats.uniqueCount((subject) => subject.semester || subject.semester_name)
+const totalSubjects = listStats.count()
+
+const { createPrimitiveOptions } = useFilterOptions(data)
+
+const creditOptions = createPrimitiveOptions({
+  value: 'credit_hours',
+  sortFn: (a, b) => Number(a) - Number(b)
 })
 
-const codeOptions = computed(() => {
-  const codes = new Set(data.value.map(s => s.code).filter(c => c != null && c !== ''))
-  return Array.from(codes).sort()
-})
-
-const totalSubjects = computed(() => data.value.length)
+const programOptions = createPrimitiveOptions({ value: 'program_name' })
 
 const handleRefresh = () => refresh(fetchSubjects)
 

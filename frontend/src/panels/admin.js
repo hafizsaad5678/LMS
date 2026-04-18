@@ -3,14 +3,24 @@
  * Full CRUD access for all entities
  */
 import { ADMIN_ROUTES } from '@/utils/constants/routes'
+import { FEATURE_FLAGS } from '@/utils/constants/config'
 
 const BASE_PATH = ADMIN_ROUTES.DASHBOARD.path
 
 // Helper to generate standard CRUD submenu for admin
 const createCrudSubmenu = (entityPath, entityName, options = {}) => {
   const {
+    showList = true,
+    showAdd = true,
+    showEdit = true,
     showDelete = true,
     showProfile = true,
+    listLabel,
+    addLabel,
+    editLabel,
+    deleteLabel,
+    profileLabel,
+    extraItems = [],
     listIcon = '📋',
     addIcon = '➕',
     editIcon = '✏️',
@@ -18,21 +28,61 @@ const createCrudSubmenu = (entityPath, entityName, options = {}) => {
     profileIcon = '📋'
   } = options
 
-  const submenu = [
-    { name: `${entityName} List`, href: `${BASE_PATH}/${entityPath}`, icon: listIcon },
-    { name: `Add ${entityName}`, href: `${BASE_PATH}/${entityPath}/add`, icon: addIcon },
-    { name: `Edit ${entityName}`, href: `${BASE_PATH}/${entityPath}/edit`, icon: editIcon }
-  ]
+  const submenu = []
+
+  if (showList) {
+    submenu.push({
+      name: listLabel || `${entityName} List`,
+      href: `${BASE_PATH}/${entityPath}`,
+      icon: listIcon
+    })
+  }
+
+  if (showAdd) {
+    submenu.push({
+      name: addLabel || `Add ${entityName}`,
+      href: `${BASE_PATH}/${entityPath}/add`,
+      icon: addIcon
+    })
+  }
+
+  if (showEdit) {
+    submenu.push({
+      name: editLabel || `Edit ${entityName}`,
+      href: `${BASE_PATH}/${entityPath}/edit`,
+      icon: editIcon
+    })
+  }
 
   if (showDelete) {
-    submenu.push({ name: `Delete ${entityName}`, href: `${BASE_PATH}/${entityPath}/delete`, icon: deleteIcon })
+    submenu.push({
+      name: deleteLabel || `Delete ${entityName}`,
+      href: `${BASE_PATH}/${entityPath}/delete`,
+      icon: deleteIcon
+    })
   }
 
   if (showProfile) {
-    submenu.push({ name: `${entityName} Profile`, href: `${BASE_PATH}/${entityPath}/profile`, icon: profileIcon })
+    submenu.push({
+      name: profileLabel || `${entityName} Profile`,
+      href: `${BASE_PATH}/${entityPath}/profile`,
+      icon: profileIcon
+    })
+  }
+
+  if (Array.isArray(extraItems) && extraItems.length > 0) {
+    submenu.push(...extraItems)
   }
 
   return submenu
+}
+
+const createStaticSubmenu = (items = []) => {
+  return items.map((item) => ({
+    name: item.name,
+    href: `${BASE_PATH}/${item.path}`,
+    icon: item.icon
+  }))
 }
 
 export const mainNav = [
@@ -72,28 +122,7 @@ export const sidebarSections = [
       }
     ]
   },
-  {
-    title: 'Institution',
-    items: [
-      {
-        name: 'Institution',
-        href: `${BASE_PATH}/institution`,
-        icon: '🏢',
-        submenu: createCrudSubmenu('institution', 'Institution')
-      }
-    ]
-  },
-  {
-    title: 'Departments',
-    items: [
-      {
-        name: 'Departments',
-        href: `${BASE_PATH}/departments`,
-        icon: '🏢',
-        submenu: createCrudSubmenu('departments', 'Department')
-      }
-    ]
-  },
+ 
   {
     title: 'Subjects',
     items: [
@@ -102,17 +131,6 @@ export const sidebarSections = [
         href: `${BASE_PATH}/subjects`,
         icon: '📚',
         submenu: createCrudSubmenu('subjects', 'Subject')
-      }
-    ]
-  },
-  {
-    title: 'Courses',
-    items: [
-      {
-        name: 'Courses',
-        href: `${BASE_PATH}/courses`,
-        icon: '📖',
-        submenu: createCrudSubmenu('courses', 'Course')
       }
     ]
   },
@@ -128,13 +146,53 @@ export const sidebarSections = [
     ]
   },
   {
+    title: 'Courses',
+    items: [
+      {
+        name: 'Courses',
+        href: `${BASE_PATH}/courses`,
+        icon: '📖',
+        submenu: createCrudSubmenu('courses', 'Course')
+      }
+    ]
+  },
+  
+  {
+    title: 'Departments',
+    items: [
+      {
+        name: 'Departments',
+        href: `${BASE_PATH}/departments`,
+        icon: '🏢',
+        submenu: createCrudSubmenu('departments', 'Department')
+      }
+    ]
+  },
+   {
+    title: 'Institution',
+    items: [
+      {
+        name: 'Institution',
+        href: `${BASE_PATH}/institution`,
+        icon: '🏢',
+        submenu: createCrudSubmenu('institution', 'Institution')
+      }
+    ]
+  },
+  {
     title: 'Academic Sessions',
     items: [
       {
         name: 'Sessions',
         href: `${BASE_PATH}/sessions`,
         icon: '🎓',
-        submenu: createCrudSubmenu('sessions', 'Session', { showDelete: false })
+        submenu: createCrudSubmenu('sessions', 'Session', {
+          showDelete: false,
+          profileIcon: '👤',
+          extraItems: [
+            { name: 'Semester Promotion', href: `${BASE_PATH}/sessions/promotion`, icon: '⏫' }
+          ]
+        })
       }
     ]
   },
@@ -145,7 +203,16 @@ export const sidebarSections = [
         name: 'Assignments',
         href: `${BASE_PATH}/assignments`,
         icon: '✏️',
-        submenu: createCrudSubmenu('assignments', 'Assignment', { showProfile: false })
+        submenu: createCrudSubmenu('assignments', 'Assignment', {
+          showAdd: FEATURE_FLAGS.ADMIN_ASSIGNMENT_MANAGEMENT,
+          showEdit: FEATURE_FLAGS.ADMIN_ASSIGNMENT_MANAGEMENT,
+          showDelete: FEATURE_FLAGS.ADMIN_ASSIGNMENT_MANAGEMENT,
+          showProfile: false,
+          listLabel: 'Assignment List',
+          extraItems: [
+            { name: 'View Assignment', href: `${BASE_PATH}/assignments/view`, icon: '👁️' }
+          ]
+        })
       }
     ]
   },
@@ -156,32 +223,32 @@ export const sidebarSections = [
         name: 'Management',
         href: '#',
         icon: '⚙️',
-        submenu: [
-          { name: 'Accounts', href: `${BASE_PATH}/accounts`, icon: '🏦' },
-          { name: 'Fees Collection', href: `${BASE_PATH}/fees-collection`, icon: '💰' },
-          { name: 'Expenses', href: `${BASE_PATH}/expenses`, icon: '💸' }
-        ]
+        submenu: createStaticSubmenu([
+          { name: 'Accounts', path: 'accounts', icon: '🏦' },
+          { name: 'Fees Collection', path: 'fees-collection', icon: '💰' },
+          { name: 'Expenses', path: 'expenses', icon: '💸' }
+        ])
       },
       {
         name: 'Academic',
         href: '#',
         icon: '📚',
-        submenu: [
-          { name: 'Holidays', href: `${BASE_PATH}/holidays`, icon: '🏖️' },
-          { name: 'Exam List', href: `${BASE_PATH}/exams`, icon: '📝' },
-          { name: 'Events', href: `${BASE_PATH}/events`, icon: '🎉' },
-          { name: 'Time Table', href: `${BASE_PATH}/timetable`, icon: '⏰' }
-        ]
+        submenu: createStaticSubmenu([
+          { name: 'Holidays', path: 'holidays', icon: '🏖️' },
+          { name: 'Exam List', path: 'exams', icon: '📝' },
+          { name: 'Events', path: 'events', icon: '🎉' },
+          { name: 'Time Table', path: 'timetable', icon: '⏰' }
+        ])
       },
       {
         name: 'Library',
         href: '#',
         icon: '📖',
-        submenu: [
-          { name: 'Overview', href: `${BASE_PATH}/library`, icon: '📊' },
-          { name: 'Books', href: `${BASE_PATH}/library/books`, icon: '📚' },
-          { name: 'Borrowings', href: `${BASE_PATH}/library/borrowings`, icon: '🔁' }
-        ]
+        submenu: createStaticSubmenu([
+          { name: 'Overview', path: 'library', icon: '📊' },
+          { name: 'Books', path: 'library/books', icon: '📚' },
+          { name: 'Borrowings', path: 'library/borrowings', icon: '🔁' }
+        ])
       }
     ]
   }

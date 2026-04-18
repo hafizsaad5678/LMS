@@ -334,7 +334,7 @@
 
                         <div class="mb-4">
                             <label class="form-label small fw-bold text-muted text-uppercase mb-2">Deadline</label>
-                            <VueDatePicker v-model="form.deadline" :format="'yyyy-MM-dd HH:mm'" :dark="false"
+                            <VueDatePicker v-model="form.deadline" :format="'yyyy-MM-dd HH:mm'" :dark="false" :text-input="false"
                                 placeholder="Select Submission Deadline" class="quiz-datepicker" />
                         </div>
 

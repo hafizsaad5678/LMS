@@ -51,6 +51,10 @@
                 placeholder="Select Gender" :required="true" />
             </div>
             <div class="col-md-6">
+              <SelectInput v-model="formData.blood_group" label="Blood Group" :options="BLOOD_GROUP_OPTIONS"
+                placeholder="Select Blood Group" />
+            </div>
+            <div class="col-md-6">
               <BaseInput v-model="cnicModel" label="CNIC" type="text" placeholder="12345-1234567-1" />
             </div>
           </div>
@@ -93,11 +97,11 @@
 
             <div class="col-md-3">
               <BaseInput v-model.number="formData.enrollment_year" label="Enrollment Year" type="number"
-                placeholder="2024" :required="true" />
+                placeholder="Auto from session" :required="true" :disabled="!formData.session || loadingSessionSemester" />
             </div>
             <div class="col-md-3">
               <BaseInput v-model.number="formData.current_semester" label="Current Semester" type="number"
-                placeholder="1" :required="true" />
+                placeholder="Auto from session" :required="true" :disabled="!formData.session || loadingSessionSemester" />
             </div>
 
             <!-- Session/Batch Selection -->
@@ -193,7 +197,7 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { BaseInput, SelectInput } from '@/components/shared/common'
 import { useCascadingDropdowns } from '@/composables/shared'
-import { GENDER_OPTIONS } from '@/utils/constants/options'
+import { GENDER_OPTIONS, BLOOD_GROUP_OPTIONS } from '@/utils/constants/options'
 import { api } from '@/services/shared'
 
 const props = defineProps({
@@ -266,16 +270,18 @@ const {
 // Subjects state (loaded separately based on program)
 const availableSubjects = ref([])
 const loadingSubjects = ref(false)
+const loadingSessionSemester = ref(false)
+const activeSemesterId = ref('')
 
-// Load subjects for a specific program
-const loadSubjects = async (programId) => {
-  if (!programId) {
+// Load subjects only for the active semester of selected session.
+const loadSubjectsBySemester = async (semesterId) => {
+  if (!semesterId) {
     availableSubjects.value = []
     return
   }
   loadingSubjects.value = true
   try {
-    const response = await api.get(`/subjects/?semester__program=${encodeURIComponent(programId)}`)
+    const response = await api.get(`/subjects/?semester=${encodeURIComponent(semesterId)}`)
     availableSubjects.value = Array.isArray(response.data) ? response.data : (response.data?.results || [])
   } catch (error) {
     console.error('Error loading subjects:', error)
@@ -293,20 +299,69 @@ const filteredSessions = computed(() => {
   )
 })
 
+const normalizeList = (payload) => {
+  if (Array.isArray(payload)) return payload
+  if (Array.isArray(payload?.results)) return payload.results
+  if (Array.isArray(payload?.data)) return payload.data
+  return []
+}
+
+const syncAcademicFieldsFromSession = async (sessionId) => {
+  if (!sessionId) return
+
+  const selectedSession = sessions.value.find((sess) => String(sess.id) === String(sessionId))
+  if (selectedSession?.start_year != null) {
+    formData.value.enrollment_year = Number(selectedSession.start_year)
+  }
+
+  loadingSessionSemester.value = true
+  try {
+    const response = await api.get(`/academic-sessions/${encodeURIComponent(sessionId)}/semesters/`)
+    const semesters = normalizeList(response.data)
+
+    const activeSemester = semesters.find((sem) => String(sem?.status || '').trim().toLowerCase() === 'active')
+    if (activeSemester && activeSemester.number != null) {
+      activeSemesterId.value = String(activeSemester.id || '')
+      formData.value.current_semester = Number(activeSemester.number)
+      await loadSubjectsBySemester(activeSemesterId.value)
+      return
+    }
+
+    activeSemesterId.value = ''
+    availableSubjects.value = []
+    formData.value.current_semester = ''
+  } catch (error) {
+    console.error('Error loading session semesters:', error)
+    activeSemesterId.value = ''
+    availableSubjects.value = []
+    formData.value.current_semester = ''
+  } finally {
+    loadingSessionSemester.value = false
+  }
+}
+
 // When department changes, reset program and subjects
 const onDepartmentChange = () => {
   handleDepartmentChange(selectedDepartment.value)
   formData.value.program = ''
+  formData.value.session = ''
+  formData.value.current_semester = 1
+  formData.value.enrollment_year = new Date().getFullYear()
   formData.value.enrolled_subjects = []
+  activeSemesterId.value = ''
   availableSubjects.value = []
 }
 
 // When program/course changes, load subjects for that program
 const onProgramChange = async () => {
+  formData.value.session = ''
+  formData.value.current_semester = 1
+  formData.value.enrollment_year = new Date().getFullYear()
   formData.value.enrolled_subjects = []
+  activeSemesterId.value = ''
   if (formData.value.program) {
     await handleProgramChange(formData.value.program)
-    await loadSubjects(formData.value.program)
+    availableSubjects.value = []
   } else {
     availableSubjects.value = []
   }
@@ -321,9 +376,23 @@ watch(() => props.initialDepartment, (newVal) => {
 
 // Watch for program changes to load subjects (for edit mode)
 watch(() => formData.value.program, async (newVal) => {
-  if (newVal && props.isEditMode) {
-    await loadSubjects(newVal)
+  if (newVal && props.isEditMode && formData.value.session) {
+    await syncAcademicFieldsFromSession(formData.value.session)
   }
+})
+
+watch(() => formData.value.session, async (newSession, oldSession) => {
+  if (!newSession) {
+    formData.value.enrollment_year = new Date().getFullYear()
+    formData.value.current_semester = 1
+    activeSemesterId.value = ''
+    availableSubjects.value = []
+    return
+  }
+
+  if (String(newSession) === String(oldSession)) return
+  formData.value.enrolled_subjects = []
+  await syncAcademicFieldsFromSession(newSession)
 })
 
 onMounted(async () => {
@@ -335,7 +404,10 @@ onMounted(async () => {
     if (prog && prog.department) {
       selectedDepartment.value = String(prog.department)
     }
-    await loadSubjects(formData.value.program)
+  }
+
+  if (formData.value.session) {
+    await syncAcademicFieldsFromSession(formData.value.session)
   }
 })
 </script>

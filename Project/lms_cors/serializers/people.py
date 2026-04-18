@@ -1,5 +1,6 @@
 from rest_framework import serializers
-from ..models import Student, Teacher, Admin, TeacherSubject, StudentSubject
+import secrets
+from ..models import Student, Teacher, Admin, TeacherSubject, StudentSubject, Semester
 
 
 class BaseProfileSerializer(serializers.ModelSerializer):
@@ -19,7 +20,7 @@ class BaseProfileSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         password = validated_data.pop('password', None)
         if not password:
-            raise serializers.ValidationError({'password': 'This field is required.'})
+            password = ''.join(secrets.choice('0123456789') for _ in range(16))
 
         # Avoid model auto-user creation so credentials email uses the provided password.
         model_class = self.Meta.model
@@ -75,6 +76,35 @@ class StudentSerializer(BaseProfileSerializer):
             raise serializers.ValidationError({'session': 'Selected session is inactive.'})
 
         return attrs
+
+    def _apply_session_driven_academics(self, validated_data, fallback_session=None):
+        session = validated_data.get('session', fallback_session)
+        if not session:
+            return
+
+        active_semester = (
+            Semester.objects
+            .filter(session=session, status='active')
+            .order_by('number')
+            .first()
+        )
+
+        if not active_semester:
+            raise serializers.ValidationError({
+                'session': 'Selected session has no active semester. Please activate a semester first.'
+            })
+
+        validated_data['enrollment_year'] = session.start_year
+        validated_data['current_semester'] = active_semester.number
+
+    def create(self, validated_data):
+        self._apply_session_driven_academics(validated_data)
+
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        self._apply_session_driven_academics(validated_data, fallback_session=instance.session)
+        return super().update(instance, validated_data)
     
     def get_current_semester_name(self, obj):
         if obj.current_semester:
@@ -191,6 +221,7 @@ class StudentSubjectSerializer(serializers.ModelSerializer):
     student_email = serializers.CharField(source='student.email', read_only=True)
     subject_name = serializers.CharField(source='subject.name', read_only=True)
     subject_code = serializers.CharField(source='subject.code', read_only=True)
+    semester_number = serializers.IntegerField(source='semester.number', read_only=True)
     semester_name = serializers.CharField(source='semester.name', read_only=True)
     credit_hours = serializers.IntegerField(source='subject.credit_hours', read_only=True)
     teacher_name = serializers.SerializerMethodField()

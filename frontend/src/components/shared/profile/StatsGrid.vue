@@ -1,6 +1,6 @@
 <template>
   <div class="row g-4">
-    <div v-for="(stat, index) in stats" :key="index" :class="colClass">
+    <div v-for="(stat, index) in stats" :key="index" :class="[colClass, 'stats-grid-col']">
       <div :class="['stat-card', stat.bgClass || 'bg-admin-light']">
         <i :class="[stat.icon, 'stat-icon', stat.iconColor || 'text-admin']"></i>
         <div class="stat-content">

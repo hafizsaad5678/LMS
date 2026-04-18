@@ -42,6 +42,7 @@
         v-model="filters.search"
         v-model:status-value="filters.status"
         search-placeholder="Search by name, email, or enrollment number..."
+        preset="admin-list"
         :loading="loading"
         @refresh="handleRefresh"
         @reset="resetFilters"

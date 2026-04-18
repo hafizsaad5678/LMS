@@ -120,28 +120,54 @@ const props = defineProps({
     type: Boolean,
     default: false
   },
+  preset: {
+    type: String,
+    default: 'none'
+  },
   loading: {
     type: Boolean,
     default: false
   },
   searchColSize: {
     type: String,
-    default: 'col-md-5 col-12'
+    default: ''
   },
   actionsColSize: {
     type: String,
-    default: 'col-md-4 col-12'
+    default: ''
   },
   theme: {
     type: String,
-    default: 'admin' // admin, teacher, student
+    default: '' // admin, teacher, student
   }
 })
 
 const emit = defineEmits(['update:modelValue', 'update:statusValue', 'refresh', 'reset', 'search'])
 
-const searchColClass = computed(() => props.searchColSize)
-const actionsColClass = computed(() => props.actionsColSize)
+const presetConfig = computed(() => {
+  const presets = {
+    'admin-list': {
+      searchColSize: 'col-md-3 col-12',
+      actionsColSize: 'col-md-3 col-12',
+      theme: 'admin'
+    },
+    'teacher-list': {
+      searchColSize: 'col-md-4 col-12',
+      actionsColSize: 'col-md-4 col-12',
+      theme: 'teacher'
+    },
+    'student-list': {
+      searchColSize: 'col-md-4 col-12',
+      actionsColSize: 'col-md-4 col-12',
+      theme: 'student'
+    }
+  }
+  return presets[props.preset] || {}
+})
+
+const searchColClass = computed(() => props.searchColSize || presetConfig.value.searchColSize || 'col-md-5 col-12')
+const actionsColClass = computed(() => props.actionsColSize || presetConfig.value.actionsColSize || 'col-md-4 col-12')
+const effectiveTheme = computed(() => props.theme || presetConfig.value.theme || 'admin')
 
 const refreshButtonClass = computed(() => {
   const classes = {
@@ -149,7 +175,7 @@ const refreshButtonClass = computed(() => {
     teacher: 'btn-teacher-outline',
     student: 'btn-student-outline'
   }
-  return classes[props.theme] || 'btn-admin-outline'
+  return classes[effectiveTheme.value] || 'btn-admin-outline'
 })
 
 // Sanitize search input before emitting

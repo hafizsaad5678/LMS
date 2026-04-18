@@ -33,36 +33,39 @@
     <!-- Filters Section -->
     <template #filters>
       <SearchFilter
-        v-model="searchQuery"
+        v-model="filters.search"
         search-placeholder="Search exams..."
+        preset="admin-list"
         :show-status-filter="false"
         :loading="loading"
-        @refresh="loadExams"
+        @refresh="handleRefresh"
         @reset="resetFilters"
       >
         <template #filters>
-          <div class="col-md-3 col-6">
-            <select v-model="typeFilter" class="form-select" @change="loadExams">
-              <option value="">All Types</option>
-              <option v-for="opt in EXAM_TYPE_OPTIONS" :key="opt.value" :value="opt.value">
-                {{ opt.label }}
-              </option>
-            </select>
-          </div>
-          <div class="col-md-3 col-6">
-            <select v-model="statusFilter" class="form-select" @change="loadExams">
-              <option value="">All Status</option>
-              <option v-for="opt in SCHEDULE_STATUS_OPTIONS" :key="opt.value" :value="opt.value">
-                {{ opt.label }}
-              </option>
-            </select>
-          </div>
+          <SelectInput
+            v-model="filters.type"
+            label="Type"
+            placeholder="All Types"
+            :options="EXAM_TYPE_OPTIONS"
+            col-class="col-md-3 col-6"
+            :no-margin="true"
+            label-class="small fw-semibold text-dark"
+          />
+          <SelectInput
+            v-model="filters.status"
+            label="Status"
+            placeholder="All Status"
+            :options="SCHEDULE_STATUS_OPTIONS"
+            col-class="col-md-3 col-6"
+            :no-margin="true"
+            label-class="small fw-semibold text-dark"
+          />
         </template>
       </SearchFilter>
     </template>
 
     <!-- Main Content -->
-    <DataTable :columns="tableColumns" :data="filteredExams" :loading="loading" loading-text="Loading exams..." empty-icon="bi bi-clipboard-check" empty-title="No exams found" empty-subtitle="Add your first exam to get started">
+    <DataTable :columns="tableColumns" :data="exams" :loading="loading" loading-text="Loading exams..." empty-icon="bi bi-clipboard-check" empty-title="No exams found" empty-subtitle="Add your first exam to get started">
       <template #cell-subject_name="{ row }">
         <div class="d-flex align-items-center">
           <div class="avatar-circle avatar-exam me-2"><i class="bi bi-clipboard-check"></i></div>
@@ -102,6 +105,7 @@
       icon="bi bi-clipboard-check"
       :loading="saving"
       :confirm-text="editingExam ? 'Update' : 'Add'"
+      confirm-variant="btn-admin-primary"
       @confirm="saveExam"
       @close="closeModal"
     >
@@ -137,11 +141,10 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
-import { smartSearch } from '@/utils'
+import { ref, onMounted } from 'vue'
 import { AdminPageTemplate } from '@/components/shared/panels'
 import { StatCard, DataTable, SearchFilter, ActionButtons, AlertMessage, BaseInput, ConfirmDialog, EntityFormModal, SelectInput } from '@/components/shared/common'
-import { useAlert } from '@/composables/shared'
+import { useAlert, useEntityList, useListStats } from '@/composables/shared'
 import { examService } from '@/services/admin/managementService'
 import { subjectService } from '@/services/shared'
 import { normalizeToArray } from '@/services/shared'
@@ -164,34 +167,49 @@ const tableColumns = [
 
 // Use shared alert composable
 const { alert, showAlert } = useAlert()
-const loading = ref(false)
 const saving = ref(false)
-const exams = ref([])
 const subjects = ref([])
-const searchQuery = ref('')
-const typeFilter = ref('')
-const statusFilter = ref('')
 const showModal = ref(false)
 const editingExam = ref(null)
 const showConfirmDialog = ref(false)
 const examToDelete = ref(null)
 const examForm = ref({ subject: '', exam_date: '', exam_time: '', exam_type: 'midterm', duration_minutes: 120, room: '' })
 
-const upcomingExams = computed(() => exams.value.filter(e => new Date(e.exam_date) > new Date()).length)
-const ongoingExams = computed(() => exams.value.filter(e => new Date(e.exam_date).toDateString() === new Date().toDateString()).length)
-const completedExams = computed(() => exams.value.filter(e => new Date(e.exam_date) < new Date()).length)
-
-const filteredExams = computed(() => {
-  let list = exams.value
-  if (searchQuery.value) {
-    list = list.filter(e => smartSearch(e, searchQuery.value, ['subject_name', 'subject_code', 'room', 'exam_type']))
-  }
-  if (typeFilter.value) list = list.filter(e => e.exam_type === typeFilter.value)
-  if (statusFilter.value === 'upcoming') list = list.filter(e => new Date(e.exam_date) > new Date())
-  else if (statusFilter.value === 'ongoing') list = list.filter(e => new Date(e.exam_date).toDateString() === new Date().toDateString())
-  else if (statusFilter.value === 'completed') list = list.filter(e => new Date(e.exam_date) < new Date())
-  return list.sort((a, b) => new Date(a.exam_date) - new Date(b.exam_date))
+const {
+  loading,
+  data,
+  filteredData: exams,
+  filters,
+  loadData,
+  resetFilters,
+  refresh
+} = useEntityList({
+  searchFields: ['subject_name', 'subject_code', 'room', 'exam_type'],
+  defaultFilters: { type: '', status: '' },
+  filterSchema: [
+    {
+      key: 'type',
+      itemValue: 'exam_type'
+    },
+    {
+      key: 'status',
+      predicate: (exam, value) => {
+        const examDate = new Date(exam.exam_date)
+        const now = new Date()
+        if (value === 'upcoming') return examDate > now
+        if (value === 'ongoing') return examDate.toDateString() === now.toDateString()
+        if (value === 'completed') return examDate < now
+        return true
+      }
+    }
+  ],
+  customFilter: (list) => list.sort((a, b) => new Date(a.exam_date) - new Date(b.exam_date))
 })
+
+const listStats = useListStats(data)
+const upcomingExams = listStats.count((exam) => new Date(exam.exam_date) > new Date())
+const ongoingExams = listStats.count((exam) => new Date(exam.exam_date).toDateString() === new Date().toDateString())
+const completedExams = listStats.count((exam) => new Date(exam.exam_date) < new Date())
 
 // Use shared formatDate utility
 const formatDate = (date) => formatDateUtil(date)
@@ -199,18 +217,21 @@ const formatDate = (date) => formatDateUtil(date)
 const getStatus = (date) => new Date(date).toDateString() === new Date().toDateString() ? 'Today' : new Date(date) > new Date() ? 'Upcoming' : 'Completed'
 const getStatusBadge = (date) => getStatus(date) === 'Today' ? 'bg-info' : getStatus(date) === 'Upcoming' ? 'bg-success' : 'bg-secondary'
 
+const fetchExams = async () => {
+  const response = await examService.getAll()
+  return response.data?.results || response.data || []
+}
+
 const loadExams = async () => {
-  loading.value = true
   try {
-    const response = await examService.getAll()
-    exams.value = response.data.results || response.data
+    await loadData(fetchExams)
   } catch (error) {
     console.error('Error loading exams:', error)
     showAlert('error', 'Failed to load exams', 'Error')
-  } finally {
-    loading.value = false
   }
 }
+
+const handleRefresh = () => refresh(fetchExams)
 
 const loadSubjects = async () => {
   try {
@@ -219,12 +240,6 @@ const loadSubjects = async () => {
   } catch (error) {
     console.error('Error loading subjects:', error)
   }
-}
-
-const resetFilters = () => {
-  searchQuery.value = ''
-  typeFilter.value = ''
-  statusFilter.value = ''
 }
 
 const editExam = (exam) => {
@@ -241,7 +256,7 @@ const deleteExam = (exam) => {
 const confirmDeleteExam = async () => {
   try {
     await examService.delete(examToDelete.value.id)
-    exams.value = exams.value.filter(e => e.id !== examToDelete.value.id)
+    await refresh(fetchExams)
     showAlert('success', 'Exam deleted', 'Success')
   } catch (error) {
     console.error('Error deleting exam:', error)
@@ -263,7 +278,7 @@ const saveExam = async () => {
       showAlert('success', 'Exam added', 'Success')
     }
     closeModal()
-    loadExams()
+    await refresh(fetchExams)
   } catch (error) {
     console.error('Error saving exam:', error)
     showAlert('error', 'Failed to save exam', 'Error')
@@ -277,11 +292,6 @@ const closeModal = () => {
   editingExam.value = null
   examForm.value = { subject: '', exam_date: '', exam_time: '', exam_type: 'midterm', duration_minutes: 120, room: '' }
 }
-
-let searchTimeout
-watch(searchQuery, () => {
-  // Local filtering only
-})
 
 onMounted(() => {
   loadExams()

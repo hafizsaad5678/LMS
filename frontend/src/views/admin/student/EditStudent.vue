@@ -124,6 +124,7 @@ const form = ref({
   phone: '',
   date_of_birth: '',
   gender: '',
+  blood_group: 'unknown',
   cnic: '',
   program: '',
   session: '',
@@ -155,6 +156,7 @@ const loadStudent = async () => {
     form.value.phone = student.phone || ''
     form.value.date_of_birth = student.date_of_birth || ''
     form.value.gender = student.gender || ''
+    form.value.blood_group = String(student.blood_group || 'unknown').toLowerCase()
     form.value.cnic = student.cnic || ''
     form.value.program = student.program ? (typeof student.program === 'object' ? String(student.program.id) : String(student.program)) : ''
     form.value.session = student.session ? (typeof student.session === 'object' ? String(student.session.id) : String(student.session)) : ''
@@ -199,6 +201,7 @@ const handleSubmit = async () => {
       phone: form.value.phone || null,
       date_of_birth: form.value.date_of_birth || null,
       gender: form.value.gender,
+      blood_group: String(form.value.blood_group || 'unknown').toLowerCase(),
       cnic: form.value.cnic && form.value.cnic.trim() ? form.value.cnic : null,
       program: form.value.program || null,
       session: form.value.session || null,

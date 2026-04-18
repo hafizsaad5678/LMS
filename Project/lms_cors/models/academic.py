@@ -23,7 +23,23 @@ def generate_sequential_id(model_class, field_name, prefix, filter_field=None, f
             except (ValueError, IndexError):
                 pass
     
-    return f"{prefix}-{new_num:04d}"
+    suffix = f"-{new_num:04d}"
+
+    # Keep generated IDs within the model field limit (e.g., Teacher.employee_id max_length=20).
+    field = model_class._meta.get_field(field_name)
+    max_length = getattr(field, 'max_length', None)
+
+    if max_length:
+        allowed_prefix_len = max_length - len(suffix)
+        if allowed_prefix_len < 1:
+            # Defensive fallback for unusually small max_length values.
+            return suffix[-max_length:]
+
+        prefix = str(prefix)[:allowed_prefix_len].rstrip('-')
+        if not prefix:
+            prefix = str(model_class.__name__).upper()[:allowed_prefix_len]
+
+    return f"{prefix}{suffix}"
 
 
 class Institution(models.Model):
@@ -242,8 +258,8 @@ class Semester(models.Model):
     updated_at = models.DateTimeField(auto_now=True, null=True)
     
     class Meta:
-        ordering = ['program', 'number']
-        unique_together = ['program', 'number']
+        ordering = ['session', 'number']
+        unique_together = ['session', 'number']
     
     def __str__(self):
         if self.program:

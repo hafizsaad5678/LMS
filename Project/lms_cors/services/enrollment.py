@@ -97,20 +97,23 @@ class SemesterFactory:
         for i in range(count):
             semester_num = i + 1
             semester_type = 'Fall' if i % 2 == 0 else 'Spring'
-            year = session.start_year + (i // 2)
+            # Academic cycle year (Fall starts cycle, Spring ends it in next calendar year).
+            cycle_year = session.start_year + (i // 2)
             
             if i % 2 == 0:
-                sem_start = datetime(year, 9, 1).date()
-                sem_end = datetime(year, 12, 31).date()
+                display_year = cycle_year
+                sem_start = datetime(display_year, 9, 1).date()
+                sem_end = datetime(display_year, 12, 31).date()
             else:
-                sem_start = datetime(year, 3, 1).date()
-                sem_end = datetime(year, 6, 30).date()
+                display_year = cycle_year + 1
+                sem_start = datetime(display_year, 3, 1).date()
+                sem_end = datetime(display_year, 6, 30).date()
             
             semester = Semester.objects.create(
                 session=session,
                 program=session.program,
                 number=semester_num,
-                name=f"Semester {semester_num} ({semester_type} {year})",
+                name=f"Semester {semester_num} ({semester_type} {display_year})",
                 start_date=sem_start,
                 end_date=sem_end,
                 status='draft'

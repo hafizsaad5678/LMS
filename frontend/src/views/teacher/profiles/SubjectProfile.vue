@@ -50,6 +50,19 @@
       </div>
 
       <StatsGrid :stats="statsData" title="Class Statistics" icon="bi bi-bar-chart" class="mt-4" />
+
+      <div class="mt-4">
+        <SubjectsTable
+          title="Enrolled Students"
+          icon="bi bi-people"
+          :subjects="enrolledStudents"
+          :columns="studentColumns"
+          count-label-singular="Student"
+          count-label-plural="Students"
+          empty-message="No students are currently enrolled in this class"
+          @view-subject="viewStudentProfile"
+        />
+      </div>
     </div>
   </TeacherPageTemplate>
 </template>
@@ -58,7 +71,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { TeacherPageTemplate } from '@/components/shared/panels'
-import { ProfileHeader, InfoCard, StatsGrid } from '@/components/shared/profile'
+import { ProfileHeader, InfoCard, StatsGrid, SubjectsTable } from '@/components/shared/profile'
 import { LoadingSpinner, EmptyState } from '@/components/shared/common'
 import teacherPanelService from '@/services/teacher/teacherPanelService'
 import { TEACHER_ROUTES } from '@/utils/constants/routes'
@@ -69,6 +82,7 @@ const route = useRoute()
 const subjectId = computed(() => route.params.id)
 const loading = ref(false)
 const subject = ref({})
+const enrolledStudents = ref([])
 const assignmentCount = ref(0)
 const attendanceRate = ref(0)
 const averageGrade = ref('N/A')
@@ -85,7 +99,9 @@ const actions = computed(() => [
 
 const profileBadges = computed(() => {
   const badges = []
+  const totalStudents = Number(subject.value.student_count || 0)
   badges.push({ text: `${subject.value.credit_hours} Credit Hours`, class: 'bg-info' })
+  badges.push({ text: `${totalStudents} Students`, class: 'bg-success' })
   if (subject.value.department_name) badges.push({ text: subject.value.department_name, class: 'bg-teacher' })
   if (subject.value.program_name) badges.push({ text: subject.value.program_name, class: 'bg-secondary' })
   if (subject.value.semester_number) badges.push({ text: `Semester ${subject.value.semester_number}`, class: 'bg-warning text-dark' })
@@ -113,9 +129,21 @@ const statsData = computed(() => [
   { value: averageGrade.value, label: 'Average Grade', icon: 'bi bi-award', bgClass: 'bg-info-light', iconColor: 'text-info' }
 ])
 
+const studentColumns = [
+  { key: 'roll_no', label: 'Enrollment #', badge: true, badgeClass: 'badge bg-dark' },
+  { key: 'name', label: 'Student Name' },
+  { key: 'email', label: 'Email' }
+]
+
+const viewStudentProfile = (student) => {
+  if (!student?.id) return
+  router.push({ name: TEACHER_ROUTES.STUDENT_PROFILE.name, params: { id: student.id } })
+}
+
 const loadSubject = async () => {
   if (!subjectId.value) return
   loading.value = true
+  enrolledStudents.value = []
   assignmentCount.value = 0
   attendanceRate.value = 0
   averageGrade.value = 'N/A'
@@ -128,16 +156,30 @@ const loadSubject = async () => {
     if (foundSubject) {
       subject.value = foundSubject
       const subjectIdToUse = foundSubject.subject_id || foundSubject.id
-      const stats = await teacherPanelService.getSubjectStatistics(subjectIdToUse)
+      const [stats, studentsResponse] = await Promise.all([
+        teacherPanelService.getSubjectStatistics(subjectIdToUse),
+        teacherPanelService.getClassStudents(foundSubject.id)
+      ])
+
       assignmentCount.value = stats.assignmentCount
       attendanceRate.value = stats.attendanceRate
       averageGrade.value = stats.averageGrade
+
+      const studentList = studentsResponse?.results || studentsResponse || []
+      enrolledStudents.value = studentList.map(student => ({
+        id: student.id,
+        name: student.name,
+        roll_no: student.roll_no,
+        email: student.email
+      }))
     } else {
       subject.value = {}
+      enrolledStudents.value = []
     }
   } catch (err) {
     console.error('Error loading subject:', err)
     subject.value = {}
+    enrolledStudents.value = []
   } finally {
     loading.value = false
   }

@@ -30,24 +30,22 @@
       <SearchFilter
         v-model="filters.search"
         search-placeholder="Search by name or code..."
+        preset="admin-list"
         :show-status-filter="false"
-        search-col-size="col-md-5 col-12"
-        actions-col-size="col-md-3 col-6"
         :loading="loading"
-        @refresh="loadCourses"
+        @refresh="handleRefresh"
         @reset="resetFilters"
       >
         <template #filters>
-          <div class="col-md-4 col-6">
-            <label class="form-label small fw-semibold text-dark">Duration</label>
-            <select v-model="filters.duration" class="form-select" @change="loadCourses">
-              <option value="">All Durations</option>
-              <option value="2">2 Years</option>
-              <option value="3">3 Years</option>
-              <option value="4">4 Years</option>
-              <option value="5">5 Years</option>
-            </select>
-          </div>
+          <SelectInput
+            v-model="filters.duration"
+            label="Duration"
+            placeholder="All Durations"
+            :options="COURSE_DURATION_OPTIONS"
+            col-class="col-md-4 col-6"
+            :no-margin="true"
+            label-class="small fw-semibold text-dark"
+          />
         </template>
       </SearchFilter>
     </template>
@@ -111,13 +109,14 @@
 </template>
 
 <script setup>
-import { onMounted, computed, watch } from 'vue'
+import { onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { AdminPageTemplate } from '@/components/shared/panels'
-import { StatCard, DataTable, SearchFilter, ActionButtons } from '@/components/shared/common'
-import { useEntityList } from '@/composables/shared'
+import { StatCard, DataTable, SearchFilter, SelectInput, ActionButtons } from '@/components/shared/common'
+import { useEntityList, useListStats } from '@/composables/shared'
 import { programService } from '@/services/shared'
 import { ADMIN_ROUTES } from '@/utils/constants/routes'
+import { COURSE_DURATION_OPTIONS } from '@/utils/constants/options'
 
 const router = useRouter()
 
@@ -145,42 +144,41 @@ const {
   filteredData,
   filters,
   loadData,
-  applyFilters,
+  refresh,
   resetFilters: baseResetFilters
 } = useEntityList({
   cacheKey: 'courses_list',
   searchFields: ['name', 'code'],
   defaultFilters: { duration: '' },
-  customFilter: (data, filterValues) => {
-    if (filterValues.duration) {
-      const duration = parseInt(filterValues.duration)
-      return data.filter(c => c.duration_years === duration)
+  filterSchema: [
+    {
+      key: 'duration',
+      itemValue: 'duration_years',
+      normalize: value => Number(value || 0)
     }
-    return data
-  }
+  ]
 })
 
-// Custom stats for courses
-const stats = computed(() => {
-  const total = filteredData.value.length
-  const totalStudents = filteredData.value.reduce((sum, c) => sum + (c.student_count || 0), 0)
-  const totalDuration = filteredData.value.reduce((sum, c) => sum + (c.duration_years || 0), 0)
-  const avgDuration = total > 0 ? (totalDuration / total).toFixed(1) : 0
-  const totalSemesters = filteredData.value.reduce((sum, c) => sum + (c.semester_count || 0), 0)
-  return { total, totalStudents, avgDuration, totalSemesters }
+const listStats = useListStats(filteredData)
+
+const stats = listStats.summary({
+  total: list => list.length,
+  totalStudents: list => list.reduce((sum, course) => sum + (course.student_count || 0), 0),
+  avgDuration: list => {
+    if (!list.length) return 0
+    const totalDuration = list.reduce((sum, course) => sum + (course.duration_years || 0), 0)
+    return (totalDuration / list.length).toFixed(1)
+  },
+  totalSemesters: list => list.reduce((sum, course) => sum + (course.semester_count || 0), 0)
 })
 
 const fetchCourses = () => programService.getAllPrograms()
 
 const loadCourses = () => loadData(fetchCourses)
 
-const resetFilters = () => {
-  filters.value.duration = ''
-  baseResetFilters()
-}
+const handleRefresh = () => refresh(fetchCourses)
 
-// Watch duration filter
-watch(() => filters.value.duration, () => applyFilters())
+const resetFilters = () => baseResetFilters()
 
 onMounted(loadCourses)
 </script>

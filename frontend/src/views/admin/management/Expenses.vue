@@ -25,27 +25,33 @@
       <SearchFilter
         v-model="searchQuery"
         search-placeholder="Search expenses..."
+        preset="admin-list"
         :show-status-filter="false"
         :loading="loadingExpenses"
         @refresh="loadExpenses"
         @reset="resetFilters"
       >
         <template #filters>
-          <div class="col-md-3 col-6">
-            <select v-model="categoryFilter" class="form-select" @change="loadExpenses">
-              <option value="">All Categories</option>
-              <option v-for="opt in EXPENSE_CATEGORY_OPTIONS" :key="opt.value" :value="opt.value">
-                {{ opt.label }}
-              </option>
-            </select>
-          </div>
-          <div class="col-md-3 col-6">
-            <select v-model="statusFilter" class="form-select" @change="loadExpenses">
-              <option value="">All Status</option>
-              <option value="approved">Approved</option>
-              <option value="pending">Pending</option>
-            </select>
-          </div>
+          <SelectInput
+            v-model="categoryFilter"
+            label="Category"
+            placeholder="All Categories"
+            :options="EXPENSE_CATEGORY_OPTIONS"
+            option-value-key="value"
+            option-label-key="label"
+            col-class="col-md-3 col-6"
+            :no-margin="true"
+            label-class="small fw-semibold text-dark"
+          />
+          <SelectInput
+            v-model="statusFilter"
+            label="Status"
+            placeholder="All Status"
+            :options="EXPENSE_APPROVAL_OPTIONS"
+            col-class="col-md-3 col-6"
+            :no-margin="true"
+            label-class="small fw-semibold text-dark"
+          />
         </template>
       </SearchFilter>
     </template>
@@ -95,6 +101,7 @@
     :icon="editMode ? 'bi bi-pencil' : 'bi bi-cash-stack'"
     :loading="submitting"
     :confirm-text="editMode ? 'Update Expense' : 'Add Expense'"
+    confirm-variant="btn-admin-primary"
     @confirm="handleSubmit()"
   >
     <form @submit.prevent="handleSubmit()">
@@ -129,15 +136,15 @@
 </template>
 
 <script setup>
-import { computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { smartSearch } from '@/utils'
 import { AdminPageTemplate } from '@/components/shared/panels'
-import { StatCard, DataTable, SearchFilter, AlertMessage, BaseInput, EntityFormModal, ConfirmDialog } from '@/components/shared/common'
+import { StatCard, DataTable, SearchFilter, SelectInput, AlertMessage, BaseInput, EntityFormModal, ConfirmDialog } from '@/components/shared/common'
 import { useCrudModal, useAsyncState } from '@/composables/shared'
 import { expenseService } from '@/services/admin/managementService'
 import { formatDate as formatDateUtil, truncateText } from '@/utils/formatters'
 import { getErrorMessage, getSuccessMessage } from '@/utils/errorMap'
-import { EXPENSE_CATEGORY_OPTIONS } from '@/utils/constants/options'
+import { EXPENSE_CATEGORY_OPTIONS, EXPENSE_APPROVAL_OPTIONS } from '@/utils/constants/options'
 import { getStatusBadgeClass } from '@/utils/badgeHelpers'
 import { CURRENCY } from '@/utils/constants/config'
 import { generateBreadcrumbs } from '@/utils/navigation'
@@ -181,7 +188,6 @@ const {
 })
 
 // UI Refs
-import { ref } from 'vue'
 const searchQuery = ref('')
 const categoryFilter = ref('')
 const statusFilter = ref('')
@@ -214,18 +220,13 @@ const resetFilters = () => {
 const approveExpense = async (expense) => {
   try {
     await expenseService.approve(expense.id)
-    expense.is_approved = true
+    await loadExpenses()
     showAlert('success', getSuccessMessage('expense', 'approve'), 'Success')
   } catch (error) {
     console.error('Error approving expense:', error)
     showAlert('error', getErrorMessage(error, 'expense', 'approve'), 'Error')
   }
 }
-
-let searchTimeout
-watch(searchQuery, () => {
-  // Local filtering only
-})
 
 onMounted(loadExpenses)
 </script>

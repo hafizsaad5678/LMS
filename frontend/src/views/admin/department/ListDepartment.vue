@@ -42,6 +42,7 @@
         v-model="filters.search"
         v-model:status-value="filters.status"
         search-placeholder="Search by name, code, or head..."
+        preset="admin-list"
         :loading="loading"
         @refresh="handleRefresh"
         @reset="resetFilters"
@@ -109,7 +110,7 @@ import { computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { AdminPageTemplate } from '@/components/shared/panels'
 import { StatCard, DataTable, SearchFilter, ActionButtons, AlertMessage } from '@/components/shared/common'
-import { useEntityList, useAlert } from '@/composables/shared'
+import { useEntityList, useAlert, useListStats } from '@/composables/shared'
 import { departmentService } from '@/services/shared'
 import { ADMIN_ROUTES } from '@/utils/constants/routes'
 import { getActiveBadgeClass, getActiveStatusText } from '@/utils/badgeHelpers'
@@ -156,9 +157,8 @@ const {
 })
 
 // Extra computed for total teachers
-const totalTeachers = computed(() => 
-  data.value.reduce((sum, d) => sum + (d.teacher_count || 0), 0)
-)
+const listStats = useListStats(data)
+const totalTeachers = listStats.sum((department) => department.teacher_count)
 
 // Methods
 const fetchDepartments = () => departmentService.getAllDepartments()

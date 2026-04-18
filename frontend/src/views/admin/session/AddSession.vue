@@ -36,7 +36,7 @@
     </div>
 
     <!-- Wizard Content -->
-    <div class="card border-0 shadow-sm">
+    <div class="card border-0 shadow-sm session-wizard-card">
       <div class="card-body p-4">
         <!-- Step 1: Select Program -->
         <div v-if="currentStep === 1" class="wizard-content">
@@ -350,12 +350,14 @@ const createSession = async () => {
     
     showAlert('success', 'Session created successfully!', 'Success!')
     
-    if (autoSetupSemesters.value) {
+    if (autoSetupSemesters.value && response?.status === 'active') {
       try {
         await sessionService.setupSemesters(sessionId)
       } catch (error) {
         console.error('Error setting up semesters:', error)
       }
+    } else if (autoSetupSemesters.value && response?.status !== 'active') {
+      showAlert('info', 'Semesters were not generated. Activate the session first, then run Setup Semesters.', 'Session Created')
     }
     setTimeout(() => router.push({ name: ADMIN_ROUTES.SESSION_LIST.name, query: { refresh: Date.now() } }), 1500)
   } catch (error) {
@@ -368,17 +370,5 @@ const createSession = async () => {
 
 onMounted(loadPrograms)
 </script>
-
-<style scoped>
-.session-program-select {
-  font-size: 1rem;
-  padding-top: 0.5rem;
-  padding-bottom: 0.5rem;
-}
-
-.session-program-select option {
-  font-size: 0.95rem;
-}
-</style>
 
 

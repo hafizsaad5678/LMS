@@ -61,6 +61,7 @@ export const ADMIN_ROUTES = {
     SESSION_ADD: { name: 'AddSession', path: '/admin-dashboard/sessions/add' },
     SESSION_EDIT: { name: 'EditSession', path: '/admin-dashboard/sessions/edit' },
     SESSION_PROFILE: { name: 'SessionProfile', path: '/admin-dashboard/sessions/profile' },
+    SESSION_PROMOTION: { name: 'SemesterPromotion', path: '/admin-dashboard/sessions/promotion' },
 
     // Library
     LIBRARY: { name: 'LibraryDashboard', path: '/admin-dashboard/library' },
@@ -80,6 +81,7 @@ export const ADMIN_ROUTES = {
 
     // Assignments
     ASSIGNMENTS: { name: 'ListAssignment', path: '/admin-dashboard/assignments' },
+    ASSIGNMENT_VIEW: { name: 'ViewAssignment', path: '/admin-dashboard/assignments/view' },
     ASSIGNMENT_ADD: { name: 'AddAssignment', path: '/admin-dashboard/assignments/add' },
     ASSIGNMENT_EDIT: { name: 'EditAssignment', path: '/admin-dashboard/assignments/edit' },
     ASSIGNMENT_DELETE: { name: 'DeleteAssignment', path: '/admin-dashboard/assignments/delete' }

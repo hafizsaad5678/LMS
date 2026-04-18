@@ -52,9 +52,8 @@
         v-model="filters.search"
         v-model:status-value="filters.status"
         search-placeholder="Search sessions..."
+        preset="admin-list"
         :loading="loading"
-        @search="applyFilters"
-        @update:status-value="applyFilters"
         @refresh="loadSessions"
         @reset="resetFilters"
       />
@@ -132,16 +131,15 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
+import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { AdminPageTemplate } from '@/components/shared/panels'
 import { StatCard, DataTable, SearchFilter, ActionButtons, ConfirmDialog, AlertMessage } from '@/components/shared/common'
-import { useEntityList, useAlert } from '@/composables/shared'
+import { useEntityList, useAlert, useListStats } from '@/composables/shared'
 import { sessionService, cacheService } from '@/services/shared'
 import { ADMIN_ROUTES } from '@/utils/constants/routes'
 
 const router = useRouter()
-const route = useRoute()
 
 const breadcrumbs = [
   { name: 'Dashboard', href: ADMIN_ROUTES.DASHBOARD.path },
@@ -162,7 +160,6 @@ const tableColumns = [
   { key: 'actions', label: 'Actions', center: true }
 ]
 
-const stats = ref({ total: 0, active: 0, upcoming: 0, completed: 0 })
 const showConfirmDialog = ref(false)
 const confirmAction = ref(null)
 const confirmMessage = ref('')
@@ -178,21 +175,29 @@ const {
   filteredData: sessions,
   filters,
   loadData,
-  applyFilters,
+  refresh,
   resetFilters: baseResetFilters
 } = useEntityList({
   cacheKey: 'sessions_list',
   searchFields: ['session_name', 'session_code', 'program_name', 'program_level_display'],
   statusField: 'status',
   defaultFilters: {},
-  customFilter: (data, filterValues) => {
-    let result = data
-    if (filterValues.status) {
-      const selectedStatus = String(filterValues.status).toLowerCase()
-      result = result.filter((s) => String(s.status || '').toLowerCase() === selectedStatus)
+  filterSchema: [
+    {
+      key: 'status',
+      itemValue: 'status',
+      normalize: value => String(value || '').toLowerCase()
     }
-    return result
-  }
+  ]
+})
+
+const listStats = useListStats(data)
+
+const stats = listStats.summary({
+  total: list => list.length,
+  active: list => list.filter((session) => session.status === 'active').length,
+  upcoming: list => list.filter((session) => session.status === 'upcoming').length,
+  completed: list => list.filter((session) => session.status === 'completed').length
 })
 
 const fetchSessions = async () => {
@@ -200,20 +205,7 @@ const fetchSessions = async () => {
   return Array.isArray(data) ? data : (data.results || [])
 }
 
-const loadSessions = async () => {
-  await loadData(fetchSessions)
-  loadStats()
-}
-
-const loadStats = () => {
-  const all = Array.isArray(data.value) ? data.value : []
-  stats.value = {
-    total: all.length,
-    active: all.filter((s) => s.status === 'active').length,
-    upcoming: all.filter((s) => s.status === 'upcoming').length,
-    completed: all.filter((s) => s.status === 'completed').length
-  }
-}
+const loadSessions = async () => loadData(fetchSessions)
 
 const setupSemesters = (session) => {
   sessionToSetup.value = session
@@ -226,9 +218,8 @@ const setupSemesters = (session) => {
 const confirmSetupSemesters = async () => {
   try {
     await sessionService.setupSemesters(sessionToSetup.value.id)
-    cacheService.clear('sessions_list')
     showAlert('success', `Successfully created semesters for ${sessionToSetup.value.session_name}`)
-    await loadSessions()
+    await refresh(fetchSessions)
   } catch (error) {
     console.error('Error setting up semesters:', error)
     showAlert('error', error.response?.data?.error || 'Failed to setup semesters')
@@ -249,9 +240,8 @@ const confirmDelete = (session) => {
 const confirmDeleteSession = async () => {
   try {
     await sessionService.deleteSession(sessionToDelete.value.id)
-    cacheService.clear('sessions_list')
     showAlert('success', 'Session deleted successfully')
-    await loadSessions()
+    await refresh(fetchSessions)
   } catch (error) {
     console.error('Error deleting session:', error)
     showAlert('error', error.response?.data?.error || 'Failed to delete session')
@@ -289,21 +279,6 @@ const getCapacityClass = (percentage) => {
   return 'bg-success'
 }
 
-// Keep list filtering in sync with search, status, and level filters.
-watch(
-  () => [filters.value.search, filters.value.status],
-  () => applyFilters()
-)
-watch(data, () => loadStats(), { deep: true })
-
-// Reload list when returning with ?refresh=... to avoid stale cache
-watch(
-  () => route.query.refresh,
-  async () => {
-    cacheService.clear('sessions_list')
-    await loadSessions()
-  },
-  { immediate: true }
-)
+onMounted(loadSessions)
 </script>
 

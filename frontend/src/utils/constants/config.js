@@ -28,6 +28,11 @@ export const USER_ROLES = Object.freeze({
     STUDENT: 'student',
 })
 
+// Feature flags (set to true when enabling hidden/disabled capabilities)
+export const FEATURE_FLAGS = Object.freeze({
+    ADMIN_ASSIGNMENT_MANAGEMENT: false
+})
+
 // Currency
 export const CURRENCY = 'PKR'
 export const CURRENCY_LOCALE = 'en-PK'
@@ -93,6 +98,7 @@ export default {
     BACKEND_BASE_URL,
     getFileUrl,
     USER_ROLES,
+    FEATURE_FLAGS,
     CURRENCY,
     CURRENCY_LOCALE,
     CACHE_DURATION,

@@ -32,23 +32,22 @@
       <SearchFilter
         v-model="filters.search"
         search-placeholder="Search by book, student, or teacher..."
+        preset="admin-list"
         :show-status-filter="false"
-        search-col-size="col-md-5 col-12"
-        actions-col-size="col-md-3 col-6"
         :loading="loading"
-        @refresh="() => refresh(fetchBorrowings)"
+        @refresh="handleRefresh"
         @reset="resetFilters"
       >
         <template #filters>
-          <div class="col-md-4 col-6">
-            <label class="form-label small fw-semibold text-dark">Status</label>
-            <select v-model="filters.statusType" class="form-select">
-              <option value="">All Statuses</option>
-              <option value="borrowed">Borrowed</option>
-              <option value="returned">Returned</option>
-              <option value="overdue">Overdue</option>
-            </select>
-          </div>
+          <SelectInput
+            v-model="filters.statusType"
+            label="Status"
+            placeholder="All Statuses"
+            :options="BORROWING_STATUS_OPTIONS"
+            col-class="col-md-4 col-6"
+            :no-margin="true"
+            label-class="small fw-semibold text-dark"
+          />
         </template>
       </SearchFilter>
     </template>
@@ -89,11 +88,12 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { AdminPageTemplate } from '@/components/shared/panels'
-import { StatCard, DataTable, SearchFilter, AlertMessage, ConfirmDialog } from '@/components/shared/common'
-import { useEntityList, useAlert } from '@/composables/shared'
+import { StatCard, DataTable, SearchFilter, SelectInput, AlertMessage, ConfirmDialog } from '@/components/shared/common'
+import { useEntityList, useAlert, useListStats } from '@/composables/shared'
 import { bookBorrowingService } from '@/services/admin/managementService'
 import { formatDate as formatDateUtil } from '@/utils/formatters'
 import { ADMIN_ROUTES } from '@/utils/constants/routes'
+import { BORROWING_STATUS_OPTIONS } from '@/utils/constants/options'
 
 const breadcrumbs = [{ name: 'Dashboard', href: ADMIN_ROUTES.DASHBOARD.path }, { name: 'Library', href: `${ADMIN_ROUTES.LIBRARY.path}/books` }, { name: 'Borrowings' }]
 const actions = []
@@ -125,16 +125,29 @@ const fetchBorrowings = async () => {
 const { loading, data, filteredData, filters, loadData, resetFilters, refresh } = useEntityList({
   searchFields: ['book_title', 'student_name', 'teacher_name'],
   defaultFilters: { statusType: '' },
-  customFilter: (list, f) => {
-    if (f.statusType === 'overdue') list = list.filter(b => isOverdue(b.due_date) && b.status === 'borrowed')
-    else if (f.statusType) list = list.filter(b => b.status === f.statusType)
-    return list.sort((a, b) => new Date(b.borrowed_date) - new Date(a.borrowed_date))
-  }
+  filterSchema: [
+    {
+      key: 'statusType',
+      predicate: (borrow, statusType) => {
+        if (statusType === 'overdue') {
+          return isOverdue(borrow.due_date) && borrow.status === 'borrowed'
+        }
+        if (statusType) {
+          return borrow.status === statusType
+        }
+        return true
+      }
+    }
+  ],
+  customFilter: (list) => list.sort((a, b) => new Date(b.borrowed_date) - new Date(a.borrowed_date))
 })
 
-const activeCount = computed(() => data.value.filter(b => b.status === 'borrowed').length)
-const returnedCount = computed(() => data.value.filter(b => b.status === 'returned').length)
-const overdueCount = computed(() => data.value.filter(b => isOverdue(b.due_date) && b.status === 'borrowed').length)
+const listStats = useListStats(data)
+const activeCount = listStats.count((borrow) => borrow.status === 'borrowed')
+const returnedCount = listStats.count((borrow) => borrow.status === 'returned')
+const overdueCount = listStats.count((borrow) => isOverdue(borrow.due_date) && borrow.status === 'borrowed')
+
+const handleRefresh = () => refresh(fetchBorrowings)
 
 const showReturnDialog = ref(false)
 const itemToReturn = ref(null)
