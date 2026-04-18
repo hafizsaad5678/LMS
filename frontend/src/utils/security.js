@@ -18,6 +18,25 @@ export const sanitizeInput = (input) => {
 }
 
 /**
+ * Sanitize rich HTML content while preserving safe formatting tags.
+ * @param {string} html - HTML content to sanitize
+ * @returns {string} Sanitized HTML
+ */
+export const sanitizeRichHtml = (html) => {
+    if (html === null || html === undefined || html === '') return ''
+
+    let clean = String(html)
+    clean = clean.replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '')
+    clean = clean.replace(/<style[\s\S]*?>[\s\S]*?<\/style>/gi, '')
+    clean = clean.replace(/ on\w+="[^"]*"/gi, '')
+    clean = clean.replace(/ on\w+='[^']*'/gi, '')
+    clean = clean.replace(/javascript:/gi, '')
+    clean = clean.replace(/<iframe[\s\S]*?>[\s\S]*?<\/iframe>/gi, '')
+
+    return clean
+}
+
+/**
  * Sanitize search query
  * @param {string} query - Search query
  * @returns {string} Sanitized query
@@ -103,6 +122,7 @@ export const validateUserId = (userId) => {
 
 export default {
     sanitizeInput,
+    sanitizeRichHtml,
     sanitizeSearchQuery,
     isValidUUID,
     isValidEmail,

@@ -54,9 +54,7 @@
         <template #cell-title="{ row }">
           <div>
             <div class="fw-bold text-dark">{{ row.title }}</div>
-            <div class="small text-muted text-truncate-300">
-              {{ row.message }}
-            </div>
+            <div class="small text-muted text-truncate-300" v-html="renderAnnouncementMessage(row.message)"></div>
           </div>
         </template>
 
@@ -127,6 +125,7 @@ import teacherPanelService from '@/services/teacher/teacherPanelService'
 import { ANNOUNCEMENT_PRIORITY_OPTIONS } from '@/utils/constants/options'
 import { TEACHER_ROUTES } from '@/utils/constants/routes'
 import { formatDate as formatDateUtil } from '@/utils/formatters'
+import { sanitizeRichHtml } from '@/utils/security'
 import { smartSearch } from '@/utils'
 
 const breadcrumbs = [
@@ -265,6 +264,8 @@ const getPriorityBadge = (priority) => {
 }
 
 const formatDate = (dateString) => formatDateUtil(dateString)
+
+const renderAnnouncementMessage = (message) => sanitizeRichHtml(message)
 
 const openEditModalWithData = (announcement) => {
   openEditModal({

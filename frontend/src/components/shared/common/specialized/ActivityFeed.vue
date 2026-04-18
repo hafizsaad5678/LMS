@@ -36,9 +36,9 @@
             <div v-else class="activity-dot rounded-circle bg-primary"></div>
           </div>
           <div class="flex-grow-1 min-w-0">
-            <p class="text-dark mb-1" v-if="activity.message">{{ activity.message }}</p>
+            <p class="text-dark mb-1" v-if="activity.message" v-html="renderRichText(activity.message)"></p>
             <p class="text-dark mb-1 fw-medium" v-else-if="activity.title">{{ activity.title }}</p>
-            <p class="small text-muted mb-0" v-if="activity.description">{{ activity.description }}</p>
+            <p class="small text-muted mb-0" v-if="activity.description" v-html="renderRichText(activity.description)"></p>
             <p class="small text-muted mb-0">{{ activity.time }}</p>
           </div>
         </div>
@@ -48,6 +48,8 @@
 </template>
 
 <script setup>
+import { sanitizeRichHtml } from '@/utils/security'
+
 defineProps({
   activities: {
     type: Array,
@@ -58,4 +60,6 @@ defineProps({
     default: false
   }
 })
+
+const renderRichText = (value) => sanitizeRichHtml(value)
 </script>

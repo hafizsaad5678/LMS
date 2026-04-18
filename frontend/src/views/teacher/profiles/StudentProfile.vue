@@ -60,6 +60,7 @@ import { TeacherPageTemplate } from '@/components/shared/panels'
 import { ProfileHeader, InfoCard, StatsGrid } from '@/components/shared/profile'
 import { LoadingSpinner, EmptyState } from '@/components/shared/common'
 import teacherPanelService from '@/services/teacher/teacherPanelService'
+import { studentService } from '@/services/shared'
 import { TEACHER_ROUTES } from '@/utils/constants/routes'
 
 const router = useRouter()
@@ -68,6 +69,7 @@ const route = useRoute()
 const studentId = computed(() => route.params.id)
 const loading = ref(false)
 const student = ref({})
+const allEnrolledSubjects = ref([])
 
 const breadcrumbs = computed(() => [
   { name: 'Dashboard', href: TEACHER_ROUTES.DASHBOARD.path },
@@ -84,18 +86,45 @@ const displaySemester = computed(() => {
   return value ? `Semester ${value}` : 'N/A'
 })
 
+const currentSemesterNumber = computed(() => Number(student.value.current_semester || student.value.semester_number || 0))
+
+const getFallbackSemesterNumber = (semesterName) => {
+  const match = String(semesterName || '').match(/Semester\s+(\d+)/i)
+  return match ? Number(match[1]) : 0
+}
+
+const currentSemesterSubjects = computed(() => {
+  const target = currentSemesterNumber.value
+  return allEnrolledSubjects.value.filter((item) => {
+    const number = Number(item.semester_number || getFallbackSemesterNumber(item.semester_name))
+    return target > 0 && number === target
+  })
+})
+
 const displaySubject = computed(() => {
   if (student.value.subject_name && student.value.subject_code && student.value.subject_name !== 'N/A') {
     return `${student.value.subject_name} (${student.value.subject_code})`
   }
-  return null
+
+  if (currentSemesterSubjects.value.length === 1) {
+    const subject = currentSemesterSubjects.value[0]
+    const name = subject.subject_name || subject.name || 'Subject'
+    const code = subject.subject_code || subject.code
+    return code ? `${name} (${code})` : name
+  }
+
+  if (currentSemesterSubjects.value.length > 1) {
+    return `${currentSemesterSubjects.value.length} subjects enrolled`
+  }
+
+  return 'N/A'
 })
 
 const profileBadges = computed(() => [
   ...(student.value.program_name && student.value.program_name !== 'N/A' ? [{ text: student.value.program_name, class: 'bg-info' }] : []),
   ...(student.value.department_name && student.value.department_name !== 'N/A' ? [{ text: student.value.department_name, class: 'bg-secondary' }] : []),
   ...(displaySemester.value !== 'N/A' ? [{ text: displaySemester.value, class: 'bg-warning text-dark' }] : []),
-  ...(displaySubject.value ? [{ text: displaySubject.value, class: 'bg-success' }] : [])
+  ...(displaySubject.value !== 'N/A' ? [{ text: displaySubject.value, class: 'bg-success' }] : [])
 ])
 
 const personalInfoItems = computed(() => [
@@ -125,8 +154,17 @@ const statsData = computed(() => {
 const loadStudent = async () => {
   if (!studentId.value) return
   loading.value = true
+  allEnrolledSubjects.value = []
   try {
-    const response = await teacherPanelService.getStudentDetail(studentId.value)
+    const [response, enrolledSubjectsResponse] = await Promise.all([
+      teacherPanelService.getStudentDetail(studentId.value),
+      studentService.getStudentSubjects(studentId.value).catch(() => [])
+    ])
+
+    allEnrolledSubjects.value = Array.isArray(enrolledSubjectsResponse)
+      ? enrolledSubjectsResponse
+      : (enrolledSubjectsResponse?.results || [])
+
     if (response) {
       // API returns the student object directly for a retrieve call
       const studentData = response
@@ -149,6 +187,7 @@ const loadStudent = async () => {
   } catch (err) {
     console.error('Error loading student:', err)
     student.value = {}
+    allEnrolledSubjects.value = []
   } finally {
     loading.value = false
   }

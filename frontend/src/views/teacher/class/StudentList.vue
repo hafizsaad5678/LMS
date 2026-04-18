@@ -26,14 +26,12 @@
                 :no-margin="true" />
             </div>
             <div class="col-md-3">
-              <SelectInput v-model="filters.department" :options="departmentOptions" placeholder="All Departments"
-                :no-margin="true" />
-            </div>
-            <div class="col-12 text-end">
-              <button @click="loadStudents(true)" class="btn btn-teacher-outline me-2"><i
-                  class="bi bi-arrow-clockwise me-1"></i>Refresh</button>
-              <button @click="resetFilters" class="btn btn-outline-secondary"><i
-                  class="bi bi-x-circle me-1"></i>Reset</button>
+              <div class="d-flex gap-2 justify-content-md-end">
+                <button @click="loadStudents(true)" class="btn btn-teacher-outline flex-fill flex-md-grow-0"><i
+                    class="bi bi-arrow-clockwise me-1"></i>Refresh</button>
+                <button @click="resetFilters" class="btn btn-outline-secondary flex-fill flex-md-grow-0"><i
+                    class="bi bi-x-circle me-1"></i>Reset</button>
+              </div>
             </div>
           </div>
         </div>
@@ -108,7 +106,7 @@ const breadcrumbs = [{ name: 'Dashboard', href: TEACHER_ROUTES.DASHBOARD.path },
 const actions = [{ label: 'Back to Classes', icon: 'bi bi-arrow-left', variant: 'btn-teacher-outline', onClick: () => router.push({ name: TEACHER_ROUTES.CLASS_LIST.name }) }]
 
 const loading = ref(false)
-const filters = ref({ subject: '', session: '', program: '', department: '', search: '' })
+const filters = ref({ subject: '', session: '', program: '', search: '' })
 const students = ref([])
 const subjects = ref([])
 const error = ref(null)
@@ -171,7 +169,6 @@ const getStudentsForOption = (excludeKey) => {
       if (!sessionIds.filter(Boolean).some(id => `${id}` === `${filters.value.session}`)) return false
     }
     if (excludeKey !== 'program' && filters.value.program && student.program_name !== filters.value.program) return false
-    if (excludeKey !== 'department' && filters.value.department && student.department_name !== filters.value.department) return false
     return true
   })
 }
@@ -214,13 +211,7 @@ const programOptions = computed(() => {
     .slice(0, MAX_FILTER_OPTIONS)
 })
 
-const departmentOptions = computed(() => {
-  return getUniqueValues(getStudentsForOption('department'), 'department_name')
-    .map(d => ({ value: d, label: d }))
-    .slice(0, MAX_FILTER_OPTIONS)
-})
-
-const hasActiveFilters = computed(() => filters.value.subject || filters.value.session || filters.value.program || filters.value.department || filters.value.search)
+const hasActiveFilters = computed(() => filters.value.subject || filters.value.session || filters.value.program || filters.value.search)
 
 const noStudentsMessage = computed(() => {
   return hasActiveFilters.value
@@ -245,7 +236,6 @@ const filteredStudents = computed(() => {
       if (!sessionIds.filter(Boolean).some(id => `${id}` === `${filters.value.session}`)) return false
     }
     if (filters.value.program && s.program_name !== filters.value.program) return false
-    if (filters.value.department && s.department_name !== filters.value.department) return false
     return true
   })
 })
@@ -352,7 +342,7 @@ async function loadStudents(forceRefresh = false) {
 }
 
 function resetFilters() {
-  filters.value = { subject: '', session: '', program: '', department: '', search: '' }
+  filters.value = { subject: '', session: '', program: '', search: '' }
   router.replace({ query: {} })
 }
 
@@ -390,9 +380,4 @@ watch(programOptions, (options) => {
   if (!allowed) filters.value.program = ''
 })
 
-watch(departmentOptions, (options) => {
-  if (!filters.value.department) return
-  const allowed = options.some(option => option.value === filters.value.department)
-  if (!allowed) filters.value.department = ''
-})
 </script>

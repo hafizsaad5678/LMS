@@ -125,7 +125,7 @@
             </div>
 
             <div class="announcement-preview mb-4 flex-grow-1">
-              <p class="text-muted small mb-0 line-clamp-3" v-html="announcement.message || announcement.content"></p>
+              <p class="text-muted small mb-0 line-clamp-3" v-html="renderAnnouncementHtml(announcement)"></p>
             </div>
 
             <!-- Attachment -->
@@ -172,6 +172,7 @@ import { getPriorityBadgeClass, getPriorityIcon } from '@/utils/badgeHelpers'
 import { ANNOUNCEMENT_PRIORITY_OPTIONS as PRIORITY_OPTIONS_LIST } from '@/utils/constants/options'
 import { STUDENT_ROUTES } from '@/utils/constants/routes'
 import { STORAGE_KEYS } from '@/utils/constants/storage'
+import { sanitizeRichHtml } from '@/utils/security'
 
 const ANNOUNCEMENT_PRIORITY_OPTIONS = PRIORITY_OPTIONS_LIST
 const PRIORITY_OPTIONS = PRIORITY_OPTIONS_LIST
@@ -259,6 +260,7 @@ const getPriorityIconClass = (p) => {
 const formatPriority = (p) => p ? p.charAt(0).toUpperCase() + p.slice(1) : 'Normal'
 const toggleDetails = (a) => a.showDetails = !a.showDetails
 const formatTime = (d) => d ? new Date(d).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) : 'N/A'
+const renderAnnouncementHtml = (announcement) => sanitizeRichHtml(announcement?.message || announcement?.content || '')
 
 const getPriorityHeaderClass = (p) => {
   const map = {
