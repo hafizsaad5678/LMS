@@ -147,6 +147,65 @@
 
       </div>
 
+      <div v-if="isTeacherRole" class="col-12">
+        <div class="card border-0 shadow-sm">
+          <div class="card-header bg-white border-0 py-3">
+            <h6 class="mb-0 fw-bold">Current Teaching Details</h6>
+          </div>
+          <div class="card-body">
+            <div class="row g-3 mb-3">
+              <div class="col-md-4">
+                <div class="bg-light rounded-3 p-3 h-100">
+                  <div class="small text-muted mb-1">Department</div>
+                  <div class="fw-semibold text-truncate" :title="teacherProfessional.department">{{ teacherProfessional.department }}</div>
+                </div>
+              </div>
+              <div class="col-md-4">
+                <div class="bg-light rounded-3 p-3 h-100">
+                  <div class="small text-muted mb-1">Institution</div>
+                  <div class="fw-semibold text-truncate" :title="teacherProfessional.institution">{{ teacherProfessional.institution }}</div>
+                </div>
+              </div>
+              <div class="col-md-4">
+                <div class="bg-light rounded-3 p-3 h-100">
+                  <div class="small text-muted mb-1">Designation</div>
+                  <div class="fw-semibold text-truncate" :title="teacherProfessional.designation">{{ teacherProfessional.designation }}</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <h6 class="mb-0">Subjects Taught (Current)</h6>
+              <span class="badge bg-secondary-subtle text-dark">{{ currentTeachingSubjects.length }}</span>
+            </div>
+
+            <div v-if="currentTeachingSubjects.length > 0" class="table-responsive">
+              <table class="table table-sm align-middle mb-0">
+                <thead>
+                  <tr>
+                    <th>Subject</th>
+                    <th>Code</th>
+                    <th>Semester</th>
+                    <th class="text-end">Students</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="subject in currentTeachingSubjects" :key="subject.id || `${subject.subject_code}-${subject.subject_name}`">
+                    <td class="fw-medium">{{ subject.subject_name || '-' }}</td>
+                    <td>{{ subject.subject_code || '-' }}</td>
+                    <td>{{ subject.semester_name || '-' }}</td>
+                    <td class="text-end">{{ subject.student_count ?? 0 }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div v-else class="text-muted small">
+              No current subjects assigned.
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div v-if="isStudentRole" class="col-12">
         <div class="card border-0 shadow-sm">
           <div class="card-header bg-white border-0 py-3">
@@ -250,21 +309,44 @@ const userId = computed(() => authStore.userId || safeStorage.get(STORAGE_KEYS.U
 
 const canUseProfile = computed(() => Boolean(userId.value && (role.value === USER_ROLES.TEACHER || role.value === USER_ROLES.STUDENT)))
 const isStudentRole = computed(() => role.value === USER_ROLES.STUDENT)
+const isTeacherRole = computed(() => role.value === USER_ROLES.TEACHER)
 const theme = computed(() => role.value === USER_ROLES.TEACHER ? 'teacher' : 'student')
 const pageTemplate = computed(() => role.value === USER_ROLES.TEACHER ? TeacherPageTemplate : StudentPageTemplate)
 const pageTitle = computed(() => role.value === USER_ROLES.TEACHER ? 'My Teacher Account' : 'My Student Account')
 const pageSubtitle = computed(() => role.value === USER_ROLES.TEACHER
-  ? 'View and update your account details'
+  ? 'View your account details'
   : 'View your account details')
 const roleLabel = computed(() => role.value === USER_ROLES.TEACHER ? 'Teacher' : 'Student')
 const badgeClass = computed(() => role.value === USER_ROLES.TEACHER ? 'bg-primary-subtle text-primary' : 'bg-success-subtle text-success')
 const primaryButtonClass = computed(() => role.value === USER_ROLES.TEACHER ? 'btn-teacher-primary' : 'btn-student-primary')
-const canEditProfile = computed(() => role.value === USER_ROLES.TEACHER)
+// Teacher and student self-service profile editing is disabled; updates are admin-managed.
+const canEditProfile = computed(() => false)
 const studentAcademic = computed(() => ({
   program: profile.value?.program_name || 'Not Assigned',
   session: profile.value?.session_name || 'Not Assigned',
   currentSemester: profile.value?.current_semester_name || 'Not Assigned'
 }))
+const teacherProfessional = computed(() => ({
+  department: profile.value?.department_name || 'Not Assigned',
+  institution: profile.value?.institution_name || 'Not Assigned',
+  designation: profile.value?.designation || 'Not Assigned'
+}))
+const currentTeachingSubjects = computed(() => {
+  const list = Array.isArray(profile.value?.teaching_subjects) ? profile.value.teaching_subjects : []
+  const activeOnly = list.filter(subject => subject?.is_active !== false)
+  const deduped = []
+  const seen = new Set()
+
+  activeOnly.forEach(subject => {
+    const key = String(subject?.subject || subject?.id || `${subject?.subject_code}-${subject?.subject_name}`)
+    if (!seen.has(key)) {
+      seen.add(key)
+      deduped.push(subject)
+    }
+  })
+
+  return deduped
+})
 
 const breadcrumbs = computed(() => {
   if (role.value === USER_ROLES.TEACHER) {

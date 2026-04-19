@@ -162,20 +162,26 @@ def teacher_my_assignments(request):
     except Teacher.DoesNotExist:
         return Response({'detail': 'Teacher profile not found.'}, status=status.HTTP_404_NOT_FOUND)
     
-    from django.db.models import Count, Q
+    from django.db.models import Count, Q, Exists, OuterRef
+    from ..models.grading import GradeComponent
     
     # Get assignments with submission counts using annotation (avoids N+1 queries)
+    # Filter out assignments that are already linked to a GradeComponent
     assignments = Assignment.objects.filter(
         created_by=teacher
+    ).exclude(
+        Exists(GradeComponent.objects.filter(name=OuterRef('title'), subject=OuterRef('subject')))
     ).select_related(
         'subject', 'subject__semester'
     ).annotate(
-        submission_count=Count('submissions'),
+        submission_count=Count('submissions', distinct=True),
+        graded_count=Count('submissions__grade', distinct=True),
         total_students=Count('subject__enrolled_students', distinct=True)
     ).order_by('-created_at')
     
     assignment_data = []
     for assignment in assignments:
+        pending_review_count = max(0, int(assignment.submission_count or 0) - int(assignment.graded_count or 0))
         assignment_data.append({
             'id': str(assignment.id),
             'title': assignment.title,
@@ -188,6 +194,8 @@ def teacher_my_assignments(request):
             'total_marks': float(assignment.total_marks),
             'submission_count': assignment.submission_count,
             'submitted': assignment.submission_count,  # Keep for backward compatibility
+            'graded_count': assignment.graded_count,
+            'pending_review_count': pending_review_count,
             'total_students': assignment.total_students,
             'status': 'active' if assignment.due_date and assignment.due_date > timezone.now() else 'closed',
             'created_at': assignment.created_at.isoformat(),
@@ -349,6 +357,8 @@ class StudentViewSet(BaseProfileViewSet):
             return 'B'
         if 'C' in value:
             return 'C'
+        if 'D' in value:
+            return 'D'
         if value == 'F':
             return 'F'
         return 'other'
@@ -367,7 +377,13 @@ class StudentViewSet(BaseProfileViewSet):
         from ..models import Assignment
         assignments = Assignment.objects.filter(subject_id__in=enrolled_subject_ids).select_related('subject', 'created_by')
         from ..serializers import StudentAssignmentSerializer
-        return Response(StudentAssignmentSerializer(assignments, many=True, context={'student': student}).data)
+        return Response(
+            StudentAssignmentSerializer(
+                assignments,
+                many=True,
+                context={'student': student, 'request': request}
+            ).data
+        )
     
     @action(detail=True)
     def grades(self, request, pk=None):
@@ -446,7 +462,7 @@ class StudentViewSet(BaseProfileViewSet):
         average_score = round(sum(r['percentage'] for r in records) / total_grades, 2) if total_grades else 0
         gpa = round(sum(self._grade_point_from_percentage(r['percentage']) for r in records) / total_grades, 2) if total_grades else 0
 
-        distribution = {'A': 0, 'B': 0, 'C': 0, 'F': 0, 'other': 0}
+        distribution = {'A': 0, 'B': 0, 'C': 0, 'D': 0, 'F': 0, 'other': 0}
         performance = {'excellent': 0, 'good': 0, 'average': 0, 'below_average': 0}
         subjects = defaultdict(lambda: {
             'name': 'Unknown',
@@ -550,8 +566,18 @@ class StudentViewSet(BaseProfileViewSet):
     
     @action(detail=True)
     def enrolled_subjects(self, request, pk=None):
+        from django.db.models import Count, Q
+        from ..models import GradeComponent, Assignment
+        
         student = self.get_object()
         queryset = student.enrolled_subjects.all().select_related('subject', 'semester')
+        
+        # Annotate with evidence counts to see if teacher has created anything to grade
+        queryset = queryset.annotate(
+            total_components=Count('subject__grade_components', distinct=True),
+            total_assignments=Count('subject__assignments', distinct=True)
+        )
+        
         if request.query_params.get('current_only') == 'true':
             if hasattr(student, 'current_semester_ref') and student.current_semester_ref:
                 queryset = queryset.filter(semester=student.current_semester_ref)
@@ -613,6 +639,14 @@ class TeacherViewSet(BaseProfileViewSet):
     filterset_fields = ['department', 'is_active', 'is_verified', 'is_suspended', 
                        'gender', 'designation']
     ordering_fields = ['full_name', 'created_at', 'employee_id', 'joining_date']
+
+    def get_permissions(self):
+        # Teachers can view teacher profiles, but only admins can create/update/delete.
+        if self.action in {'create', 'update', 'partial_update', 'destroy'}:
+            permission_classes = [IsAuthenticated, IsAdminUser]
+        else:
+            permission_classes = [IsAuthenticated, IsAdminOrTeacher]
+        return [permission() for permission in permission_classes]
     
     def get_serializer_class(self):
         return TeacherDetailSerializer if self.action == 'retrieve' else TeacherSerializer

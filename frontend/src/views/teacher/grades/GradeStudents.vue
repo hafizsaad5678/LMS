@@ -37,11 +37,11 @@
       @change="loadComponents"
     />
 
-    <!-- Main Content: Split View -->
-    <div v-if="selectedSubject" class="row g-4">
+    <div v-if="selectedSubject" class="row g-4 d-flex align-items-stretch">
       <!-- Left Sidebar: Assessments List -->
-      <div class="col-lg-4 col-xl-3">
+      <div class="col-lg-4 col-xl-3 d-flex flex-column">
         <AssessmentSidebar
+          class="flex-grow-1"
           :items="components"
           :loading="loading"
           :selected-id="selectedComponent?.id"
@@ -53,8 +53,8 @@
       </div>
 
       <!-- Right Detail: Grading Interface -->
-      <div class="col-lg-8 col-xl-9">
-        <div class="card border-0 shadow-sm h-100">
+      <div class="col-lg-8 col-xl-9 d-flex flex-column">
+        <div class="card border-0 shadow-sm flex-grow-1 min-h-600">
           <div v-if="!selectedComponent" class="card-body d-flex flex-column align-items-center justify-content-center py-5 text-center text-muted">
             <div class="bg-light rounded-circle p-4 mb-4">
               <i class="bi bi-arrow-left-circle display-4 text-teacher opacity-50"></i>
@@ -113,7 +113,7 @@
       :form="form"
       :subjects="filteredSubjects"
       :is-editing="isEditing"
-      :loading="false"
+      :loading="submitting"
       @submit="submitComponent"
     />
   </TeacherPageTemplate>
@@ -219,7 +219,7 @@ const actions = computed(() => {
 })
 
 const editComponent = (comp) => {
-  openEditModal(comp)
+  openEditModal({ ...comp, subject: comp.subject || selectedSubject.value })
 }
 const openMarksEntry = async (comp) => {
   selectedComponent.value = comp
@@ -260,6 +260,11 @@ const saveMarks = async () => {
     await teacherPanelService.bulkUpdateMarks(selectedComponent.value.id, payload)
     marksData.value.forEach(m => m.is_dirty = false)
     showSuccess('Grades saved successfully!')
+    
+    // Auto-redirect to Grade Management
+    setTimeout(() => {
+      router.push(TEACHER_ROUTES.GRADE_MANAGEMENT.path)
+    }, 1500)
   } catch (e) {
     showError('Failed to save grades')
   } finally {

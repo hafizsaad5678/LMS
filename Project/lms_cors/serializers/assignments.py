@@ -1,15 +1,23 @@
+import os
+
 from rest_framework import serializers
 from ..models import Assignment, SubmissionHistory, Grade
 
 
 ALLOWED_SUBMISSION_EXTENSIONS = {'.pdf', '.doc', '.docx', '.zip', '.rar'}
 MAX_SUBMISSION_FILE_SIZE = 10 * 1024 * 1024
+ALLOWED_ASSIGNMENT_MATERIAL_EXTENSIONS = {
+    '.pdf', '.doc', '.docx', '.ppt', '.pptx', '.xls', '.xlsx', '.zip', '.rar', '.txt'
+}
+MAX_ASSIGNMENT_MATERIAL_FILE_SIZE = 25 * 1024 * 1024
 
 
 class AssignmentSerializer(serializers.ModelSerializer):
     subject_name = serializers.CharField(source='subject.name', read_only=True)
     subject_code = serializers.CharField(source='subject.code', read_only=True)
     created_by_name = serializers.CharField(source='created_by.full_name', read_only=True)
+    material_file_url = serializers.SerializerMethodField()
+    material_file_name = serializers.SerializerMethodField()
     submission_count = serializers.SerializerMethodField()
     total_students = serializers.SerializerMethodField()
     
@@ -22,17 +30,83 @@ class AssignmentSerializer(serializers.ModelSerializer):
         title = (attrs.get('title') or '').strip()
         description = (attrs.get('description') or '').strip()
 
-        if not title:
-            raise serializers.ValidationError({'title': 'This field is required.'})
-        if not description:
-            raise serializers.ValidationError({'description': 'This field is required.'})
-        if attrs.get('due_date') is None:
-            raise serializers.ValidationError({'due_date': 'This field is required.'})
+        if self.instance is None or 'title' in attrs:
+            if not title:
+                raise serializers.ValidationError({'title': 'This field is required.'})
+        if self.instance is None or 'description' in attrs:
+            if not description:
+                raise serializers.ValidationError({'description': 'This field is required.'})
+        if self.instance is None or 'due_date' in attrs:
+            if attrs.get('due_date') is None:
+                raise serializers.ValidationError({'due_date': 'This field is required.'})
+
+        material_file = attrs.get('material_file')
+        if material_file is not None:
+            filename = (getattr(material_file, 'name', '') or '').lower()
+            ext = os.path.splitext(filename)[1]
+            if ext not in ALLOWED_ASSIGNMENT_MATERIAL_EXTENSIONS:
+                raise serializers.ValidationError({'material_file': 'Unsupported file type.'})
+
+            if getattr(material_file, 'size', 0) > MAX_ASSIGNMENT_MATERIAL_FILE_SIZE:
+                raise serializers.ValidationError({'material_file': 'File size exceeds 25MB limit.'})
 
         return attrs
 
+    def get_material_file_url(self, obj):
+        if not obj.material_file:
+            return None
+
+        request = self.context.get('request')
+        if request:
+            return request.build_absolute_uri(obj.material_file.url)
+        return obj.material_file.url
+
+    def get_material_file_name(self, obj):
+        if not obj.material_file:
+            return None
+        return os.path.basename(obj.material_file.name)
+
     def get_submission_count(self, obj):
         return obj.submissions.all().count()
+
+    def create(self, validated_data):
+        assignment = super().create(validated_data)
+        self._sync_material(assignment)
+        return assignment
+
+    def update(self, instance, validated_data):
+        old_file_name = instance.material_file.name if instance.material_file else None
+        assignment = super().update(instance, validated_data)
+        new_file_name = assignment.material_file.name if assignment.material_file else None
+        
+        if new_file_name and old_file_name != new_file_name:
+            self._sync_material(assignment)
+            
+        return assignment
+
+    def _sync_material(self, assignment):
+        if not assignment.material_file:
+            return
+            
+        from ..models import Material
+        
+        # Determine size safely
+        file_size = 0
+        try:
+            file_size = assignment.material_file.size
+        except Exception:
+            pass
+
+        Material.objects.create(
+            title=assignment.title,
+            description='Material record uploaded by teacher.',
+            subject=assignment.subject,
+            uploaded_by=assignment.created_by,
+            material_type='outline',
+            access_level='class_only',
+            file_upload=assignment.material_file,
+            file_size=file_size
+        )
 
     def get_total_students(self, obj):
         if not obj.subject:
@@ -90,19 +164,21 @@ class SubmissionHistorySerializer(serializers.ModelSerializer):
         if self.instance is None:
             assignment = attrs.get('assignment')
             file_upload = attrs.get('file_upload')
+            submission_text = (attrs.get('submission_text') or '').strip()
 
             if assignment is None:
                 raise serializers.ValidationError({'assignment': 'This field is required.'})
 
-            if file_upload is None:
-                raise serializers.ValidationError({'file_upload': 'A submission file is required.'})
+            if file_upload is None and not submission_text:
+                raise serializers.ValidationError({'non_field_errors': ['Provide a file or submission text.']})
 
-            filename = (getattr(file_upload, 'name', '') or '').lower()
-            if not any(filename.endswith(ext) for ext in ALLOWED_SUBMISSION_EXTENSIONS):
-                raise serializers.ValidationError({'file_upload': 'Unsupported file type.'})
+            if file_upload is not None:
+                filename = (getattr(file_upload, 'name', '') or '').lower()
+                if not any(filename.endswith(ext) for ext in ALLOWED_SUBMISSION_EXTENSIONS):
+                    raise serializers.ValidationError({'file_upload': 'Unsupported file type.'})
 
-            if getattr(file_upload, 'size', 0) > MAX_SUBMISSION_FILE_SIZE:
-                raise serializers.ValidationError({'file_upload': 'File size exceeds 10MB limit.'})
+                if getattr(file_upload, 'size', 0) > MAX_SUBMISSION_FILE_SIZE:
+                    raise serializers.ValidationError({'file_upload': 'File size exceeds 10MB limit.'})
 
         return attrs
     

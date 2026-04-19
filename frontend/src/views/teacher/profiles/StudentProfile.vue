@@ -70,6 +70,9 @@ const studentId = computed(() => route.params.id)
 const loading = ref(false)
 const student = ref({})
 const allEnrolledSubjects = ref([])
+const attendanceStats = ref({ percentage: 0 })
+const assignmentStats = ref({ completed: 0, total: 0 })
+const averageGrade = ref('N/A')
 
 const breadcrumbs = computed(() => [
   { name: 'Dashboard', href: TEACHER_ROUTES.DASHBOARD.path },
@@ -142,28 +145,89 @@ const academicInfoItems = computed(() => [
 ])
 
 const statsData = computed(() => {
+  const completed = assignmentStats.value.completed || 0
+  const total = assignmentStats.value.total || 0
+
   const stats = [
-    { value: `${student.value.attendance_percentage || 0}%`, label: 'Attendance', icon: 'bi bi-calendar-check', bgClass: 'bg-teacher-light', iconColor: 'text-teacher' },
-    { value: student.value.assignments_completed || 0, label: 'Assignments', icon: 'bi bi-file-earmark-text', bgClass: 'bg-success-light', iconColor: 'text-success' },
-    { value: student.value.average_grade || 'N/A', label: 'Avg Grade', icon: 'bi bi-graph-up', bgClass: 'bg-info-light', iconColor: 'text-info' },
+    { value: `${attendanceStats.value.percentage || 0}%`, label: 'Attendance', icon: 'bi bi-calendar-check', bgClass: 'bg-teacher-light', iconColor: 'text-teacher' },
+    { value: `${completed}/${total}`, label: 'Assignments', icon: 'bi bi-file-earmark-text', bgClass: 'bg-success-light', iconColor: 'text-success' },
+    { value: averageGrade.value, label: 'Avg Grade', icon: 'bi bi-graph-up', bgClass: 'bg-info-light', iconColor: 'text-info' },
     { value: student.value.participation_score || 'Good', label: 'Participation', icon: 'bi bi-chat-dots', bgClass: 'bg-warning-light', iconColor: 'text-warning' }
   ]
   return stats
 })
 
+const calculateAverageGrade = (grades = []) => {
+  const percentages = grades
+    .map((item) => {
+      const direct = Number(item?.percentage)
+      if (Number.isFinite(direct) && direct > 0) return direct
+
+      const obtained = Number(item?.marks_obtained)
+      const total = Number(item?.total_marks)
+      if (Number.isFinite(obtained) && Number.isFinite(total) && total > 0) {
+        return (obtained / total) * 100
+      }
+
+      return null
+    })
+    .filter((value) => Number.isFinite(value))
+
+  if (!percentages.length) return 'N/A'
+
+  const avg = percentages.reduce((sum, value) => sum + value, 0) / percentages.length
+  return `${avg.toFixed(1)}%`
+}
+
+const calculateAttendancePercentage = (records = []) => {
+  const total = records.length
+  if (!total) return 0
+
+  const presentOrLate = records.filter((r) => ['present', 'late'].includes(String(r.status || '').toLowerCase())).length
+  return Math.round((presentOrLate / total) * 100)
+}
+
 const loadStudent = async () => {
   if (!studentId.value) return
   loading.value = true
   allEnrolledSubjects.value = []
+  attendanceStats.value = { percentage: 0 }
+  assignmentStats.value = { completed: 0, total: 0 }
+  averageGrade.value = 'N/A'
   try {
-    const [response, enrolledSubjectsResponse] = await Promise.all([
+    const [response, enrolledSubjectsResponse, attendanceResponse, assignmentsResponse, gradesResponse] = await Promise.all([
       teacherPanelService.getStudentDetail(studentId.value),
-      studentService.getStudentSubjects(studentId.value).catch(() => [])
+      studentService.getStudentSubjects(studentId.value).catch(() => []),
+      studentService.getAttendance(studentId.value).catch(() => []),
+      studentService.getAssignments(studentId.value).catch(() => []),
+      studentService.getGrades(studentId.value).catch(() => [])
     ])
 
     allEnrolledSubjects.value = Array.isArray(enrolledSubjectsResponse)
       ? enrolledSubjectsResponse
       : (enrolledSubjectsResponse?.results || [])
+
+    const attendanceRecords = Array.isArray(attendanceResponse)
+      ? attendanceResponse
+      : (attendanceResponse?.results || [])
+    attendanceStats.value = {
+      percentage: calculateAttendancePercentage(attendanceRecords)
+    }
+
+    const assignments = Array.isArray(assignmentsResponse)
+      ? assignmentsResponse
+      : (assignmentsResponse?.results || [])
+    const totalAssignments = Number(assignmentsResponse?.count) || assignments.length
+
+    assignmentStats.value = {
+      completed: assignments.filter(a => Boolean(a.is_submitted)).length,
+      total: totalAssignments
+    }
+
+    const grades = Array.isArray(gradesResponse)
+      ? gradesResponse
+      : (gradesResponse?.results || [])
+    averageGrade.value = calculateAverageGrade(grades)
 
     if (response) {
       // API returns the student object directly for a retrieve call

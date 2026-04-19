@@ -28,6 +28,7 @@ export const studentRoutes = {
         // Grades routes
         { path: 'grades', name: 'StudentMyGrade', component: () => import('../../views/student/grades/MyGrade.vue') },
         { path: 'grades/report', name: 'StudentGradeReport', component: () => import('../../views/student/grades/StudentGradeReport.vue') },
+        { path: 'grades/gpa-cgpa-calculator', name: 'StudentGpaCgpaCalculator', component: () => import('../../views/student/grades/GpaCgpaCalculator.vue') },
 
         // Schedule routes
         { path: 'schedule/class', name: 'StudentClassSchedule', component: () => import('../../views/student/schedule/ClassSchedule.vue') },

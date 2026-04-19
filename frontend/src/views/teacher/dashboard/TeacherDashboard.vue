@@ -116,7 +116,7 @@ const stats = ref({
 const dashboardStats = computed(() => [
   { value: stats.value.totalClasses, title: 'My Classes', icon: 'bi bi-book-half', type: 'teacher', variant: 'glass', route: { name: TEACHER_ROUTES.CLASS_LIST.name } },
   { value: stats.value.totalStudents, title: 'Total Students', icon: 'bi bi-people', type: 'student', variant: 'glass', route: { name: TEACHER_ROUTES.STUDENT_LIST.name } },
-  { value: stats.value.pendingReviews, title: 'Pending Reviews', icon: 'bi bi-clipboard-check', type: 'finance', variant: 'glass', route: { name: TEACHER_ROUTES.SUBMISSIONS.name } },
+  { value: stats.value.pendingReviews, title: 'Pending Reviews', icon: 'bi bi-clipboard-check', type: 'finance', variant: 'glass', route: { name: TEACHER_ROUTES.ASSIGNMENT_LIST.name } },
   { value: stats.value.upcomingDeadlines, title: 'Due This Week', icon: 'bi bi-calendar-event', type: 'department', variant: 'glass', route: { name: TEACHER_ROUTES.ASSIGNMENT_LIST.name } }
 ])
 
@@ -126,7 +126,7 @@ const loadDashboard = async () => {
   try {
     // Load stats and activities in parallel
     const [dashboardStats, activities] = await Promise.all([
-      teacherPanelService.getDashboardStats(),
+      teacherPanelService.getDashboardStats({ forceRefresh: true }),
       teacherPanelService.getRecentActivities()
     ])
     

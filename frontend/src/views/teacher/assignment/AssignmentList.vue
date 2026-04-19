@@ -88,7 +88,7 @@ import { StatCard, DataTable, SearchFilter, ConfirmDialog, AlertMessage, SelectI
 import teacherPanelService from '@/services/teacher/teacherPanelService'
 import { useEntityList, useAlert, useAsyncState } from '@/composables/shared'
 import { generateBreadcrumbs } from '@/utils/navigation'
-import { formatDate } from '@/utils/formatters'
+import { formatDate, isDateWithinNextDays } from '@/utils/formatters'
 import { TEACHER_ROUTES } from '@/utils/constants/routes'
 
 const router = useRouter()
@@ -130,20 +130,26 @@ const subjectOptions = computed(() => (subjects.value?.results || []).map(s => (
 
 const statsCards = computed(() => {
   const now = new Date()
-  const weekOut = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
 
   return [
     { title: 'Total Assignments', value: assignments.value.length, icon: 'bi bi-file-earmark-text', bgColor: 'bg-admin-light', iconColor: 'text-teacher' },
     {
       title: 'Due This Week', value: assignments.value.filter(a => {
-        const due = new Date(a.due_date); return due > now && due < weekOut
+        return isDateWithinNextDays(a.due_date, 7, now)
       }).length, icon: 'bi bi-calendar-week', bgColor: 'bg-warning-light', iconColor: 'text-warning'
     },
     { title: 'Total Submissions', value: assignments.value.reduce((sum, a) => sum + (a.submission_count || 0), 0), icon: 'bi bi-upload', bgColor: 'bg-success-light', iconColor: 'text-success' },
     {
-      title: 'Pending Review', value: assignments.value.filter(a => {
-        const due = new Date(a.due_date); return due < now && (a.submission_count || 0) < (a.total_students || 0)
-      }).length, icon: 'bi bi-clock-history', bgColor: 'bg-danger-light', iconColor: 'text-danger'
+      title: 'Pending Review',
+      value: assignments.value.reduce((sum, a) => {
+        if (typeof a.pending_review_count === 'number') {
+          return sum + a.pending_review_count
+        }
+        return sum + Math.max(0, (a.submission_count || 0) - (a.graded_count || 0))
+      }, 0),
+      icon: 'bi bi-clock-history',
+      bgColor: 'bg-danger-light',
+      iconColor: 'text-danger'
     }
   ]
 })

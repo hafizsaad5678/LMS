@@ -64,6 +64,26 @@
                   <div class="col-12">
                     <RichTextEditor v-model="form.description" placeholder="Provide detailed instructions for the students..." />
                   </div>
+                  <div class="col-12">
+                    <label class="form-label fw-semibold">
+                      <i class="bi bi-paperclip me-2"></i>Assignment Material (Optional)
+                    </label>
+                    <input
+                      type="file"
+                      class="form-control border-0 shadow-sm p-3 bg-light"
+                      accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.zip,.rar,.txt"
+                      @change="onMaterialFileSelect"
+                    >
+                    <small class="text-muted d-block mt-1">Supported formats: PDF, DOC, DOCX, PPT, XLS, ZIP, RAR, TXT (Max 25MB)</small>
+                    <div v-if="materialFile" class="d-flex align-items-center justify-content-between mt-2 p-2 bg-light rounded">
+                      <span class="small text-dark text-truncate me-3">
+                        <i class="bi bi-file-earmark me-1"></i>{{ materialFile.name }}
+                      </span>
+                      <button type="button" class="btn btn-sm btn-outline-danger" @click="removeMaterialFile">
+                        Remove
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -88,7 +108,6 @@ import { useRouter } from 'vue-router'
 import { TeacherPageTemplate } from '@/components/shared/panels'
 import { BaseInput, AlertMessage, ConfirmDialog, RichTextEditor } from '@/components/shared/common'
 import teacherPanelService from '@/services/teacher/teacherPanelService'
-import { cacheService } from '@/services/shared'
 import { useAlert, useFormSubmit, createForm } from '@/composables/shared'
 import { TEACHER_ROUTES } from '@/utils/constants/routes'
 
@@ -99,6 +118,7 @@ const form = createForm('assignment')
 
 const subjects = ref([])
 const showConfirmDialog = ref(false)
+const materialFile = ref(null)
 
 const breadcrumbs = [
   { name: 'Dashboard', href: TEACHER_ROUTES.DASHBOARD.path },
@@ -119,10 +139,43 @@ const loadSubjects = async () => {
   }
 }
 
+const onMaterialFileSelect = (event) => {
+  const file = event.target.files?.[0]
+  if (!file) {
+    materialFile.value = null
+    return
+  }
+
+  const extension = `.${(file.name.split('.').pop() || '').toLowerCase()}`
+  const allowed = ['.pdf', '.doc', '.docx', '.ppt', '.pptx', '.xls', '.xlsx', '.zip', '.rar', '.txt']
+  if (!allowed.includes(extension)) {
+    event.target.value = ''
+    materialFile.value = null
+    showError('Unsupported material format.')
+    return
+  }
+
+  if (file.size > 25 * 1024 * 1024) {
+    event.target.value = ''
+    materialFile.value = null
+    showError('Material size must be 25MB or less.')
+    return
+  }
+
+  materialFile.value = file
+}
+
+const removeMaterialFile = () => {
+  materialFile.value = null
+}
+
 const submitForm = () => {
   handleSubmit(async () => {
-    await teacherPanelService.createAssignment({ ...form.value, total_marks: Number(form.value.total_marks) })
-    cacheService.clearPattern('teacher_assignments')
+    await teacherPanelService.createAssignment({
+      ...form.value,
+      total_marks: Number(form.value.total_marks),
+      ...(materialFile.value ? { material_file: materialFile.value } : {})
+    })
     showSuccess('Assignment created successfully!')
     setTimeout(() => router.push(TEACHER_ROUTES.ASSIGNMENT_LIST.path), 1500)
   }, null, (error) => {
@@ -133,7 +186,7 @@ const submitForm = () => {
 }
 
 const handleCancel = () => {
-  if (form.value.title || form.value.description) showConfirmDialog.value = true
+  if (form.value.title || form.value.description || materialFile.value) showConfirmDialog.value = true
   else router.push(TEACHER_ROUTES.ASSIGNMENT_LIST.path)
 }
 

@@ -9,4 +9,4 @@ from .assignments import AssignmentAdmin, SubmissionHistoryAdmin, GradeAdmin
 from .attendance import AttendanceAdmin
 from .scheduling import EventAdmin, HolidayAdmin, ExamAdmin, TimetableAdmin
 from .management import FeeAdmin, ExpenseAdmin, AccountAdmin
-from .library import LibraryBookAdmin, BookBorrowingAdmin
+from .library import LibraryBookAdmin, BookBorrowingAdmin, LibraryBorrowPolicyAdmin

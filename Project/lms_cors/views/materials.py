@@ -2,12 +2,13 @@ from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes, action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.exceptions import PermissionDenied
 from django.utils import timezone
 from django.db.models import Q, F
 
 
 from .base import BaseViewSet
-from ..models import Material, Announcement, ActivityLog, Teacher, TeacherSubject, StudentSubject
+from ..models import Material, Announcement, ActivityLog, Teacher, TeacherSubject, StudentSubject, Assignment
 from ..serializers import MaterialSerializer, AnnouncementSerializer, ActivityLogSerializer
 from ..permissions import IsTeacherUser, IsAdminUser, IsStudentUser
 
@@ -66,6 +67,28 @@ class MaterialViewSet(BaseViewSet):
                 model_name='Material',
                 object_id=str(serializer.instance.id)
             )
+
+    def perform_destroy(self, instance):
+        # Teachers can delete only their own uploaded material records.
+        if hasattr(self.request.user, 'teacher_profile'):
+            teacher = self.request.user.teacher_profile
+            if instance.uploaded_by_id and instance.uploaded_by_id != teacher.id:
+                raise PermissionDenied('You can only delete your own materials.')
+
+        # If this material mirrors an assignment attachment, clear the assignment attachment too
+        # so students no longer see stale file links in assignment cards.
+        if instance.file_upload:
+            qs = Assignment.objects.filter(material_file=instance.file_upload.name)
+            if instance.uploaded_by_id:
+                qs = qs.filter(created_by_id=instance.uploaded_by_id)
+            if instance.subject_id:
+                qs = qs.filter(subject_id=instance.subject_id)
+
+            for assignment in qs:
+                assignment.material_file = None
+                assignment.save(update_fields=['material_file', 'updated_at'])
+
+        instance.delete()
 
     @action(detail=True, methods=['post'])
     def download(self, request, pk=None):

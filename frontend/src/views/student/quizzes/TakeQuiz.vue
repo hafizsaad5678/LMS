@@ -53,7 +53,7 @@
               </div>
             </div>
 
-            <p class="mb-3">{{ question.question_text }}</p>
+            <div class="mb-3 quiz-question-text" v-html="renderRichText(question.question_text)"></div>
 
             <div class="quiz-answer-panels mb-3">
               <div class="quiz-answer-panel">
@@ -112,7 +112,7 @@
                   <span class="badge bg-light text-dark">{{ activeQuestion.marks }} marks</span>
                 </div>
 
-                <p class="mb-4 quiz-question-text">{{ activeQuestion.question_text }}</p>
+                <div class="mb-4 quiz-question-text" v-html="renderRichText(activeQuestion.question_text)"></div>
 
                 <div v-if="activeQuestion.question_type === 'mcq'" class="d-flex flex-column gap-2">
                   <button
@@ -206,6 +206,7 @@ import studentPanelService from '@/services/student/studentPanelService'
 import { StudentPageTemplate } from '@/components/shared/panels'
 import { LoadingSpinner, BaseButton, AlertMessage, QuizQuestionPalette, QuizSubmitSummaryModal, ConfirmDialog } from '@/components/shared/common'
 import { STUDENT_ROUTES } from '@/utils/constants/routes'
+import { sanitizeRichHtml } from '@/utils/security'
 
 const route = useRoute()
 const router = useRouter()
@@ -274,6 +275,8 @@ const percentageText = computed(() => {
   const pct = (Number(reviewData.value.score || 0) / Number(reviewData.value.total_marks || 1)) * 100
   return `Percentage: ${pct.toFixed(0)}%`
 })
+
+const renderRichText = (content) => sanitizeRichHtml(content || '')
 
 const requestLeaveConfirmation = () => {
   showLeaveConfirmDialog.value = true

@@ -18,6 +18,23 @@ class MaterialSerializer(serializers.ModelSerializer):
         model = Material
         fields = '__all__'
 
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+
+        # Legacy assignment-attachment records should appear as normal materials.
+        if data.get('material_type') == 'assignment':
+            title = (data.get('title') or '').strip()
+            if title.endswith(' (Attachment)'):
+                data['title'] = title[:-13].strip()
+
+            description = (data.get('description') or '').strip()
+            if description.lower().startswith('attachment from assignment:'):
+                data['description'] = 'Material record uploaded by teacher.'
+
+            data['material_type'] = 'outline'
+
+        return data
+
     def validate(self, attrs):
         title = str(attrs.get('title', '')).strip()
         if not title:

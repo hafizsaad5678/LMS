@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.db import models
 from django.core.exceptions import ValidationError
 import uuid
@@ -38,6 +40,53 @@ class LibraryBook(models.Model):
         return f"{self.title} by {self.author}"
 
 
+class LibraryBorrowPolicy(models.Model):
+    """Admin-configurable borrowing and fine rules."""
+
+    name = models.CharField(max_length=100, default='Default Policy')
+    free_days = models.PositiveSmallIntegerField(default=5)
+    fine_per_day = models.DecimalField(max_digits=8, decimal_places=2, default=Decimal('10.00'))
+    max_request_days = models.PositiveSmallIntegerField(default=30)
+    is_active = models.BooleanField(default=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'library_borrow_policies'
+        verbose_name = 'Library Borrow Policy'
+        verbose_name_plural = 'Library Borrow Policies'
+
+    def __str__(self):
+        return f"{self.name} (Free: {self.free_days} days, Fine: Rs. {self.fine_per_day}/day)"
+
+    def clean(self):
+        if self.free_days < 1:
+            raise ValidationError('Free days must be at least 1.')
+        if self.max_request_days < self.free_days:
+            raise ValidationError('Maximum request days must be greater than or equal to free days.')
+
+    def save(self, *args, **kwargs):
+        self.clean()
+        super().save(*args, **kwargs)
+
+        if self.is_active:
+            LibraryBorrowPolicy.objects.exclude(pk=self.pk).update(is_active=False)
+
+    @classmethod
+    def get_active_policy(cls):
+        policy = cls.objects.filter(is_active=True).first()
+        if policy:
+            return policy
+
+        policy = cls.objects.first()
+        if policy:
+            if not policy.is_active:
+                policy.is_active = True
+                policy.save(update_fields=['is_active'])
+            return policy
+
+        return cls.objects.create(name='Default Policy', free_days=5, fine_per_day=Decimal('10.00'), max_request_days=30, is_active=True)
+
+
 class BookBorrowing(models.Model):
     """Book borrowing records"""
     BORROW_STATUS = [
@@ -60,6 +109,7 @@ class BookBorrowing(models.Model):
         related_name='book_borrowings', null=True, blank=True
     )
     borrowed_date = models.DateField(auto_now_add=True)
+    requested_days = models.PositiveSmallIntegerField(default=5)
     due_date = models.DateField()
     returned_date = models.DateField(null=True, blank=True)
     status = models.CharField(max_length=20, choices=BORROW_STATUS, default='borrowed')

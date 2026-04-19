@@ -3,6 +3,7 @@
  * Orchestration layer for teacher dashboard with centralized caching
  */
 import { api, cacheService, getTimeAgo, normalizeToArray } from '@/services/shared'
+import { isDateWithinNextDays } from '@/utils/formatters'
 
 // Cache key constants
 const CACHE_KEYS = {
@@ -39,16 +40,38 @@ const dedupeRequest = async (key, requestFn) => {
     return promise
 }
 
+const toAssignmentPayload = (data = {}) => {
+    if (data instanceof FormData) return data
+
+    const hasMaterialFile = data?.material_file instanceof File
+    if (!hasMaterialFile) return data
+
+    const formData = new FormData()
+    Object.entries(data).forEach(([key, value]) => {
+        if (value === undefined || value === null || value === '') return
+        formData.append(key, value)
+    })
+
+    return formData
+}
+
 export const teacherPanelService = {
     // ==================== Dashboard Stats ====================
-    async getDashboardStats() {
+    async getDashboardStats(options = {}) {
+        const { forceRefresh = false } = options
+
+        if (forceRefresh) {
+            cacheService.clear(CACHE_KEYS.DASHBOARD_STATS)
+            pendingRequests.delete(CACHE_KEYS.DASHBOARD_STATS)
+        }
+
         const cached = cacheService.get(CACHE_KEYS.DASHBOARD_STATS)
         if (cached) return cached
 
         try {
             const [classesResult, assignmentsResult] = await Promise.allSettled([
-                this.getMyClasses(),
-                this.getMyAssignments()
+                this.getMyClasses({}, { forceRefresh }),
+                this.getMyAssignments({ forceRefresh })
             ])
 
             let totalClasses = 0, totalStudents = 0
@@ -66,16 +89,17 @@ export const teacherPanelService = {
                 totalAssignments = assignments.count || assignmentsArray.length || 0
 
                 pendingReviews = assignmentsArray.reduce((sum, a) => {
-                    const pending = (a.total_students || 0) - (a.submitted || 0)
-                    return sum + Math.max(0, pending)
+                    if (typeof a.pending_review_count === 'number') {
+                        return sum + a.pending_review_count
+                    }
+                    const submissionCount = a.submission_count ?? a.submitted ?? 0
+                    const gradedCount = a.graded_count ?? 0
+                    return sum + Math.max(0, submissionCount - gradedCount)
                 }, 0)
 
                 const today = new Date()
-                const weekFromNow = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000)
                 upcomingDeadlines = assignmentsArray.filter(a => {
-                    if (!a.due_date) return false
-                    const dueDate = new Date(a.due_date)
-                    return dueDate >= today && dueDate <= weekFromNow && a.status !== 'closed'
+                    return isDateWithinNextDays(a.due_date, 7, today)
                 }).length
             }
 
@@ -160,7 +184,18 @@ export const teacherPanelService = {
     },
 
     // ==================== Assignments ====================
-    async getMyAssignments() {
+    async getMyAssignments(options = {}) {
+        const { forceRefresh = false } = options
+
+        if (forceRefresh) {
+            cacheService.clear(CACHE_KEYS.MY_ASSIGNMENTS)
+            pendingRequests.delete(CACHE_KEYS.MY_ASSIGNMENTS)
+
+            const response = await api.get('/teacher/my-assignments/')
+            cacheService.set(CACHE_KEYS.MY_ASSIGNMENTS, response.data)
+            return response.data
+        }
+
         return dedupeRequest(CACHE_KEYS.MY_ASSIGNMENTS, async () => {
             const response = await api.get('/teacher/my-assignments/')
             return response.data
@@ -173,16 +208,18 @@ export const teacherPanelService = {
     },
 
     async createAssignment(data) {
-        const response = await api.post('/assignments/', data)
+        const response = await api.post('/assignments/', toAssignmentPayload(data))
         cacheService.clearPattern('teacher:myAssignments')
         cacheService.clearPattern('teacher:dashboard')
+        cacheService.clearPattern('teacher_materials')
         return response.data
     },
 
     async updateAssignment(id, data) {
-        const response = await api.patch(`/assignments/${id}/`, data)
+        const response = await api.patch(`/assignments/${id}/`, toAssignmentPayload(data))
         cacheService.clearPattern('teacher:myAssignments')
         cacheService.clearPattern('teacher:dashboard')
+        cacheService.clearPattern('teacher_materials')
         return response.data
     },
 
@@ -190,6 +227,7 @@ export const teacherPanelService = {
         const response = await api.delete(`/assignments/${id}/`)
         cacheService.clearPattern('teacher:myAssignments')
         cacheService.clearPattern('teacher:dashboard')
+        cacheService.clearPattern('teacher_materials')
         return response.data
     },
 
@@ -198,8 +236,17 @@ export const teacherPanelService = {
         return response.data
     },
 
-    // ==================== Grade Components ====================
+    async markZeroForMissingSubmission(assignmentId, studentId) {
+        const response = await api.post(`/assignments/${assignmentId}/mark_zero/`, { student: studentId })
+        cacheService.clearPattern('teacher:myAssignments')
+        cacheService.clearPattern('teacher:dashboard')
+        cacheService.clearPattern('teacher:activities')
+        return response.data
+    },
+
+    // ==================== Grade Components (Canonical) ====================
     async getComponents(params) {
+        if (!params) return { results: [] }
         const response = await api.get('/grade-components/', { params })
         return response.data
     },
@@ -242,11 +289,13 @@ export const teacherPanelService = {
     // ==================== Attendance ====================
     async markAttendance(data) {
         const response = await api.post('/attendance/', data)
+        cacheService.clearPattern('teacher:attendance:')
         return response.data
     },
 
     async bulkMarkAttendance(attendanceData) {
         const response = await api.post('/attendance/bulk_create/', attendanceData)
+        cacheService.clearPattern('teacher:attendance:')
         return response.data
     },
 
@@ -255,14 +304,42 @@ export const teacherPanelService = {
         return response.data
     },
 
-    async getAllAttendance(params = {}) {
-        const key = `teacher:attendance:${JSON.stringify(params)}`
-        const cached = cacheService.get(key)
-        if (cached) return cached
+    async getAllAttendance(params = {}, options = {}) {
+        const { forceRefresh = false } = options
+        const key = `teacher:attendance:v2:${JSON.stringify(params)}`
+
+        if (!forceRefresh) {
+            const cached = cacheService.get(key)
+            if (cached) return cached
+        } else {
+            cacheService.clear(key)
+            pendingRequests.delete(key)
+        }
 
         try {
-            const response = await api.get('/attendance/', { params: { page_size: 1000, ...params } })
-            const data = response.data.results || response.data || []
+            const baseParams = { ...params }
+            const allRows = []
+            let page = 1
+
+            while (true) {
+                const response = await api.get('/attendance/', { params: { ...baseParams, page } })
+                const payload = response.data
+
+                // Non-paginated response fallback
+                if (Array.isArray(payload)) {
+                    allRows.push(...payload)
+                    break
+                }
+
+                const pageRows = payload?.results || []
+                allRows.push(...pageRows)
+
+                // DRF paginated response uses `next`; stop when it ends
+                if (!payload?.next) break
+                page += 1
+            }
+
+            const data = allRows
             cacheService.set(key, data)
             return data
         } catch (error) {
@@ -274,17 +351,23 @@ export const teacherPanelService = {
     // ==================== Grades ====================
     async submitGrades(data) {
         const response = await api.post('/grades/', data)
+        cacheService.clearPattern('teacher:myAssignments')
+        cacheService.clearPattern('teacher:dashboard')
+        cacheService.clearPattern('teacher:activities')
         return response.data
     },
 
     async updateGrade(gradeId, data) {
         const response = await api.patch(`/grades/${gradeId}/`, data)
+        cacheService.clearPattern('teacher:myAssignments')
+        cacheService.clearPattern('teacher:dashboard')
+        cacheService.clearPattern('teacher:activities')
         return response.data
     },
 
     async getGradeReport(params) {
-        const response = await api.get('/student-marks/', { params })
-        return response.data
+        // Backward-compatible alias for getAllMarks
+        return this.getAllMarks(params)
     },
 
     // ==================== Quiz Management ====================
@@ -333,6 +416,21 @@ export const teacherPanelService = {
         return response.data
     },
 
+    async unpublishQuiz(id) {
+        const response = await api.post(`/quizzes/${id}/unpublish/`)
+        return response.data
+    },
+
+    async getQuizAttempts(quizId) {
+        const response = await api.get(`/quiz-attempts/`, { 
+            params: { 
+                quiz: quizId,
+                latest_only: 'true' // Group by student to avoid repeated entries
+            } 
+        })
+        return response.data
+    },
+
     async getGradeComponents(subjectId = '') {
         const params = subjectId ? { subject: subjectId } : {}
         const response = await api.get('/grade-components/', { params })
@@ -340,16 +438,19 @@ export const teacherPanelService = {
     },
 
     async createGradeComponent(data) {
+        // Backward-compatible alias for createComponent
         const response = await api.post('/grade-components/', data)
         return response.data
     },
 
     async updateGradeComponent(id, data) {
+        // Backward-compatible alias for updateComponent
         const response = await api.patch(`/grade-components/${id}/`, data)
         return response.data
     },
 
     async deleteGradeComponent(id) {
+        // Backward-compatible alias for deleteComponent
         const response = await api.delete(`/grade-components/${id}/`)
         return response.data
     },

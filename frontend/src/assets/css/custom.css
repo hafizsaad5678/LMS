@@ -1345,31 +1345,29 @@ body {
     font-size: 0.9rem;
 }
 
+.custom-grading-table .form-control {
+    border-radius: 8px;
+    border: 1.5px solid #d0e3ff !important;
+    background-color: #f0f7ff !important;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+    color: #0d47a1;
+}
+
+.custom-grading-table .form-control:focus {
+    background-color: #fff !important;
+    border-color: #0d6efd !important;
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.15) !important;
+}
+
 .form-control-marks {
     width: 80px;
     text-align: center;
     font-weight: 700;
-    border-radius: 10px;
-    border: 2px solid #edeff2;
-    transition: all 0.2s;
-}
-
-.form-control-marks:focus {
-    border-color: #0d6efd;
-    box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.15);
 }
 
 .form-control-remarks {
-    border: none;
-    background: transparent;
-    font-size: 0.9rem;
-    color: #495057;
-}
-
-.form-control-remarks:focus {
-    box-shadow: none;
-    border-bottom: 2px solid #0d6efd;
-    border-radius: 0;
+    padding: 0.5rem 1rem;
 }
 
 .lock-btn {
@@ -1411,6 +1409,24 @@ body {
     color: #d63031;
 }
 
+.grade-badge-success { background: #d1e7dd; color: #0f5132; }
+.grade-badge-warning { background: #fff3cd; color: #664d03; }
+.grade-badge-danger { background: #f8d7da; color: #842029; }
+
+.min-h-600 {
+    min-height: 600px;
+}
+
+.extra-small-label {
+    font-size: 10px;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+}
+
+.is-invalid-input {
+    border-color: #dc3545 !important;
+}
+
 .mw-300 {
     max-width: 300px;
 }
@@ -1419,6 +1435,45 @@ body {
     position: relative;
     display: flex;
     align-items: center;
+}
+
+/* Dropdown Customization */
+.dropdown-menu {
+    padding: 0.5rem;
+    border-radius: 12px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.1) !important;
+    border: 1px solid rgba(0,0,0,0.05) !important;
+}
+
+.dropdown-item {
+    border-radius: 8px;
+    padding: 0.6rem 1rem;
+    font-weight: 500;
+    color: #495057;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+}
+
+.dropdown-item i {
+    font-size: 1.1rem;
+    width: 2rem;
+}
+
+.dropdown-item:hover {
+    background-color: #f0f7ff;
+    color: #0d6efd;
+    transform: translateX(4px);
+}
+
+.dropdown-item.text-danger:hover {
+    background-color: #fff5f5;
+    color: #dc3545;
+}
+
+.dropdown-divider {
+    margin: 0.4rem 0.5rem;
+    opacity: 0.1;
 }
 
 .icon-hint {

@@ -3,11 +3,12 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.utils import timezone
+from decimal import Decimal
 
 from .base import BaseViewSet
-from ..models import LibraryBook, BookBorrowing
-from ..serializers import LibraryBookSerializer, BookBorrowingSerializer
-from ..permissions import ReadOnlyForStudents, IsStudentUser
+from ..models import LibraryBook, LibraryBorrowPolicy, BookBorrowing
+from ..serializers import LibraryBookSerializer, BookBorrowingSerializer, LibraryBorrowPolicySerializer
+from ..permissions import ReadOnlyForStudents
 
 
 class LibraryBookViewSet(BaseViewSet):
@@ -34,6 +35,11 @@ class BookBorrowingViewSet(BaseViewSet):
     permission_classes = [IsAuthenticated, ReadOnlyForStudents]
     filterset_fields = ['book', 'student', 'teacher', 'status']
     ordering_fields = ['borrowed_date', 'due_date']
+
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
+    def borrow_policy(self, request):
+        policy = LibraryBorrowPolicy.get_active_policy()
+        return Response(LibraryBorrowPolicySerializer(policy).data)
     
     def get_queryset(self):
         """Filter borrowings based on user role"""
@@ -62,6 +68,20 @@ class BookBorrowingViewSet(BaseViewSet):
         
         if book.copies_available <= 0:
             return Response({'error': 'Book is not available'}, status=status.HTTP_400_BAD_REQUEST)
+
+        policy = LibraryBorrowPolicy.get_active_policy()
+        requested_days_raw = request.data.get('requested_days', policy.free_days)
+
+        try:
+            requested_days = int(requested_days_raw)
+        except (TypeError, ValueError):
+            return Response({'error': 'Requested days must be a valid number.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if requested_days < 1:
+            return Response({'error': 'Requested days must be at least 1.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if requested_days > policy.max_request_days:
+            return Response({'error': f'Maximum allowed days are {policy.max_request_days}.'}, status=status.HTTP_400_BAD_REQUEST)
         
         # Check if student already has this book borrowed
         if hasattr(request.user, 'student_profile'):
@@ -74,12 +94,13 @@ class BookBorrowingViewSet(BaseViewSet):
             if existing:
                 return Response({'error': 'You already have this book borrowed'}, status=status.HTTP_400_BAD_REQUEST)
             
-            # Create borrowing (model save method will handle availability decrement)
-            due_date = timezone.now().date() + timedelta(days=14)
+            # Due date follows active policy free-days window.
+            due_date = timezone.now().date() + timedelta(days=policy.free_days)
             borrowing = BookBorrowing.objects.create(
                 book=book,
                 student=request.user.student_profile,
                 borrowed_date=timezone.now().date(),
+                requested_days=requested_days,
                 due_date=due_date,
                 status='borrowed'
             )
@@ -108,6 +129,10 @@ class BookBorrowingViewSet(BaseViewSet):
             return Response({'error': 'Book already returned'}, status=status.HTTP_400_BAD_REQUEST)
         
         # Update status (model save method will handle availability increment)
+        policy = LibraryBorrowPolicy.get_active_policy()
+        borrowed_days = max((timezone.now().date() - borrowing.borrowed_date).days, 0)
+        extra_days = max(borrowed_days - policy.free_days, 0)
+        borrowing.fine_amount = Decimal(extra_days) * policy.fine_per_day
         borrowing.status = 'returned'
         borrowing.returned_date = timezone.now().date()
         borrowing.save()

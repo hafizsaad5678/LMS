@@ -79,13 +79,38 @@ def _close_attempt(attempt, close_status):
     attempt.status = 'evaluated'
     attempt.save()
 
+    # --- AUTO-SYNC TO GRADE COMPONENTS ---
+    try:
+        # Check if there is an active GradeComponent linked to this Quiz
+        # We match by name and subject, or we can add a formal link later.
+        component = GradeComponent.objects.filter(
+            name=attempt.quiz.title,
+            subject=attempt.quiz.subject,
+            component_type='quiz'
+        ).first()
+
+        if component:
+            StudentMark.objects.update_or_create(
+                component=component,
+                student=attempt.student,
+                defaults={
+                    'marks_obtained': attempt.score,
+                    'remarks': f"Auto-graded from Quiz: {attempt.quiz.title}",
+                    'graded_by': attempt.quiz.created_by,
+                    'is_locked': True
+                }
+            )
+    except Exception as e:
+        print(f"Error auto-syncing quiz grade: {e}")
+    # --------------------------------------
+
 
 class QuizViewSet(viewsets.ModelViewSet):
     serializer_class = QuizSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def get_permissions(self):
-        if self.action in {'create', 'update', 'partial_update', 'destroy', 'publish'}:
+        if self.action in {'create', 'update', 'partial_update', 'destroy', 'publish', 'unpublish'}:
             permission_classes = [permissions.IsAuthenticated, IsAdminOrTeacher]
         else:
             permission_classes = [permissions.IsAuthenticated]
@@ -141,6 +166,13 @@ class QuizViewSet(viewsets.ModelViewSet):
         quiz.is_published = True
         quiz.save()
         return Response({'status': 'quiz published'})
+
+    @action(detail=True, methods=['post'])
+    def unpublish(self, request, pk=None):
+        quiz = self.get_object()
+        quiz.is_published = False
+        quiz.save()
+        return Response({'status': 'quiz unpublished'})
 
     @action(detail=True, methods=['post'])
     def start(self, request, pk=None):
@@ -285,17 +317,39 @@ class QuizAttemptViewSet(viewsets.ModelViewSet):
         if not user.is_authenticated:
             return QuizAttempt.objects.none()
 
+        queryset = QuizAttempt.objects.all()
+
         if user.is_staff or user.is_superuser or hasattr(user, 'admin_profile'):
-            return QuizAttempt.objects.all()
-            
-        if hasattr(user, 'teacher_profile'):
+            # Admin returns full queryset
+            pass
+        elif hasattr(user, 'teacher_profile'):
             # Teachers see attempts for their quizzes
-            return QuizAttempt.objects.filter(quiz__created_by=user.teacher_profile)
+            queryset = queryset.filter(quiz__created_by=user.teacher_profile)
+        elif hasattr(user, 'student_profile'):
+            queryset = queryset.filter(student=user.student_profile)
+        else:
+            return QuizAttempt.objects.none()
 
-        if hasattr(user, 'student_profile'):
-            return QuizAttempt.objects.filter(student=user.student_profile)
+        # Filter by quiz ID if provided (used in the attempts modal)
+        quiz_id = self.request.query_params.get('quiz')
+        if quiz_id:
+            queryset = queryset.filter(quiz_id=quiz_id)
 
-        return QuizAttempt.objects.none()
+        # Filter by student ID if provided
+        student_id = self.request.query_params.get('student')
+        if student_id:
+            queryset = queryset.filter(student_id=student_id)
+
+        # Handle duplicates: If multiple attempts by same student, only return the latest one
+        # unless explicitly asked for all.
+        if self.request.query_params.get('latest_only') == 'true':
+            from django.db.models import OuterRef, Subquery
+            latest_attempt = queryset.filter(
+                student_id=OuterRef('student_id')
+            ).order_by('-started_at', '-id').values('id')[:1]
+            queryset = queryset.filter(id=Subquery(latest_attempt))
+
+        return queryset.select_related('student', 'quiz', 'quiz__subject').order_by('-started_at')
 
     def create(self, request, *args, **kwargs):
         return Response(
@@ -511,7 +565,42 @@ class GradeComponentViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         if not hasattr(self.request.user, 'teacher_profile'):
             raise ValidationError('Only teachers can create grade components.')
-        serializer.save(created_by=self.request.user.teacher_profile)
+        
+        # Handle assignment linking
+        assignment_id = self.request.data.get('assignment_id')
+        instance = serializer.save(created_by=self.request.user.teacher_profile)
+
+        if assignment_id:
+            try:
+                from ..models.assignments import Assignment, SubmissionHistory, Grade
+                from ..models.people import Student
+                assignment = Assignment.objects.get(id=assignment_id)
+                
+                # Link all existing submissions/grades to this component
+                submissions = SubmissionHistory.objects.filter(assignment=assignment)
+                for sub in submissions:
+                    # Check if there's a grade for this submission
+                    try:
+                        grade = sub.grade
+                        StudentMark.objects.update_or_create(
+                            component=instance,
+                            student=sub.student,
+                            defaults={
+                                'marks_obtained': grade.marks_obtained,
+                                'remarks': grade.feedback,
+                                'graded_by': self.request.user.teacher_profile,
+                                'is_locked': True
+                            }
+                        )
+                    except Grade.DoesNotExist:
+                        # Just create the record with null marks if no grade exists yet
+                        StudentMark.objects.get_or_create(
+                            component=instance,
+                            student=sub.student,
+                            defaults={'marks_obtained': None}
+                        )
+            except Exception as e:
+                print(f"Error linking assignment marks: {e}")
 
     @action(detail=True, methods=['get'])
     def marks(self, request, pk=None):

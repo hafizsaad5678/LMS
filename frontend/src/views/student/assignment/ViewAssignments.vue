@@ -10,9 +10,11 @@
       <div class="px-2 pt-1 pb-2">
         <SearchFilter
           v-model="searchQuery"
+          :status-value="statusFilter"
           :show-card="false"
           search-placeholder="Search assignments..."
           theme="student"
+          @update:statusValue="onStatusFilterChange"
           @refresh="loadData"
           @reset="resetFilters"
         >
@@ -102,6 +104,15 @@
                 <i class="bi bi-info-circle me-1"></i> Details
               </button>
 
+              <button
+                v-if="assignment.material_file_url"
+                class="btn btn-outline-primary rounded-3 py-2 small"
+                @click="openMaterial(assignment)"
+                title="Download material"
+              >
+                <i class="bi bi-paperclip"></i>
+              </button>
+
               <button 
                 v-if="!isSubmitted(assignment)"
                 class="btn flex-grow-1 rounded-3 py-2 fw-bold" 
@@ -133,61 +144,85 @@
       size="lg"
       variant="student"
     >
-      <div v-if="selectedAssignment" class="assignment-details p-3">
-        <div class="row g-4">
-          <div class="col-lg-8 border-end">
-            <h6 class="text-uppercase text-muted fw-bold small mb-3">
-              <i class="bi bi-file-text me-2"></i>Description & Instructions
-            </h6>
-            <div
-              class="description-content text-break"
-              v-html="selectedAssignment.description || '<p class=\'text-muted fst-italic\'>No description provided.</p>'"
-            ></div>
-          </div>
-          
-          <div class="col-lg-4">
-            <div class="bg-light bg-opacity-50 rounded-3 p-3 h-100">
-              <h6 class="text-uppercase text-muted fw-bold small mb-3 border-bottom pb-2">
-                <i class="bi bi-info-circle me-2"></i>Details
-              </h6>
-              
-              <div class="mb-4">
-                <small class="text-muted d-block mb-1">Subject</small>
-                <div class="d-flex align-items-center">
-                  <i class="bi bi-book text-student me-2"></i>
-                  <strong class="text-dark">{{
-                    selectedAssignment.subject_name ||
-                    selectedAssignment.subject?.name
-                  }}</strong>
-                </div>
-              </div>
-
-              <div class="mb-4">
+      <div v-if="selectedAssignment" class="assignment-details-modal p-2 p-md-3">
+        <div class="row g-3 mb-3">
+          <div class="col-6 col-md-3">
+            <div class="detail-chip card border-0 bg-light h-100">
+              <div class="card-body p-3">
                 <small class="text-muted d-block mb-1">Due Date</small>
-                <div class="d-flex align-items-center">
-                  <i class="bi bi-calendar-event text-student me-2"></i>
-                  <strong :class="getDueDateClass(selectedAssignment)">{{
-                    formatDate(selectedAssignment.due_date)
-                  }}</strong>
+                <div class="fw-semibold" :class="getDueDateClass(selectedAssignment)">
+                  <i class="bi bi-calendar-event me-1"></i>{{ formatDate(selectedAssignment.due_date) }}
                 </div>
               </div>
-
-              <div class="mb-4">
+            </div>
+          </div>
+          <div class="col-6 col-md-3">
+            <div class="detail-chip card border-0 bg-light h-100">
+              <div class="card-body p-3">
                 <small class="text-muted d-block mb-1">Total Marks</small>
-                <div class="d-flex align-items-center">
-                  <i class="bi bi-award text-student me-2"></i>
-                  <strong>{{ selectedAssignment.total_marks || 100 }}</strong>
+                <div class="fw-semibold">
+                  <i class="bi bi-award text-student me-1"></i>{{ selectedAssignment.total_marks || 100 }}
                 </div>
               </div>
-
-              <div class="mb-3">
-                 <small class="text-muted d-block mb-1">Status</small>
-                 <span
-                  class="badge rounded-pill"
-                  :class="`bg-${getStatusColor(selectedAssignment)}`"
-                >
+            </div>
+          </div>
+          <div class="col-6 col-md-3">
+            <div class="detail-chip card border-0 bg-light h-100">
+              <div class="card-body p-3">
+                <small class="text-muted d-block mb-1">Status</small>
+                <span class="badge rounded-pill px-3 py-2" :class="`bg-${getStatusColor(selectedAssignment)}`">
                   {{ getStatusText(selectedAssignment) }}
                 </span>
+              </div>
+            </div>
+          </div>
+          <div class="col-6 col-md-3">
+            <div class="detail-chip card border-0 bg-light h-100">
+              <div class="card-body p-3">
+                <small class="text-muted d-block mb-1">Subject</small>
+                <div class="fw-semibold text-truncate">
+                  <i class="bi bi-book text-student me-1"></i>{{ selectedAssignment.subject_name || selectedAssignment.subject?.name }}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="row g-3 align-items-stretch">
+          <div class="col-lg-8">
+            <div class="card border-0 bg-light h-100">
+              <div class="card-body p-3 p-md-4">
+                <h6 class="text-uppercase text-muted fw-bold small mb-3">
+                  <i class="bi bi-file-text me-2"></i>Description & Instructions
+                </h6>
+                <div
+                  class="description-content text-break"
+                  v-html="selectedAssignment.description || '<p class=\'text-muted fst-italic mb-0\'>No description provided.</p>'"
+                ></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-lg-4">
+            <div class="card border-0 bg-light h-100">
+              <div class="card-body p-3 p-md-4 d-flex flex-column">
+                <h6 class="text-uppercase text-muted fw-bold small mb-3">
+                  <i class="bi bi-paperclip me-2"></i>Resources
+                </h6>
+
+                <div v-if="selectedAssignment.material_file_url" class="mt-1">
+                  <button
+                    class="btn btn-outline-primary btn-sm w-100 text-start d-flex align-items-center justify-content-between"
+                    @click="openMaterial(selectedAssignment)"
+                  >
+                    <span class="text-truncate me-2">
+                      {{ selectedAssignment.material_file_name || 'Download Material' }}
+                    </span>
+                    <i class="bi bi-download"></i>
+                  </button>
+                </div>
+
+                <div v-else class="text-muted small fst-italic">No attachment available.</div>
               </div>
             </div>
           </div>
@@ -272,6 +307,7 @@ const loading = ref(true);
 const error = ref(null);
 const assignments = ref([]);
 const filterStatus = ref("");
+const statusFilter = ref("");
 const searchQuery = ref("");
 const showDetailsModal = ref(false);
 const selectedAssignment = ref(null);
@@ -283,16 +319,24 @@ const breadcrumbs = [
 
 const filteredAssignments = computed(() => {
   let filtered = [...assignments.value];
-  if (filterStatus.value) {
-    filtered = filtered.filter((a) => {
-      if (filterStatus.value === "pending")
+
+  const applyStatusFilter = (list, statusValue) => {
+    if (!statusValue || statusValue === "all") return list;
+
+    return list.filter((a) => {
+      if (statusValue === "pending" || statusValue === "active") {
         return !isSubmitted(a) && !isOverdue(a);
-      if (filterStatus.value === "submitted") return isSubmitted(a);
-      if (filterStatus.value === "overdue")
-        return isOverdue(a) && !isSubmitted(a);
+      }
+      if (statusValue === "submitted") return isSubmitted(a);
+      if (statusValue === "overdue") return isOverdue(a) && !isSubmitted(a);
+      if (statusValue === "inactive") return isSubmitted(a) || isOverdue(a);
       return true;
     });
-  }
+  };
+
+  filtered = applyStatusFilter(filtered, filterStatus.value);
+  filtered = applyStatusFilter(filtered, statusFilter.value);
+
   if (searchQuery.value) {
     filtered = filtered.filter(a => smartSearch(a, searchQuery.value, ['title', 'subject_name']));
   }
@@ -321,7 +365,13 @@ const loadData = async () => {
 
 const resetFilters = () => {
   filterStatus.value = "";
+  statusFilter.value = "";
   searchQuery.value = "";
+  resetPagination();
+};
+
+const onStatusFilterChange = (value) => {
+  statusFilter.value = value;
   resetPagination();
 };
 
@@ -342,8 +392,53 @@ const viewDetails = (assignment) => {
   showDetailsModal.value = true;
 };
 
+const getDownloadName = (assignment) => {
+  if (assignment?.material_file_name) return assignment.material_file_name;
+
+  const rawUrl = String(assignment?.material_file_url || "");
+  const fromUrl = rawUrl.split("?")[0].split("#")[0].split("/").pop();
+  if (fromUrl) return decodeURIComponent(fromUrl);
+
+  return "assignment-material";
+};
+
+const openMaterial = async (assignment) => {
+  const url = assignment?.material_file_url;
+  if (!url) return;
+
+  try {
+    const response = await fetch(url, { method: "GET", credentials: "include" });
+    if (!response.ok) throw new Error("Download request failed");
+
+    const blob = await response.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = objectUrl;
+    link.download = getDownloadName(assignment);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(objectUrl);
+  } catch (error) {
+    console.error("Attachment download failed:", error);
+    // Fallback to direct navigation if blob download fails.
+    window.open(url, "_blank", "noopener");
+  }
+};
+
 onMounted(loadData);
 </script>
+
+<style scoped>
+.assignment-details-modal .description-content {
+  min-height: 180px;
+  line-height: 1.6;
+}
+
+.assignment-details-modal .detail-chip {
+  border: 1px solid rgba(0, 0, 0, 0.04);
+}
+</style>
 
 
 

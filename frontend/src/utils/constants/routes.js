@@ -147,6 +147,7 @@ export const STUDENT_ROUTES = {
     // Grades
     MY_GRADES: { name: 'StudentMyGrade', path: '/student-dashboard/grades' },
     GRADE_REPORT: { name: 'StudentGradeReport', path: '/student-dashboard/grades/report' },
+    GPA_CGPA_CALCULATOR: { name: 'StudentGpaCgpaCalculator', path: '/student-dashboard/grades/gpa-cgpa-calculator' },
 
     // Attendance
     MY_ATTENDANCE: { name: 'StudentMyAttendance', path: '/student-dashboard/attendance' },

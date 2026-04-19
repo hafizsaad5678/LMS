@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from ..models import LibraryBook, BookBorrowing
+from ..models import LibraryBook, LibraryBorrowPolicy, BookBorrowing
 
 
 class LibraryBookSerializer(serializers.ModelSerializer):
@@ -18,3 +18,9 @@ class BookBorrowingSerializer(serializers.ModelSerializer):
         model = BookBorrowing
         fields = '__all__'
         read_only_fields = ['id', 'borrowed_date']
+
+
+class LibraryBorrowPolicySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = LibraryBorrowPolicy
+        fields = ['id', 'name', 'free_days', 'fine_per_day', 'max_request_days', 'is_active', 'updated_at']

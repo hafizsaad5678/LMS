@@ -11,7 +11,9 @@
             
             <!-- Content -->
             <h4 class="confirm-title">{{ title }}</h4>
-            <p class="confirm-message">{{ message }}</p>
+            <slot name="content">
+              <p class="confirm-message">{{ message }}</p>
+            </slot>
             
             <!-- Actions -->
             <div class="confirm-actions">

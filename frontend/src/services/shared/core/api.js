@@ -18,6 +18,12 @@ api.interceptors.request.use((config) => {
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
   }
+  
+  // Let the browser automatically set the correct Content-Type boundary for FormData
+  if (config.data instanceof FormData) {
+    delete config.headers['Content-Type']
+  }
+  
   return config
 }, (error) => {
   return Promise.reject(error)
@@ -83,14 +89,15 @@ api.interceptors.response.use(
         } catch (err) {
           processQueue(err, null)
           safeStorage.clear()
-          router.push({ name: 'Login' })
+          // Use location.href for a clean redirect if router is in a weird state
+          window.location.href = '/login'
           return Promise.reject(err)
         } finally {
           isRefreshing = false
         }
       } else {
         safeStorage.clear()
-        router.push({ name: 'Login' })
+        window.location.href = '/login'
       }
     }
 

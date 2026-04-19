@@ -27,8 +27,16 @@
           </div>
           <div class="col-md-3">
             <select v-model="filters.month" class="form-select">
-              <option value="">All Time</option>
+              <option value="">All Months</option>
               <option v-for="option in monthOptions" :key="option.value" :value="option.value">
+                {{ option.label }}
+              </option>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <select v-model="filters.year" class="form-select">
+              <option value="">All Years</option>
+              <option v-for="option in yearOptions" :key="option.value" :value="option.value">
                 {{ option.label }}
               </option>
             </select>
@@ -126,6 +134,7 @@ import { useAlert } from '@/composables/shared'
 import teacherPanelService from '@/services/teacher/teacherPanelService'
 import { getAttendanceColorClass, getAttendanceStatusLabel } from '@/utils/badgeHelpers'
 import { TEACHER_ROUTES } from '@/utils/constants/routes'
+import { MONTH_NUMBER_OPTIONS, getYearRangeOptions } from '@/utils/constants/options'
 
 const router = useRouter()
 const { alert, showAlert } = useAlert()
@@ -143,10 +152,13 @@ const actions = [
 
 const loading = ref(false)
 const searchQuery = ref('')
-const filters = ref({ class: '', month: '' })
+const filters = ref({ class: '', month: '', year: '' })
 const classes = ref([])
 const students = ref([])
 const attendanceRecords = ref([])
+const baseStudents = ref([])
+
+const normalizeId = (value) => String(value ?? '')
 
 const filteredStudents = computed(() => {
   // Note: Highly complex filtering involving nested arrays, mapping transformations, and secondary calculations.
@@ -159,27 +171,15 @@ const filteredStudents = computed(() => {
 
   if (filters.value.class) {
     result = result.filter(s => {
-      const hasClass = s.class_ids && s.class_ids.includes(filters.value.class)
+      const selectedClassId = normalizeId(filters.value.class)
+      const hasClass = (s.class_ids || []).map(normalizeId).includes(selectedClassId)
       return hasClass
     })
   }
 
-  // Recalculate stats based on filters
+  // Recalculate stats from server-filtered attendance records.
   return result.map(student => {
-    let filteredAttendance = student.attendance_records || []
-
-    // Filter by selected class/subject for STATS calculation only
-    if (filters.value.class) {
-      const selectedClass = classes.value.find(c => c.id === filters.value.class)
-      if (selectedClass && selectedClass.subject_id) {
-        filteredAttendance = filteredAttendance.filter(a => a.subject === selectedClass.subject_id)
-      }
-    }
-
-    // Filter by month
-    if (filters.value.month) {
-      filteredAttendance = filteredAttendance.filter(a => a.session_date && a.session_date.startsWith(filters.value.month))
-    }
+    const filteredAttendance = student.attendance_records || []
 
     // Recalculate stats with filtered data
     const stats = filteredAttendance.length > 0 ? calculateStats(filteredAttendance) : {
@@ -248,25 +248,20 @@ const statsCards = computed(() => [
   }
 ])
 
-const monthOptions = computed(() => {
-  const monthMap = new Map()
+const monthOptions = MONTH_NUMBER_OPTIONS
+
+const yearOptions = computed(() => {
+  const years = new Map(getYearRangeOptions(10, 1).map(item => [item.value, item]))
 
   attendanceRecords.value.forEach(record => {
-    const rawDate = String(record?.session_date || '').trim()
-    if (!rawDate) return
-
-    const monthKey = rawDate.slice(0, 7)
-    if (!/^\d{4}-\d{2}$/.test(monthKey) || monthMap.has(monthKey)) return
-
-    const dateObj = new Date(`${monthKey}-01T00:00:00`)
-    const label = Number.isNaN(dateObj.getTime())
-      ? monthKey
-      : dateObj.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
-
-    monthMap.set(monthKey, { value: monthKey, label })
+    const year = String(record?.session_date || '').slice(0, 4)
+    if (/^\d{4}$/.test(year) && !years.has(year)) {
+      years.set(year, { value: year, label: year })
+    }
   })
 
-  return Array.from(monthMap.values()).sort((a, b) => b.value.localeCompare(a.value))
+  return Array.from(years.values())
+    .sort((a, b) => Number(b.value) - Number(a.value))
 })
 
 const getAttendanceColor = (percentage) => getAttendanceColorClass(percentage)
@@ -279,51 +274,106 @@ const getStatusBadge = (percentage) => {
 
 const getStatusLabel = (percentage) => getAttendanceStatusLabel(percentage)
 
+const buildAttendanceParams = () => {
+  const params = {}
+
+  if (filters.value.month) params.month = filters.value.month
+  if (filters.value.year) params.year = filters.value.year
+
+  if (filters.value.class) {
+    const selectedClass = classes.value.find(c => normalizeId(c.id) === normalizeId(filters.value.class))
+    if (selectedClass?.subject_id) params.subject = selectedClass.subject_id
+  }
+
+  return params
+}
+
+const loadBaseData = async () => {
+  if (classes.value.length > 0 && baseStudents.value.length > 0) return
+
+  const [classResponse, allStudentsData] = await Promise.all([
+    teacherPanelService.getMyClasses(),
+    teacherPanelService.getAllStudentsFromClasses()
+  ])
+
+  const classList = classResponse.results || classResponse || []
+  classes.value = classList.map(cls => ({
+    id: normalizeId(cls.id),
+    subject_id: normalizeId(cls.subject_id),
+    name: `${cls.subject_name} - ${cls.subject_code}`
+  }))
+
+  const studentMap = new Map()
+  allStudentsData.forEach(student => {
+    const classId = normalizeId(student.class?.id || student.class_id)
+    const subjectId = normalizeId(student.class?.subject_id || student.subject_id)
+
+    if (!studentMap.has(student.id)) {
+      studentMap.set(student.id, {
+        ...student,
+        id: normalizeId(student.id),
+        class_ids: classId ? [classId] : [],
+        subject_ids: subjectId ? [subjectId] : []
+      })
+      return
+    }
+
+    const existing = studentMap.get(student.id)
+    if (classId && !existing.class_ids.includes(classId)) existing.class_ids.push(classId)
+    if (subjectId && !existing.subject_ids.includes(subjectId)) existing.subject_ids.push(subjectId)
+  })
+
+  baseStudents.value = Array.from(studentMap.values())
+}
+
 const loadAttendanceReport = async () => {
   loading.value = true
   try {
-    const classResponse = await teacherPanelService.getMyClasses()
-    const classList = classResponse.results || classResponse || []
-    classes.value = classList.map(cls => ({
-      id: cls.id,
-      subject_id: cls.subject_id,
-      name: `${cls.subject_name} - ${cls.subject_code}`
-    }))
+    await loadBaseData()
 
-    const allStudentsData = await teacherPanelService.getAllStudentsFromClasses()
-    const studentMap = new Map()
+    const allAttendance = await teacherPanelService.getAllAttendance(buildAttendanceParams(), { forceRefresh: true })
+    attendanceRecords.value = allAttendance
 
-    allStudentsData.forEach(student => {
-      const classId = student.class?.id || student.class_id
-      const subjectId = student.class?.subject_id || student.subject_id
+    // Merge base students with any historical students discovered from attendance rows
+    // (e.g., previous-year records where student is no longer in current class list).
+    const mergedStudentMap = new Map()
 
-      if (!studentMap.has(student.id)) {
-        studentMap.set(student.id, {
-          ...student,
-          class_ids: [classId],
-          subject_ids: [subjectId]
+    baseStudents.value.forEach((student) => {
+      mergedStudentMap.set(normalizeId(student.id), {
+        ...student,
+        id: normalizeId(student.id),
+        class_ids: Array.isArray(student.class_ids) ? student.class_ids.map(normalizeId) : [],
+        subject_ids: Array.isArray(student.subject_ids) ? student.subject_ids.map(normalizeId) : []
+      })
+    })
+
+    allAttendance.forEach((record) => {
+      const sid = normalizeId(record.student)
+      if (!sid || sid === 'null' || sid === 'undefined') return
+
+      const ridSubject = normalizeId(record.subject)
+      if (!mergedStudentMap.has(sid)) {
+        mergedStudentMap.set(sid, {
+          id: sid,
+          name: record.student_name || 'Unknown Student',
+          roll_no: record.student_enrollment || '-',
+          class_ids: [],
+          subject_ids: ridSubject ? [ridSubject] : []
         })
-      } else {
-        const existing = studentMap.get(student.id)
-        if (classId && !existing.class_ids.includes(classId)) {
-          existing.class_ids.push(classId)
-        }
-        if (subjectId && !existing.subject_ids.includes(subjectId)) {
-          existing.subject_ids.push(subjectId)
-        }
+        return
+      }
+
+      const existing = mergedStudentMap.get(sid)
+      if (ridSubject && !existing.subject_ids.includes(ridSubject)) {
+        existing.subject_ids.push(ridSubject)
       }
     })
 
-    const allAttendance = await teacherPanelService.getAllAttendance()
-    attendanceRecords.value = allAttendance
-
-    const studentsWithStats = Array.from(studentMap.values()).map(student => {
-      let studentAttendance = allAttendance.filter(a => a.student === student.id)
+    const studentsWithStats = Array.from(mergedStudentMap.values()).map(student => {
+      let studentAttendance = allAttendance.filter(a => normalizeId(a.student) === normalizeId(student.id))
       studentAttendance = removeDuplicates(studentAttendance)
 
-      // Calculate stats for ALL attendance (unfiltered)
       const stats = calculateStats(studentAttendance)
-      const sortedByDate = [...studentAttendance].sort((a, b) => new Date(b.session_date) - new Date(a.session_date))
 
       return {
         id: student.id,
@@ -331,14 +381,13 @@ const loadAttendanceReport = async () => {
         roll_no: student.roll_no,
         class_ids: student.class_ids,
         subject_ids: student.subject_ids,
-        attendance_records: studentAttendance, // Keep all records for filtering
+        attendance_records: studentAttendance,
         present: stats.presentCount - stats.lateCount,
         late: stats.lateCount,
         absent: stats.absentCount,
         leave: stats.excusedCount,
         total: stats.totalClasses,
-        percentage: stats.percentage,
-        lastAttended: sortedByDate.length > 0 ? sortedByDate[0].session_date : '-'
+        percentage: stats.percentage
       }
     })
 
@@ -347,6 +396,7 @@ const loadAttendanceReport = async () => {
     console.error('Error loading report:', error)
     students.value = []
     classes.value = []
+    baseStudents.value = []
   } finally {
     loading.value = false
   }
@@ -354,11 +404,18 @@ const loadAttendanceReport = async () => {
 
 const resetFilters = () => {
   searchQuery.value = ''
-  filters.value = { class: '', month: '' }
+  filters.value = { class: '', month: '', year: '' }
 }
 
 const exportReport = () => showAlert('info', 'Exporting attendance report to CSV...', 'Info')
 
 onMounted(loadAttendanceReport)
+
+watch(
+  () => [filters.value.class, filters.value.month, filters.value.year],
+  () => {
+    loadAttendanceReport()
+  }
+)
 
 </script>

@@ -16,6 +16,7 @@ export const STORAGE_KEYS = {
     // Announcement helpers (prefix templates – call with userId)
     READ_ANNOUNCEMENTS: (userId) => `read_announcements_${userId}`,
     VISITED_ANNOUNCEMENTS: (userId) => `visited_announcements_${userId}`,
+    CURRENT_GPA: (userId) => `current_gpa_${userId}`,
 
     // Cache prefixes
     CACHE_PREFIX: {

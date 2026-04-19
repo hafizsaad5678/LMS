@@ -29,6 +29,7 @@ export const handleRequest = async (requestFn, errorContext = 'API request') => 
  */
 export const createRequest = (method, url, options = {}, errorContext) => {
     const { data, params, config } = options
+    // console.log("request" , url)
 
     const requestMap = {
         get: () => api.get(url, { params, ...config }),

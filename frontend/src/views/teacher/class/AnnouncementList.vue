@@ -16,8 +16,8 @@
             icon-color="text-success" />
         </div>
         <div class="col-md-3">
-          <StatCard title="Total Views" :value="stats.totalViews" icon="bi bi-eye" bg-color="bg-info-light"
-            icon-color="text-info" />
+          <StatCard title="High Priority" :value="stats.highPriority" icon="bi bi-exclamation-triangle-fill" bg-color="bg-warning-light"
+            icon-color="text-warning" />
         </div>
         <div class="col-md-3">
           <StatCard title="Urgent" :value="stats.urgent" icon="bi bi-exclamation-triangle" bg-color="bg-danger-light"
@@ -72,14 +72,6 @@
           <div class="small text-muted">
             <i class="bi bi-calendar-event me-1"></i>
             {{ formatDate(value) }}
-          </div>
-        </template>
-
-        <template #cell-views="{ value }">
-          <div class="text-center">
-            <span class="badge bg-info-light text-info px-3">
-              <i class="bi bi-eye me-1"></i>{{ value }}
-            </span>
           </div>
         </template>
 
@@ -206,7 +198,6 @@ const tableColumns = [
   { key: 'subject', label: 'Subject' },
   { key: 'priority', label: 'Priority' },
   { key: 'created_at', label: 'Posted On' },
-  { key: 'views', label: 'Views', center: true },
   { key: 'actions', label: 'Actions', center: true }
 ]
 
@@ -217,7 +208,7 @@ const stats = computed(() => {
   return {
     total: announcements.value.length,
     thisWeek: announcements.value.filter(a => new Date(a.created_at) > weekAgo).length,
-    totalViews: announcements.value.reduce((sum, a) => sum + (a.views || 0), 0),
+    highPriority: announcements.value.filter(a => a.priority === 'high').length,
     urgent: announcements.value.filter(a => a.priority === 'urgent').length
   }
 })

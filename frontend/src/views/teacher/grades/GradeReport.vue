@@ -83,7 +83,10 @@
                   <td class="text-center">{{ student.final }}%</td>
                   <td class="text-center fw-bold text-dark">{{ student.overall }}%</td>
                   <td class="text-center">
-                    <span :class="['badge px-3', getGradeBadge(student.grade)]">{{ student.grade }}</span>
+                    <span v-if="student.is_pending" class="badge px-3 bg-warning-subtle text-warning-emphasis">Pending</span>
+                    <span v-else :class="['badge px-3', getGradeBadge(student.grade)]">{{ student.grade }}</span>
+                    <div v-if="student.is_pending" class="extra-small text-muted mt-1 fw-semibold">Marks not entered yet</div>
+                    <div v-else-if="student.overall < 40" class="extra-small text-danger mt-1 fw-semibold">Below 40%</div>
                   </td>
                 </tr>
               </tbody>
@@ -138,13 +141,15 @@ const detailedGrades = ref([])
 const statsCards = computed(() => [
   { title: 'Class Average', value: averageGrade.value, icon: 'bi bi-award', type: 'student' },
   { title: 'Total Students', value: detailedGrades.value.length, icon: 'bi bi-people', type: 'teacher' },
+  { title: 'Pending', value: detailedGrades.value.filter(s => s.is_pending).length, icon: 'bi bi-hourglass-split', type: 'finance' },
   { title: 'Excellent (A)', value: detailedGrades.value.filter(s => s.overall >= 85).length, icon: 'bi bi-star', type: 'department' },
-  { title: 'Below 50%', value: detailedGrades.value.filter(s => s.overall < 50).length, icon: 'bi bi-exclamation-triangle', type: 'finance' }
+  { title: 'Below 50%', value: detailedGrades.value.filter(s => !s.is_pending && s.overall < 50).length, icon: 'bi bi-exclamation-triangle', type: 'finance' }
 ])
 
 const averageGrade = computed(() => {
-  if (detailedGrades.value.length === 0) return '0%'
-  return Math.round(detailedGrades.value.reduce((sum, s) => sum + s.overall, 0) / detailedGrades.value.length) + '%'
+  const gradedOnly = detailedGrades.value.filter(s => !s.is_pending)
+  if (gradedOnly.length === 0) return '0%'
+  return Math.round(gradedOnly.reduce((sum, s) => sum + s.overall, 0) / gradedOnly.length) + '%'
 })
 
 function exportReport() {
@@ -193,23 +198,45 @@ async function loadGradeReport() {
           name: mark.student_name || 'Unknown Student',
           roll_no: mark.student_roll_no || mark.roll_no || mark.student_enrollment || null,
           assignments: 0, quizzes: 0, midterm: 0, final: 0,
-          componentCount: { assignments: 0, quizzes: 0, midterm: 0, final: 0 }
+          componentCount: { assignments: 0, quizzes: 0, midterm: 0, final: 0 },
+          gradedCount: { assignments: 0, quizzes: 0, midterm: 0, final: 0 }
         })
       }
       const student = studentMap.get(studentId)
       const componentType = mark.component_type || 'assignment'
-      const percentage = typeof mark.percentage === 'number' ? mark.percentage : (mark.marks_obtained && mark.total_marks) ? (parseFloat(mark.marks_obtained) / parseFloat(mark.total_marks)) * 100 : 0
+      const isGraded = mark.marks_obtained !== null && mark.marks_obtained !== undefined
+      const percentage = typeof mark.percentage === 'number'
+        ? mark.percentage
+        : (isGraded && mark.max_marks)
+          ? (parseFloat(mark.marks_obtained) / parseFloat(mark.max_marks)) * 100
+          : 0
       const typeMap = { assignment: 'assignments', quiz: 'quizzes', midterm: 'midterm', final: 'final' }
       const key = typeMap[componentType] || 'assignments'
-      student[key] += percentage
-      student.componentCount[key]++
+      if (isGraded) {
+        student[key] += percentage
+        student.componentCount[key]++
+        student.gradedCount[key]++
+      }
     })
     
     detailedGrades.value = Array.from(studentMap.values()).map(student => {
       const avg = (key) => student.componentCount[key] > 0 ? Math.round(student[key] / student.componentCount[key]) : 0
       const components = [avg('assignments'), avg('quizzes'), avg('midterm'), avg('final')].filter(v => v > 0)
+      const gradedComponents = ['assignments', 'quizzes', 'midterm', 'final'].reduce((sum, key) => sum + (student.gradedCount[key] || 0), 0)
       const overall = components.length > 0 ? Math.round(components.reduce((sum, v) => sum + v, 0) / components.length) : 0
-      return { id: student.id, name: student.name, roll_no: student.roll_no, assignments: avg('assignments'), quizzes: avg('quizzes'), midterm: avg('midterm'), final: avg('final'), overall, grade: calculateGrade(overall) }
+      const isPending = gradedComponents === 0
+      return {
+        id: student.id,
+        name: student.name,
+        roll_no: student.roll_no,
+        assignments: avg('assignments'),
+        quizzes: avg('quizzes'),
+        midterm: avg('midterm'),
+        final: avg('final'),
+        overall,
+        grade: isPending ? 'Pending' : calculateGrade(overall),
+        is_pending: isPending
+      }
     })
     
     calculateDistribution()
@@ -225,7 +252,7 @@ async function loadGradeReport() {
 }
 
 function calculateDistribution() {
-  const distribution = { 'A+': 0, 'A': 0, 'A-': 0, 'B+': 0, 'B': 0, 'B-': 0, 'C+': 0, 'C': 0, 'C-': 0, 'D': 0, 'F': 0 }
+  const distribution = { 'A+': 0, 'A': 0, 'A-': 0, 'B+': 0, 'B': 0, 'B-': 0, 'C+': 0, 'C': 0, 'C-': 0, 'D': 0, 'F': 0, 'Pending': 0 }
   detailedGrades.value.forEach(s => { if (distribution[s.grade] !== undefined) distribution[s.grade]++ })
   const total = detailedGrades.value.length || 1
   gradeDistribution.value = Object.entries(distribution).filter(([_, count]) => count > 0).map(([grade, count]) => ({ grade, count, percentage: Math.round((count / total) * 100) }))

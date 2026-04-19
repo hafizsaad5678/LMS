@@ -75,6 +75,7 @@ class QuizSerializer(serializers.ModelSerializer):
     created_by_name = serializers.CharField(source='created_by.full_name', read_only=True)
     question_count = serializers.SerializerMethodField()
     last_attempt = serializers.SerializerMethodField()
+    attempt_stats = serializers.SerializerMethodField()
     
     class Meta:
         model = Quiz
@@ -82,25 +83,49 @@ class QuizSerializer(serializers.ModelSerializer):
             'id', 'title', 'subject', 'subject_name', 'time_limit_minutes', 
             'total_marks', 'is_published', 'created_at', 'updated_at', 
             'created_by', 'created_by_name', 'question_count', 'last_attempt',
-            'questions'
+            'attempt_stats', 'questions'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at', 'created_by', 'is_published']
 
+    def get_attempt_stats(self, obj):
+        """Get stats for teacher/admin to see total attempts and student performance"""
+        from django.db.models import Count, Max, Avg
+        stats = obj.attempts.filter(is_submitted=True).aggregate(
+            total_students=Count('student', distinct=True),
+            total_attempts=Count('id'),
+            max_score=Max('score'),
+            avg_score=Avg('score')
+        )
+        return {
+            'total_students': stats['total_students'] or 0,
+            'total_attempts': stats['total_attempts'] or 0,
+            'max_score': float(stats['max_score'] or 0),
+            'avg_score': round(float(stats['avg_score'] or 0), 2)
+        }
+
     def validate(self, attrs):
-        title = str(attrs.get('title', '')).strip()
+        instance = getattr(self, 'instance', None)
+        is_create = instance is None
+
+        title = str(attrs.get('title', getattr(instance, 'title', ''))).strip()
         if not title:
             raise serializers.ValidationError({'title': 'This field is required.'})
+        attrs['title'] = title
 
-        if attrs.get('subject') is None:
+        subject = attrs.get('subject', getattr(instance, 'subject', None))
+        if subject is None:
             raise serializers.ValidationError({'subject': 'This field is required.'})
 
-        time_limit = attrs.get('time_limit_minutes')
+        time_limit = attrs.get('time_limit_minutes', getattr(instance, 'time_limit_minutes', None))
         if time_limit is None or time_limit <= 0:
             raise serializers.ValidationError({'time_limit_minutes': 'Time limit must be greater than zero.'})
 
-        total_marks = attrs.get('total_marks')
-        if total_marks is None or total_marks <= 0:
-            raise serializers.ValidationError({'total_marks': 'Total marks must be greater than zero.'})
+        # On PATCH from list/edit modal, total_marks is typically not included.
+        # Validate it only when explicitly provided, or during create.
+        if is_create or 'total_marks' in attrs:
+            total_marks = attrs.get('total_marks')
+            if total_marks is None or total_marks <= 0:
+                raise serializers.ValidationError({'total_marks': 'Total marks must be greater than zero.'})
 
         return attrs
         

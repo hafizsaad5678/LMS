@@ -17,7 +17,7 @@
           icon-color="text-success" />
       </div>
       <div class="col-md-3 col-6">
-        <StatCard title="Unread" :value="unreadCount" icon="bi bi-eye-fill" bg-color="bg-info-light"
+        <StatCard title="Urgent" :value="urgentCount" icon="bi bi-exclamation-octagon-fill" bg-color="bg-warning-light"
           icon-color="text-info" />
       </div>
     </div>
@@ -89,9 +89,6 @@
                 <span class="badge rounded-pill px-3 py-2" :class="getPriorityBadgeClass(announcement.priority)">
                   {{ formatPriority(announcement.priority) }}
                 </span>
-                <span v-if="!announcement.is_read" class="badge bg-student text-white rounded-pill px-3 py-2">
-                  <i class="bi bi-star-fill me-1 small"></i>New
-                </span>
               </div>
             </template>
             <template #title>{{ announcement.title }}</template>
@@ -145,14 +142,58 @@
               <button class="btn btn-student flex-grow-1 rounded-3 py-2 fw-bold small" @click="toggleDetails(announcement)">
                  View Details
               </button>
-              <button v-if="!announcement.is_read" class="btn btn-outline-student rounded-3 p-2" title="Mark as Read" @click="markAsRead(announcement)">
-                 <i class="bi bi-check-lg"></i>
-              </button>
             </div>
           </div>
         </div>
       </div>
     </div>
+
+    <!-- Announcement Details Modal -->
+    <BaseModal v-model="showDetailsModal" :title="selectedAnnouncement?.title || 'Announcement Details'" variant="student"
+      size="md" :loading="false">
+      <div v-if="selectedAnnouncement">
+        <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+          <span class="badge rounded-pill px-3 py-2" :class="getPriorityBadgeClass(selectedAnnouncement.priority)">
+            {{ formatPriority(selectedAnnouncement.priority) }}
+          </span>
+          <small class="text-muted">
+            <i class="bi bi-calendar3 me-1"></i>{{ formatDateTime(selectedAnnouncement.created_at) }}
+          </small>
+        </div>
+
+        <div class="mb-3">
+          <div class="small text-muted mb-1">Subject</div>
+          <div class="fw-semibold">{{ selectedAnnouncement.subject_name || 'General' }}</div>
+        </div>
+
+        <div class="mb-3">
+          <div class="small text-muted mb-1">Posted By</div>
+          <div class="fw-semibold">{{ selectedAnnouncement.created_by_name || 'Administration' }}</div>
+        </div>
+
+        <div class="p-3 bg-light rounded-3 mb-3">
+          <div class="announcement-content" v-html="renderAnnouncementHtml(selectedAnnouncement)"></div>
+        </div>
+
+        <div v-if="selectedAnnouncement.attachment || selectedAnnouncement.file_upload"
+          class="attachment-box p-3 bg-light rounded-3 d-flex align-items-center">
+          <i class="bi bi-file-earmark-pdf-fill text-danger fs-4 me-3"></i>
+          <div class="flex-grow-1 overflow-hidden">
+            <div class="small fw-bold text-dark text-truncate">{{ selectedAnnouncement.attachment_name || 'Attachment' }}</div>
+            <small class="text-muted">Download file</small>
+          </div>
+          <button class="btn btn-student-outline btn-sm" @click="downloadAttachment(selectedAnnouncement)">
+            <i class="bi bi-download me-1"></i>Download
+          </button>
+        </div>
+      </div>
+
+      <template #footer>
+        <button type="button" class="btn btn-student-primary" @click="showDetailsModal = false">
+          Close
+        </button>
+      </template>
+    </BaseModal>
 
     <!-- Pagination -->
     <Pagination v-if="totalPages > 1" :current-page="currentPage" :total-pages="totalPages"
@@ -161,9 +202,9 @@
 </template>
 
 <script setup>
-import { computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { StudentPageTemplate } from '@/components/shared/panels'
-import { AlertMessage, StatCard, SelectInput, SearchFilter, Pagination, LoadingSpinner, StudentStatusCardHeader } from '@/components/shared/common'
+import { AlertMessage, StatCard, SelectInput, SearchFilter, Pagination, LoadingSpinner, StudentStatusCardHeader, BaseModal } from '@/components/shared/common'
 import { useEntityList, usePagination } from '@/composables/shared'
 import { useStudentBase } from '@/composables/student/useStudentBase'
 import { studentService, api } from '@/services/shared'
@@ -171,7 +212,6 @@ import { formatDateTime, formatRelativeDate } from '@/utils/formatters'
 import { getPriorityBadgeClass, getPriorityIcon } from '@/utils/badgeHelpers'
 import { ANNOUNCEMENT_PRIORITY_OPTIONS as PRIORITY_OPTIONS_LIST } from '@/utils/constants/options'
 import { STUDENT_ROUTES } from '@/utils/constants/routes'
-import { STORAGE_KEYS } from '@/utils/constants/storage'
 import { sanitizeRichHtml } from '@/utils/security'
 
 const ANNOUNCEMENT_PRIORITY_OPTIONS = PRIORITY_OPTIONS_LIST
@@ -192,8 +232,7 @@ const {
   searchFields: ['title', 'message', 'content', 'subject_name'],
   defaultFilters: { subject: '', priority: '' },
   customFilter: (items, f) => {
-    let res = items; const readIds = JSON.parse(localStorage.getItem(STORAGE_KEYS.READ_ANNOUNCEMENTS(studentId)) || '[]')
-    res.forEach(a => { a.is_read = readIds.includes(a.id); a.showDetails = a.showDetails || false })
+    let res = items
     if (f.subject === 'none') {
       res = res.filter(a => !a.subject_name)
     } else if (f.subject) {
@@ -227,20 +266,14 @@ const availableSubjects = computed(() => {
 })
 const totalAnnouncements = computed(() => announcements.value.length)
 const highPriorityCount = computed(() => announcements.value.filter(a => a.priority === 'high').length)
-const unreadCount = computed(() => announcements.value.filter(a => !a.is_read).length)
+const urgentCount = computed(() => announcements.value.filter(a => a.priority === 'urgent').length)
 const todayCount = computed(() => {
   const today = new Date().toDateString()
   return announcements.value.filter(a => new Date(a.created_at).toDateString() === today).length
 })
 
-const markAsRead = async (announcement) => {
-  if (announcement.is_read) return
-  announcement.is_read = true; const readIds = JSON.parse(localStorage.getItem(STORAGE_KEYS.READ_ANNOUNCEMENTS(studentId)) || '[]')
-  if (!readIds.includes(announcement.id)) {
-    readIds.push(announcement.id); localStorage.setItem(STORAGE_KEYS.READ_ANNOUNCEMENTS(studentId), JSON.stringify(readIds))
-  }
-  try { await api.post(`/announcements/${announcement.id}/mark_read/`) } catch { }
-}
+const showDetailsModal = ref(false)
+const selectedAnnouncement = ref(null)
 
 const downloadAttachment = async (announcement) => {
   try {
@@ -251,14 +284,17 @@ const downloadAttachment = async (announcement) => {
 }
 
 const clearFilters = () => { filters.value = { search: '', subject: '', priority: '' } }
-const getAnnouncementCardClass = (a) => !a.is_read ? 'border-start-student-thick' : ''
+const getAnnouncementCardClass = () => ''
 const getPriorityIconClass = (p) => {
   const map = { urgent: 'bg-danger-light text-danger', high: 'bg-warning-light text-warning', medium: 'bg-info-light text-info', low: 'bg-success-light text-success' }
   return map[p] || 'bg-secondary-light text-secondary'
 }
 
 const formatPriority = (p) => p ? p.charAt(0).toUpperCase() + p.slice(1) : 'Normal'
-const toggleDetails = (a) => a.showDetails = !a.showDetails
+const toggleDetails = async (a) => {
+  selectedAnnouncement.value = a
+  showDetailsModal.value = true
+}
 const formatTime = (d) => d ? new Date(d).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) : 'N/A'
 const renderAnnouncementHtml = (announcement) => sanitizeRichHtml(announcement?.message || announcement?.content || '')
 
@@ -283,7 +319,6 @@ const getPriorityIconStyle = (p) => {
 onMounted(async () => {
   loadProfile()
   await loadData(() => studentService.getAnnouncements(studentId))
-  localStorage.setItem(STORAGE_KEYS.VISITED_ANNOUNCEMENTS(studentId), 'true')
 })
 </script>
 

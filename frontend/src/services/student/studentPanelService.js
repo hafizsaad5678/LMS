@@ -10,6 +10,28 @@ import { STORAGE_KEYS } from '@/utils/constants/storage'
 // Cache key helper
 const getCacheKey = (studentId, type) => `student:${studentId}:${type}`
 
+const normalizeMaterialRecord = (material) => {
+    if (!material || typeof material !== 'object') return material
+
+    const normalized = { ...material }
+    const title = (normalized.title || '').trim()
+    const description = (normalized.description || '').trim()
+
+    if (normalized.material_type === 'assignment') {
+        if (title.endsWith(' (Attachment)')) {
+            normalized.title = title.slice(0, -13).trim()
+        }
+
+        if (description.toLowerCase().startsWith('attachment from assignment:')) {
+            normalized.description = 'Material record uploaded by teacher.'
+        }
+
+        normalized.material_type = 'outline'
+    }
+
+    return normalized
+}
+
 export const studentPanelService = {
     /**
      * Get dashboard statistics with caching
@@ -32,10 +54,18 @@ export const studentPanelService = {
             ])
 
             const summary = gradeReport?.summary || {}
+            const normalizedSubjects = normalizeToArray(subjects)
+            
+            // Filter pending logic: subjects that have assignments/components but aren't graded yet
+            const gradedCount = Number(summary.total_grades ?? 0)
+            const activeSubjects = normalizedSubjects.filter(s => 
+                (Number(s.total_components || 0) + Number(s.total_assignments || 0)) > 0
+            ).length
 
             const stats = {
-                enrolledCourses: normalizeToArray(subjects).length,
+                enrolledCourses: normalizedSubjects.length,
                 gpa: String(summary.overall_gpa ?? '0.00'),
+                gradingProgress: `${gradedCount}/${activeSubjects}`,
                 attendance: `${this._calculateAttendance(attendance)}%`,
                 pendingAssignments: this._calculatePendingAssignments(normalizeToArray(assignments)),
                 unreadAnnouncements: this._calculateUnreadAnnouncements(normalizeToArray(announcements))
@@ -275,9 +305,32 @@ export const studentPanelService = {
         }
     },
 
-    async requestBookBorrow(bookId) {
+    async getBorrowPolicy(params = {}) {
+        const key = 'student:borrowPolicy'
+        if (!params._t) {
+            const cached = cacheService.get(key)
+            if (cached) return cached
+        }
+
         try {
-            const response = await api.post('/book-borrowings/request_borrow/', { book: bookId })
+            const response = await api.get('/book-borrowings/borrow_policy/')
+            const data = response.data || { free_days: 5, fine_per_day: 10, max_request_days: 30 }
+            if (!params._t) cacheService.set(key, data)
+            return data
+        } catch (error) {
+            console.error('Error loading borrow policy:', error)
+            return { free_days: 5, fine_per_day: 10, max_request_days: 30 }
+        }
+    },
+
+    async requestBookBorrow(bookId, requestedDays) {
+        try {
+            const payload = { book: bookId }
+            if (Number.isFinite(requestedDays)) {
+                payload.requested_days = requestedDays
+            }
+
+            const response = await api.post('/book-borrowings/request_borrow/', payload)
             this.clearCache() // Clear borrowed books cache
             return response.data
         } catch (error) {
@@ -305,12 +358,13 @@ export const studentPanelService = {
 
         const key = `student:material:${materialId}`
         const cached = cacheService.get(key)
-        if (cached) return cached
+        if (cached) return normalizeMaterialRecord(cached)
 
         try {
             const response = await api.get(`/materials/${materialId}/`)
-            cacheService.set(key, response.data)
-            return response.data
+            const normalized = normalizeMaterialRecord(response.data)
+            cacheService.set(key, normalized)
+            return normalized
         } catch (error) {
             console.error('Error loading material:', error)
             throw error
@@ -325,13 +379,13 @@ export const studentPanelService = {
 
         const key = `student:materials:${subjectIds.join(',')}`
         const cached = cacheService.get(key)
-        if (cached) return cached
+        if (cached) return normalizeToArray(cached).map(normalizeMaterialRecord)
 
         try {
             const response = await api.get('/materials/', {
                 params: { subject__in: subjectIds.join(',') }
             })
-            const data = response.data.results || response.data || []
+            const data = normalizeToArray(response.data.results || response.data || []).map(normalizeMaterialRecord)
             cacheService.set(key, data)
             return data
         } catch (error) {
@@ -483,7 +537,7 @@ export const studentPanelService = {
     },
 
     _getDefaultStats() {
-        return { enrolledCourses: 0, gpa: '0.00', attendance: '0%', pendingAssignments: 0, unreadAnnouncements: 0 }
+        return { enrolledCourses: 0, gpa: '0.00', gradingProgress: '0/0', attendance: '0%', pendingAssignments: 0, unreadAnnouncements: 0 }
     },
 
     calculateAttendance(attendance) {
@@ -551,10 +605,8 @@ export const studentPanelService = {
     },
 
     _calculateUnreadAnnouncements(announcements) {
-        const studentId = localStorage.getItem(STORAGE_KEYS.USER_ID)
-        if (!studentId) return announcements.length
-        const readAnnouncements = JSON.parse(localStorage.getItem(STORAGE_KEYS.READ_ANNOUNCEMENTS(studentId)) || '[]')
-        return announcements.filter(a => !readAnnouncements.includes(a.id)).length
+        // Read/view tracking is intentionally disabled for announcements.
+        return announcements.length
     }
 }
 

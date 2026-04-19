@@ -76,6 +76,26 @@ export function formatRelativeDate(dateString) {
 }
 
 /**
+ * Check whether a date falls within the next N days from now.
+ * Uses strict bounds: date > now and date < now + days.
+ * @param {string|Date} dateInput - Date value to test
+ * @param {number} days - Number of days ahead window
+ * @param {Date} nowRef - Optional reference "now" for consistent batch calculations
+ * @returns {boolean} True when date is within range
+ */
+export function isDateWithinNextDays(dateInput, days = 7, nowRef = new Date()) {
+    if (!dateInput) return false
+    const targetDate = new Date(dateInput)
+    if (isNaN(targetDate.getTime())) return false
+
+    const now = nowRef instanceof Date ? nowRef : new Date(nowRef)
+    if (isNaN(now.getTime())) return false
+
+    const windowEnd = new Date(now.getTime() + days * 24 * 60 * 60 * 1000)
+    return targetDate > now && targetDate < windowEnd
+}
+
+/**
  * Format currency
  * @param {number} amount - Amount to format
  * @param {string} currency - Currency code
@@ -160,6 +180,7 @@ export default {
     formatDateTime,
     formatTime,
     formatRelativeDate,
+    isDateWithinNextDays,
     formatCurrency,
     formatPercentage,
     truncateText,

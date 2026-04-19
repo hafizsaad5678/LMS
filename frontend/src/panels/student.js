@@ -36,7 +36,8 @@ export const sidebarSections = [
       createMenuItem('Subject Materials', '/resources/material', '📁'),
       createMenuItem('Online Quizzes', '/quizzes', '🧩'),
       createMenuItem('My Grades', '/grades', '⭐'),
-      createMenuItem('Grade Report', '/grades/report', '📈')
+      createMenuItem('Grade Report', '/grades/report', '📈'),
+      createMenuItem('GPA / CGPA Calculator', '/grades/gpa-cgpa-calculator', '🧮')
     ]
   },
   {

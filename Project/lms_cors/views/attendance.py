@@ -42,6 +42,20 @@ class AttendanceViewSet(BaseViewSet):
         else:
             return Attendance.objects.none()
 
+        month = self.request.query_params.get('month')
+        if month:
+            try:
+                queryset = queryset.filter(session_date__month=int(month))
+            except (TypeError, ValueError):
+                pass
+
+        year = self.request.query_params.get('year')
+        if year:
+            try:
+                queryset = queryset.filter(session_date__year=int(year))
+            except (TypeError, ValueError):
+                pass
+
         return queryset.distinct().order_by('-session_date', '-marked_at')
     
     def perform_create(self, serializer):

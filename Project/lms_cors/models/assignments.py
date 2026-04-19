@@ -7,6 +7,7 @@ class Assignment(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     title = models.CharField(max_length=200)
     description = models.TextField()
+    material_file = models.FileField(upload_to='assignments/materials/', blank=True, null=True)
     subject = models.ForeignKey(
         'lms_cors.Subject', on_delete=models.CASCADE, 
         related_name='assignments', null=True, blank=True
@@ -42,7 +43,7 @@ class SubmissionHistory(models.Model):
     )
     submitted_at = models.DateTimeField(auto_now_add=True)
     file_url = models.URLField(max_length=500, blank=True)
-    file_upload = models.FileField(upload_to='assignments/')
+    file_upload = models.FileField(upload_to='assignments/', blank=True, null=True)
     submission_text = models.TextField(blank=True)
     
     class Meta:

@@ -56,6 +56,31 @@
                   <div class="col-12">
                     <RichTextEditor v-model="form.description" placeholder="Update assignment details..." />
                   </div>
+                  <div class="col-12">
+                    <label class="form-label fw-semibold">
+                      <i class="bi bi-paperclip me-2"></i>Assignment Material (Optional)
+                    </label>
+                    <div v-if="existingMaterialUrl" class="d-flex align-items-center justify-content-between p-2 mb-2 bg-light rounded">
+                      <a :href="existingMaterialUrl" target="_blank" rel="noopener" class="small text-decoration-none text-teacher fw-semibold text-truncate me-3">
+                        <i class="bi bi-file-earmark-arrow-down me-1"></i>{{ existingMaterialName || 'Current attachment' }}
+                      </a>
+                    </div>
+                    <input
+                      type="file"
+                      class="form-control border-0 shadow-sm p-3 bg-light"
+                      accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.zip,.rar,.txt"
+                      @change="onMaterialFileSelect"
+                    >
+                    <small class="text-muted d-block mt-1">Upload new file to replace current attachment (Max 25MB)</small>
+                    <div v-if="materialFile" class="d-flex align-items-center justify-content-between mt-2 p-2 bg-light rounded">
+                      <span class="small text-dark text-truncate me-3">
+                        <i class="bi bi-file-earmark me-1"></i>{{ materialFile.name }}
+                      </span>
+                      <button type="button" class="btn btn-sm btn-outline-danger" @click="removeMaterialFile">
+                        Remove
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -80,7 +105,6 @@ import { useRouter, useRoute } from 'vue-router'
 import { TeacherPageTemplate } from '@/components/shared/panels'
 import { BaseInput, AlertMessage, LoadingSpinner, RichTextEditor } from '@/components/shared/common'
 import teacherPanelService from '@/services/teacher/teacherPanelService'
-import { cacheService } from '@/services/shared'
 import { useAlert, useFormSubmit, createForm } from '@/composables/shared'
 import { TEACHER_ROUTES } from '@/utils/constants/routes'
 
@@ -93,6 +117,9 @@ const { submitting, handleSubmit } = useFormSubmit()
 const form = createForm('assignment')
 const loading = ref(true)
 const subjects = ref([])
+const materialFile = ref(null)
+const existingMaterialUrl = ref('')
+const existingMaterialName = ref('')
 
 const breadcrumbs = [
   { name: 'Dashboard', href: TEACHER_ROUTES.DASHBOARD.path },
@@ -103,6 +130,36 @@ const breadcrumbs = [
 const actions = [
   { label: 'Back to List', icon: 'bi bi-arrow-left', variant: 'btn-teacher-outline', onClick: () => router.push(TEACHER_ROUTES.ASSIGNMENT_LIST.path) }
 ]
+
+const onMaterialFileSelect = (event) => {
+  const file = event.target.files?.[0]
+  if (!file) {
+    materialFile.value = null
+    return
+  }
+
+  const extension = `.${(file.name.split('.').pop() || '').toLowerCase()}`
+  const allowed = ['.pdf', '.doc', '.docx', '.ppt', '.pptx', '.xls', '.xlsx', '.zip', '.rar', '.txt']
+  if (!allowed.includes(extension)) {
+    event.target.value = ''
+    materialFile.value = null
+    showError('Unsupported material format.')
+    return
+  }
+
+  if (file.size > 25 * 1024 * 1024) {
+    event.target.value = ''
+    materialFile.value = null
+    showError('Material size must be 25MB or less.')
+    return
+  }
+
+  materialFile.value = file
+}
+
+const removeMaterialFile = () => {
+  materialFile.value = null
+}
 
 const loadData = async () => {
   loading.value = true
@@ -132,6 +189,8 @@ const loadData = async () => {
       due_date: formattedDate,
       total_marks: assignData.total_marks || 100
     }
+    existingMaterialUrl.value = assignData.material_file_url || ''
+    existingMaterialName.value = assignData.material_file_name || ''
   } catch (error) {
     showError('Failed to load assignment details.')
   } finally {
@@ -141,7 +200,11 @@ const loadData = async () => {
 
 const submitForm = () => {
   handleSubmit(async () => {
-    await teacherPanelService.updateAssignment(assignmentId, { ...form.value, total_marks: Number(form.value.total_marks) })
+    await teacherPanelService.updateAssignment(assignmentId, {
+      ...form.value,
+      total_marks: Number(form.value.total_marks),
+      ...(materialFile.value ? { material_file: materialFile.value } : {})
+    })
     showSuccess('Assignment updated successfully!')
     setTimeout(() => router.push(TEACHER_ROUTES.ASSIGNMENT_LIST.path), 1500)
   }, null, (error) => {

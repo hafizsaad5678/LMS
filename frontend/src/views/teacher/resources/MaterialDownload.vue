@@ -37,32 +37,31 @@
         </i>Add Material</button>
     </div>
 
-    <div v-else class="material-download-grid">
-      <div v-for="m in finalFilteredData" :key="m.id" class="material-download-item">
+    <div v-else class="row g-4">
+      <div v-for="m in finalFilteredData" :key="m.id" class="col-md-6 col-lg-4">
         <div class="card border-0 shadow-sm h-100 hover-card material-download-card">
           <div class="card-body">
-            <div class="d-flex justify-content-between align-items-start mb-3">
+            <div class="d-flex justify-content-between align-items-start mb-2">
               <div class="d-flex align-items-center">
-                <div :class="['file-icon me-3', getIcon(m.material_type).class]">
+                <div :class="['file-icon me-2', getIcon(m.material_type).class]">
                   <i :class="getIcon(m.material_type).icon"></i>
                 </div>
                 <div>
-                  <h6 class="mb-1 fw-semibold">{{ m.title }}</h6>
+                  <h6 class="mb-0 fw-semibold text-truncate">{{ m.title }}</h6>
                   <small class="text-muted">{{ m.subject_name }}</small>
                 </div>
               </div>
               <div class="text-end">
-                <span :class="['badge rounded-pill px-3 py-2 fw-bold text-uppercase badge-font-xs d-inline-block mb-1',
+                <span :class="['badge rounded-pill px-2 py-1 fw-bold text-uppercase d-inline-block mb-1',
                   getIcon(m.material_type).badge]">
                   {{ formatType(m.material_type) }}</span>
-                <span :class="['badge rounded-pill px-3 py-2 fw-bold badge-font-xs d-block text-uppercase',
+                <span :class="['badge rounded-pill px-2 py-1 fw-bold d-block text-uppercase',
                   getAccess(m.access_level).badge]"><i :class="getAccess(m.access_level).icon" class="me-1">
                   </i>{{ getAccess(m.access_level).label }}</span>
               </div>
             </div>
-            <p v-if="m.description" class="text-muted small mb-3">{{ m.description.substring(0, 100) }}
-              {{ m.description.length > 100 ? '...' : '' }}</p>
-            <div class="d-flex justify-content-between align-items-center mb-3 text-sm material-meta-row">
+            <p v-if="m.description" class="text-muted small mb-2 text-truncate">{{ m.description }}</p>
+            <div class="d-flex justify-content-between align-items-center mb-2 text-sm material-meta-row">
               <span class="text-muted"><i class="bi bi-calendar me-1">
 
                 </i>{{ formatDate(m.uploaded_at) }}</span>
@@ -163,15 +162,41 @@ const loadInitial = async () => {
   } catch (e) { }
 }
 
+const getDownloadName = (m, sourceUrl) => {
+  const rawName = sourceUrl?.split('?')[0]?.split('#')[0]?.split('/').pop() || ''
+  if (rawName) return decodeURIComponent(rawName)
+
+  const safeTitle = (m?.title || 'material').replace(/[^a-zA-Z0-9-_ ]/g, '').trim().replace(/\s+/g, '_')
+  return `${safeTitle || 'material'}`
+}
+
 const downloadFile = async (m) => {
   const url = m.file_upload || m.file_url
   if (!url) return showError('No file available.')
   const fullUrl = getFileUrl(url)
+
   try {
-    await teacherPanelService.incrementDownloadCount(m.id)
-    m.download_count = (m.download_count || 0) + 1
-    window.open(fullUrl, '_blank')
-  } catch (e) { window.open(fullUrl, '_blank') }
+    const response = await fetch(fullUrl, { method: 'GET', credentials: 'include' })
+    if (!response.ok) throw new Error('Download request failed')
+
+    const blob = await response.blob()
+    const objectUrl = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = objectUrl
+    link.download = getDownloadName(m, fullUrl)
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(objectUrl)
+
+    teacherPanelService.incrementDownloadCount(m.id)
+      .then(() => {
+        m.download_count = (m.download_count || 0) + 1
+      })
+      .catch(() => {})
+  } catch (e) {
+    showError('Download failed. Please try again.')
+  }
 }
 
 const shareLink = async (m) => {

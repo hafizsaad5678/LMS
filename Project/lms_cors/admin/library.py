@@ -1,5 +1,5 @@
 from django.contrib import admin
-from ..models import LibraryBook, BookBorrowing
+from ..models import LibraryBook, LibraryBorrowPolicy, BookBorrowing
 
 
 @admin.register(LibraryBook)
@@ -28,3 +28,11 @@ class BookBorrowingAdmin(admin.ModelAdmin):
         elif obj.teacher:
             return f"Teacher: {obj.teacher.full_name}"
         return "Unknown"
+
+
+@admin.register(LibraryBorrowPolicy)
+class LibraryBorrowPolicyAdmin(admin.ModelAdmin):
+    list_display = ['name', 'free_days', 'fine_per_day', 'max_request_days', 'is_active', 'updated_at']
+    list_editable = ['is_active']
+    search_fields = ['name']
+    ordering = ['-is_active', 'name']

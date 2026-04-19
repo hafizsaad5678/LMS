@@ -76,6 +76,39 @@
         </div>
       </div>
 
+      <div class="card border-0 shadow-sm mt-4">
+        <div class="card-header bg-white border-bottom">
+          <h5 class="mb-0">Pending Grade List</h5>
+        </div>
+        <div class="card-body p-0">
+          <div v-if="loadingPending" class="p-4 text-muted small">Loading pending grades...</div>
+          <div v-else-if="pendingGradeItems.length === 0" class="p-4 text-muted small">No pending grades right now.</div>
+          <div v-else class="table-responsive">
+            <table class="table table-hover mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th>Subject</th>
+                  <th>Pending Detail</th>
+                  <th>Status</th>
+                  <th>Updated At</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="item in pendingGradeItems" :key="item.id">
+                  <td>
+                    <strong>{{ item.subject_name || 'N/A' }}</strong><br>
+                    <small class="text-muted">{{ item.subject_code || '-' }}</small>
+                  </td>
+                  <td>{{ item.title || 'Grades not posted yet' }}</td>
+                  <td><span class="badge badge-soft-warning">Pending Grading</span></td>
+                  <td><small>{{ formatDate(item.updated_at || item.created_at) }}</small></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
       <Pagination v-if="totalPages > 1" :current-page="currentPage" :total-pages="totalPages"
         :display-pages="displayPages" theme="student" @change="changePage" />
     </div>
@@ -100,6 +133,8 @@ const gradeSummary = ref({
   total_subjects: 0,
   total_grades: 0
 })
+const pendingGradeItems = ref([])
+const loadingPending = ref(false)
 
 const breadcrumbs = [
   { name: 'Dashboard', href: STUDENT_ROUTES.DASHBOARD.path },
@@ -143,7 +178,12 @@ const subjectOptions = computed(() => {
 })
 
 const statsCards = computed(() => [
-  { title: 'Overall GPA', value: gradeSummary.value.overall_gpa, icon: 'bi bi-trophy-fill', type: 'student' },
+  {
+    title: 'Pending Grades',
+    value: pendingGradeItems.value.length,
+    icon: 'bi bi-hourglass-split',
+    type: 'finance'
+  },
   { title: 'Total Subjects', value: Number(gradeSummary.value.total_subjects || 0), icon: 'bi bi-book-fill', type: 'department' },
   { title: 'Average Score', value: `${Math.round(Number(gradeSummary.value.average_score || 0))}%`, icon: 'bi bi-star-fill', type: 'teacher' }
 ])
@@ -185,6 +225,49 @@ const loadGradeSummary = async () => {
   }
 }
 
+const loadPendingGrades = async () => {
+  if (!studentId) return
+
+  try {
+    loadingPending.value = true
+    const [subjectsRes, gradesRes] = await Promise.all([
+      studentService.getEnrolledSubjects(studentId),
+      studentService.getGrades(studentId)
+    ])
+
+    const subjects = subjectsRes?.results || subjectsRes || []
+    const gradedEntries = gradesRes?.results || gradesRes || []
+
+    const gradedSubjectKeys = new Set(
+      gradedEntries.map(g => `${g.subject_name || g.assignment?.subject?.name || ''}|${g.subject_code || g.assignment?.subject?.code || ''}`)
+    )
+
+    pendingGradeItems.value = subjects
+      .filter(s => {
+        const name = s.subject_name || s.subject?.name || ''
+        const code = s.subject_code || s.subject?.code || ''
+        
+        // Only count as pending if teacher has actually created assignments or grade components
+        const hasAssessments = (Number(s.total_components || 0) + Number(s.total_assignments || 0)) > 0
+        
+        return hasAssessments && !gradedSubjectKeys.has(`${name}|${code}`)
+      })
+      .map(s => ({
+        id: s.id || `${s.subject_name || s.subject?.name}-${s.subject_code || s.subject?.code}`,
+        title: 'No grade published yet for this subject',
+        subject_name: s.subject_name || s.subject?.name,
+        subject_code: s.subject_code || s.subject?.code,
+        updated_at: s.updated_at || s.created_at,
+        created_at: s.created_at
+      }))
+  } catch (err) {
+    console.error('Error loading pending grades:', err)
+    pendingGradeItems.value = []
+  } finally {
+    loadingPending.value = false
+  }
+}
+
 onMounted(async () => {
   if (!studentId) return
 
@@ -192,7 +275,8 @@ onMounted(async () => {
 
   await Promise.all([
     loadData(() => studentService.getGrades(studentId)),
-    loadGradeSummary()
+    loadGradeSummary(),
+    loadPendingGrades()
   ])
 })
 </script>

@@ -65,8 +65,8 @@
 
     <!-- Exams List -->
     <div v-else class="row g-4 pt-2">
-      <div v-for="exam in paginatedExams" :key="exam.id" class="col-md-6 col-xl-4">
-        <div class="exam-card card border-0 shadow-sm rounded-4 h-100 overflow-hidden hover-lift">
+      <div v-for="(exam, index) in paginatedExams" :key="getExamKey(exam, index)" class="col-md-6 col-xl-4">
+        <div class="exam-card card border-0 shadow-sm rounded-4 overflow-hidden hover-lift">
           <StudentStatusCardHeader
             :header-class="getStatusColor(exam) === 'success' ? 'bg-success-light' : 'bg-student-light'"
             icon-class="bi bi-calendar-event fs-4"
@@ -99,7 +99,7 @@
                       </div>
                       <div>
                          <small class="text-muted d-block text-xxs-65">START TIME</small>
-                         <span class="small fw-bold">{{ formatTime(exam.start_time) }}</span>
+                         <span class="small fw-bold">{{ formatTime(exam.exam_time || exam.start_time) }}</span>
                       </div>
                    </div>
                 </div>
@@ -110,7 +110,7 @@
                       </div>
                       <div>
                          <small class="text-muted d-block text-xxs-65">DURATION</small>
-                         <span class="small fw-bold">{{ exam.duration || 'TBA' }} Min</span>
+                         <span class="small fw-bold">{{ formatDuration(exam) }}</span>
                       </div>
                    </div>
                 </div>
@@ -121,20 +121,20 @@
                 <i class="bi bi-geo-alt-fill text-danger fs-5 me-3"></i>
                 <div>
                    <small class="text-muted d-block text-uppercase letter-spacing-1 text-xxs-65">Hall / Room</small>
-                   <span class="small fw-bold text-dark">{{ exam.location || exam.room_number || 'To Be Announced' }}</span>
+                   <span class="small fw-bold text-dark">{{ exam.room || exam.location || exam.room_number || 'To Be Announced' }}</span>
                 </div>
              </div>
 
              <!-- Action Buttons -->
              <div class="mt-auto pt-2">
-                <button class="btn btn-student w-100 rounded-3 py-2 fw-bold small" @click="toggleExpand(exam.id)">
-                   {{ expandedIds.includes(exam.id) ? 'Hide Instructions' : 'View Instructions' }}
-                   <i class="bi ms-1" :class="expandedIds.includes(exam.id) ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
+               <button class="btn btn-student w-100 rounded-3 py-2 fw-bold small" @click="toggleExpand(getExamKey(exam, index))">
+                 {{ expandedExamKey === getExamKey(exam, index) ? 'Hide Instructions' : 'View Instructions' }}
+                 <i class="bi ms-1" :class="expandedExamKey === getExamKey(exam, index) ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
                 </button>
              </div>
 
              <!-- Expanded Instructions (Inline) -->
-             <div v-if="expandedIds.includes(exam.id)" class="mt-3 animate__animated animate__fadeIn">
+             <div v-if="expandedExamKey === getExamKey(exam, index)" class="mt-3 animate__animated animate__fadeIn">
                 <div class="p-3 bg-warning-light rounded-3 border border-warning-subtle">
                    <h6 class="text-warning small fw-bold mb-2"><i class="bi bi-info-circle me-1"></i>Candidate Info</h6>
                    <div v-if="exam.instructions" class="small text-muted" v-html="exam.instructions"></div>
@@ -211,7 +211,7 @@ const paginatedExams = computed(() => {
   return paginate(filteredData.value || [])
 })
 
-const expandedIds = ref([])
+const expandedExamKey = ref(null)
 
 const resetFilters = () => {
   resetFiltersFn()
@@ -219,12 +219,17 @@ const resetFilters = () => {
   filterStatus.value = ''
 }
 
-const toggleExpand = (id) => {
-  if (expandedIds.value.includes(id)) {
-    expandedIds.value = expandedIds.value.filter(i => i !== id)
-  } else {
-    expandedIds.value.push(id)
-  }
+const getExamKey = (exam, index = 0) => {
+  if (exam?.id) return String(exam.id)
+  const subject = exam?.subject_name || exam?.subject?.name || 'subject'
+  const date = exam?.exam_date || 'date'
+  const time = exam?.exam_time || exam?.start_time || 'time'
+  const room = exam?.room || exam?.location || exam?.room_number || 'room'
+  return `${subject}-${date}-${time}-${room}-${index}`
+}
+
+const toggleExpand = (key) => {
+  expandedExamKey.value = expandedExamKey.value === key ? null : key
 }
 
 // Sync local v-models with composable filters
@@ -285,6 +290,13 @@ const formatDate = (dateString) => {
 
 // Use shared formatTime utility
 const formatTime = (timeString) => formatTimeUtil(timeString) || 'TBA'
+
+const formatDuration = (exam) => {
+  const minutes = Number(exam?.duration_minutes)
+  if (Number.isFinite(minutes) && minutes > 0) return `${minutes} Min`
+  if (exam?.duration) return `${exam.duration} Min`
+  return 'TBA'
+}
 
 
 // Breadcrumbs and Routes

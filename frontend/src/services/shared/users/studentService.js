@@ -91,9 +91,9 @@ export const studentService = {
     },
 
     async getAssignments(id) {
-        return dedupeRequest(getCacheKey(id, 'assignments'), () =>
-            apiGet(`/students/${id}/assignments/`, null, `fetching assignments for student ${id}`)
-        )
+        // Always fetch fresh assignments so attachment/material deletes are reflected immediately.
+        cacheService.clearPattern(getCacheKey(id, 'assignments'))
+        return apiGet(`/students/${id}/assignments/`, null, `fetching assignments for student ${id}`)
     },
 
     async getAnnouncements(id) {

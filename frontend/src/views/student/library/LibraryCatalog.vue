@@ -5,6 +5,20 @@
     <AlertMessage v-if="alert.show" :type="alert.type" :message="alert.message" :title="alert.title" :auto-close="true"
       :auto-close-duration="3000" @close="alert.show = false" />
 
+    <ConfirmDialog v-model="showBorrowDialog" title="Borrow Duration" type="info" theme="student" confirm-text="Confirm Borrow"
+      :loading="borrowing" @confirm="confirmBorrowRequest" @cancel="resetBorrowDialog">
+      <template #content>
+        <p class="confirm-message mb-2">
+          How many days do you need this book? (1-{{ borrowPolicy.max_request_days }})
+        </p>
+        <p class="confirm-message small text-muted mb-3">
+          First {{ borrowPolicy.free_days }} days are free. After that Rs. {{ borrowPolicy.fine_per_day }}/day fine applies.
+        </p>
+        <input v-model.number="requestedDaysInput" type="number" class="form-control" min="1"
+          :max="borrowPolicy.max_request_days" />
+      </template>
+    </ConfirmDialog>
+
     <!-- Stats Section -->
     <template #stats>
       <div class="row g-3 mb-4">
@@ -70,10 +84,7 @@
                 <small class="text-muted d-block text-uppercase letter-spacing-1 text-xxs-65">Category</small>
                 <span class="small fw-bold text-dark">{{ book.category || 'General' }}</span>
               </div>
-              <div class="col-6 text-end">
-                <small class="text-muted d-block text-uppercase letter-spacing-1 text-xxs-65">Year</small>
-                <span class="small fw-bold text-dark">{{ book.publication_year || 'N/A' }}</span>
-              </div>
+              
             </div>
 
             <div class="flex-grow-1">
@@ -97,10 +108,13 @@
 
             <div class="mt-4">
               <button @click="requestBorrow(book)" class="btn btn-student w-100 rounded-3 py-2 fw-bold shadow-sm"
-                :disabled="book.copies_available === 0 || borrowing">
+                :disabled="book.copies_available === 0 || borrowing || isAlreadyBorrowed(book)">
                 <i class="bi bi-bookmark-plus me-2"></i>
-                {{ book.copies_available > 0 ? 'Request to Borrow' : 'Not Available' }}
+                {{ getBorrowButtonLabel(book) }}
               </button>
+              <p class="small text-muted mt-2 mb-0 text-center">
+                Free {{ borrowPolicy.free_days }} days, then Rs. {{ borrowPolicy.fine_per_day }}/day fine
+              </p>
             </div>
           </div>
         </div>
@@ -113,7 +127,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useAlert } from '@/composables/shared'
 import { StudentPageTemplate } from '@/components/shared/panels'
-import { StatCard, AlertMessage, SearchFilter, SelectInput, LoadingSpinner, StudentStatusCardHeader } from '@/components/shared/common'
+import { StatCard, AlertMessage, SearchFilter, SelectInput, LoadingSpinner, StudentStatusCardHeader, ConfirmDialog } from '@/components/shared/common'
 import studentPanelService from '@/services/student/studentPanelService'
 import { STUDENT_ROUTES } from '@/utils/constants/routes'
 import { smartSearch } from '@/utils'
@@ -127,6 +141,10 @@ const loading = ref(true)
 const borrowing = ref(false)
 const books = ref([])
 const myBorrowings = ref([])
+const borrowPolicy = ref({ free_days: 5, fine_per_day: 10, max_request_days: 30 })
+const showBorrowDialog = ref(false)
+const selectedBook = ref(null)
+const requestedDaysInput = ref(5)
 const filters = ref({ search: '', category: '' })
 
 const { alert, showSuccess, showError } = useAlert()
@@ -157,6 +175,18 @@ const filteredBooks = computed(() => {
   return result
 })
 
+const isAlreadyBorrowed = (book) => {
+  if (!book?.id) return false
+  return myBorrowings.value.some(b => b.status === 'borrowed' && String(b.book) === String(book.id))
+}
+
+const getBorrowButtonLabel = (book) => {
+  if (isAlreadyBorrowed(book)) return 'Already Borrowed'
+  if (book.copies_available === 0) return 'Not Available'
+  if (borrowing.value) return 'Processing...'
+  return 'Request to Borrow'
+}
+
 const loadBooks = async () => {
   loading.value = true
   try {
@@ -176,15 +206,55 @@ const loadMyBorrowings = async () => {
   }
 }
 
+const loadBorrowPolicy = async () => {
+  try {
+    borrowPolicy.value = await studentPanelService.getBorrowPolicy({ _t: new Date().getTime() })
+  } catch (error) {
+    console.error('Error loading borrow policy:', error)
+  }
+}
+
+const resetBorrowDialog = () => {
+  showBorrowDialog.value = false
+  selectedBook.value = null
+  requestedDaysInput.value = Number(borrowPolicy.value?.free_days || 5)
+}
+
 const requestBorrow = async (book) => {
-  if (book.copies_available === 0) return
+  if (book.copies_available === 0 || isAlreadyBorrowed(book)) return
+
+  selectedBook.value = book
+  requestedDaysInput.value = Number(borrowPolicy.value?.free_days || 5)
+  showBorrowDialog.value = true
+}
+
+const confirmBorrowRequest = async () => {
+  const book = selectedBook.value
+  if (!book) {
+    resetBorrowDialog()
+    return
+  }
+
+  const maxDays = Number(borrowPolicy.value?.max_request_days || 30)
+  const requestedDays = Number(requestedDaysInput.value)
+  if (!Number.isInteger(requestedDays) || requestedDays < 1 || requestedDays > maxDays) {
+    showError(`Please enter valid days between 1 and ${maxDays}.`)
+    return
+  }
 
   borrowing.value = true
   try {
-    await studentPanelService.requestBookBorrow(book.id)
+    await studentPanelService.requestBookBorrow(book.id, requestedDays)
 
-    showSuccess('Book borrowed successfully! Please collect it from the library.')
+    const freeDays = Number(borrowPolicy.value?.free_days || 5)
+    const fine = Number(borrowPolicy.value?.fine_per_day || 10)
+    const note = requestedDays > freeDays
+      ? ` You requested ${requestedDays} days. After ${freeDays} days, fine will be Rs. ${fine}/day.`
+      : ''
 
+    showSuccess(`Book borrowed successfully! Please collect it from the library.${note}`)
+
+    resetBorrowDialog()
     await Promise.all([loadBooks(), loadMyBorrowings()])
   } catch (error) {
     console.error('Error borrowing book:', error)
@@ -208,6 +278,7 @@ const truncateText = (text, length) => {
 onMounted(() => {
   loadBooks()
   loadMyBorrowings()
+  loadBorrowPolicy()
 })
 </script>
 

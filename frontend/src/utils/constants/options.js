@@ -286,6 +286,30 @@ export const getMonthOptions = (year = new Date().getFullYear()) => {
     }))
 }
 
+// Month options without year suffix (value: '01'..'12')
+export const MONTH_NUMBER_OPTIONS = [
+    { value: '01', label: 'January' },
+    { value: '02', label: 'February' },
+    { value: '03', label: 'March' },
+    { value: '04', label: 'April' },
+    { value: '05', label: 'May' },
+    { value: '06', label: 'June' },
+    { value: '07', label: 'July' },
+    { value: '08', label: 'August' },
+    { value: '09', label: 'September' },
+    { value: '10', label: 'October' },
+    { value: '11', label: 'November' },
+    { value: '12', label: 'December' }
+]
+
+export const getYearRangeOptions = (startOffset = 10, endOffset = 1, baseYear = new Date().getFullYear()) => {
+    const result = []
+    for (let year = baseYear - startOffset; year <= baseYear + endOffset; year += 1) {
+        result.push({ value: String(year), label: String(year) })
+    }
+    return result
+}
+
 // Helper to get label from options array
 export const getOptionLabel = (options, value) => {
     const option = options.find(opt => opt.value === value)
@@ -325,5 +349,7 @@ export default {
     COUNTRY_OPTIONS,
     HOLIDAY_TYPE_OPTIONS,
     getMonthOptions,
+    MONTH_NUMBER_OPTIONS,
+    getYearRangeOptions,
     getOptionLabel
 }

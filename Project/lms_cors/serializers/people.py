@@ -152,6 +152,8 @@ class StudentSerializer(BaseProfileSerializer):
 
 class TeacherSerializer(BaseProfileSerializer):
     department_name = serializers.CharField(source='department.name', read_only=True)
+    department_code = serializers.CharField(source='department.code', read_only=True, allow_null=True)
+    institution_name = serializers.CharField(source='department.institution.name', read_only=True, allow_null=True)
     
     class Meta:
         model = Teacher
@@ -224,6 +226,8 @@ class StudentSubjectSerializer(serializers.ModelSerializer):
     semester_number = serializers.IntegerField(source='semester.number', read_only=True)
     semester_name = serializers.CharField(source='semester.name', read_only=True)
     credit_hours = serializers.IntegerField(source='subject.credit_hours', read_only=True)
+    total_components = serializers.IntegerField(read_only=True)
+    total_assignments = serializers.IntegerField(read_only=True)
     teacher_name = serializers.SerializerMethodField()
     
     class Meta:

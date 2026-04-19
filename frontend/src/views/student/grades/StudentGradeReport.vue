@@ -118,6 +118,7 @@ const { studentId } = useStudentId()
 const loading = ref(true)
 const studentName = ref('')
 const studentEnrollment = ref('')
+const pendingCount = ref(0)
 const report = ref({
   summary: { overall_gpa: '0.00', average_score: 0, total_subjects: 0, total_grades: 0 },
   distribution: { A: 0, B: 0, C: 0, F: 0, other: 0 },
@@ -133,18 +134,19 @@ const breadcrumbs = [
 ]
 
 const statCards = computed(() => [
-  { title: 'Overall GPA', value: report.value.summary.overall_gpa, icon: 'bi bi-trophy-fill', type: 'student' },
+  { title: 'Pending Grades', value: pendingCount.value, icon: 'bi bi-hourglass-split', type: 'finance' },
   { title: 'Average Score', value: `${Math.round(Number(report.value.summary.average_score || 0))}%`, icon: 'bi bi-percent', iconColor: 'text-success', bgColor: 'bg-success-light' },
   { title: 'Total Subjects', value: Number(report.value.summary.total_subjects || 0), icon: 'bi bi-book-fill', type: 'department' },
   { title: 'Total Grades', value: Number(report.value.summary.total_grades || 0), icon: 'bi bi-graph-up', type: 'teacher' }
 ])
 
 const distributions = computed(() => {
-  const dist = report.value.distribution || { A: 0, B: 0, C: 0, F: 0, other: 0 }
+  const dist = report.value.distribution || { A: 0, B: 0, C: 0, D: 0, F: 0, other: 0 }
   return [
     { label: 'A', value: Number(dist.A || 0), bgClass: 'bg-student-light', textClass: 'text-student' },
     { label: 'B', value: Number(dist.B || 0), bgClass: 'bg-student-light', textClass: 'text-student' },
     { label: 'C', value: Number(dist.C || 0), bgClass: 'bg-warning-light', textClass: 'text-warning' },
+    { label: 'D', value: Number(dist.D || 0), bgClass: 'bg-orange-light', textClass: 'text-orange' },
     { label: 'F', value: Number(dist.F || 0), bgClass: 'bg-danger-light', textClass: 'text-danger' },
     { label: 'Other', value: Number(dist.other || 0), bgClass: 'bg-light', textClass: 'text-secondary' }
   ]
@@ -160,9 +162,11 @@ const loadData = async () => {
   if (!studentId.value) return
   loading.value = true
   try {
-    const [profile, gradeReport] = await Promise.all([
+    const [profile, gradeReport, subjectsRes, gradesRes] = await Promise.all([
       studentService.getStudent(studentId.value),
-      studentService.getGradeReport(studentId.value)
+      studentService.getGradeReport(studentId.value),
+      studentService.getEnrolledSubjects(studentId.value),
+      studentService.getGrades(studentId.value)
     ])
     studentName.value = profile.full_name
     studentEnrollment.value = profile.enrollment_number
@@ -172,6 +176,18 @@ const loadData = async () => {
       performance_summary: Array.isArray(gradeReport?.performance_summary) ? gradeReport.performance_summary : [],
       subject_performance: Array.isArray(gradeReport?.subject_performance) ? gradeReport.subject_performance : []
     }
+
+    // Calculate Pending Count
+    const subjects = subjectsRes?.results || subjectsRes || []
+    const gradedEntries = gradesRes?.results || gradesRes || []
+    const gradedKeys = new Set(gradedEntries.map(g => `${g.subject_name || g.assignment?.subject?.name || ''}|${g.subject_code || g.assignment?.subject?.code || ''}`))
+    
+    pendingCount.value = subjects.filter(s => {
+      const hasAssessments = (Number(s.total_components || 0) + Number(s.total_assignments || 0)) > 0
+      const key = `${s.subject_name || s.subject?.name || ''}|${s.subject_code || s.subject?.code || ''}`
+      return hasAssessments && !gradedKeys.has(key)
+    }).length
+
   } catch (err) { console.error(err) } finally { loading.value = false }
 }
 

@@ -4,6 +4,8 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.exceptions import ValidationError
 
+from decimal import Decimal
+from django.utils import timezone
 from django.db.models import Q
 from .base import BaseViewSet
 from ..models import Assignment, SubmissionHistory, Grade, TeacherSubject, StudentSubject
@@ -94,6 +96,71 @@ class AssignmentViewSet(BaseViewSet):
         )
         
         return Response(serializer.data)
+
+    @action(detail=True, methods=['post'])
+    def mark_zero(self, request, pk=None):
+        """Allow teacher/admin to mark 0 when assignment is expired and student did not submit."""
+        assignment = self.get_object()
+        student_id = request.data.get('student') or request.data.get('student_id')
+
+        if not student_id:
+            return Response({'detail': 'student is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Verify teacher has access to this assignment's subject
+        teacher = getattr(request.user, 'teacher_profile', None)
+        if teacher:
+            teacher_subjects = TeacherSubject.objects.filter(
+                teacher=teacher,
+                is_active=True
+            ).values_list('subject_id', flat=True)
+
+            if assignment.subject_id not in teacher_subjects and assignment.created_by != teacher:
+                return Response({'detail': 'You do not have permission to grade this assignment.'}, status=status.HTTP_403_FORBIDDEN)
+
+        if assignment.due_date and assignment.due_date > timezone.now():
+            return Response({'detail': 'Cannot assign zero marks before due date expires.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        enrollment = StudentSubject.objects.select_related('student').filter(
+            student_id=student_id,
+            subject=assignment.subject
+        ).first()
+
+        if not enrollment or not enrollment.student:
+            return Response({'detail': 'Student is not enrolled in this assignment subject.'}, status=status.HTTP_404_NOT_FOUND)
+
+        student = enrollment.student
+
+        submission, _ = SubmissionHistory.objects.get_or_create(
+            assignment=assignment,
+            student=student,
+            defaults={
+                'submission_text': 'No submission received before due date. Auto-marked by teacher.',
+                'file_upload': None,
+                'file_url': ''
+            }
+        )
+
+        grade, created = Grade.objects.get_or_create(
+            submission=submission,
+            defaults={
+                'grade_value': 'F',
+                'marks_obtained': Decimal('0.00'),
+                'feedback': 'Marked as 0 because no submission was received before due date.',
+                'graded_by': teacher if teacher else None
+            }
+        )
+
+        if not created:
+            # Keep action idempotent and ensure explicit zero state.
+            grade.grade_value = 'F'
+            grade.marks_obtained = Decimal('0.00')
+            if not grade.feedback:
+                grade.feedback = 'Marked as 0 because no submission was received before due date.'
+            if teacher:
+                grade.graded_by = teacher
+            grade.save()
+
+        return Response({'detail': 'Zero marks assigned successfully.'}, status=status.HTTP_200_OK)
 
 
 class SubmissionHistoryViewSet(BaseViewSet):

@@ -43,11 +43,11 @@
         </template>
 
         <template #cell-weightage="{ value }">
-          <div class="text-center"><span class="badge bg-primary-light text-primary px-3 fs-6">{{ value }}%</span></div>
+          <div class="text-center"><span class="badge bg-primary-light text-primary px-3 fs-6">{{ value || 0 }}%</span></div>
         </template>
 
-        <template #cell-total_marks="{ value }">
-          <div class="text-center fw-bold text-dark">{{ value }}</div>
+        <template #cell-max_marks="{ value }">
+          <div class="text-center fw-bold text-dark">{{ value || 0 }}</div>
         </template>
 
         <template #cell-graded="{ row }">
@@ -97,7 +97,6 @@
 import { ref, computed, onMounted } from 'vue'
 import { smartSearch } from '@/utils'
 import { useRouter } from 'vue-router'
-import { useFilterLogic } from '@/composables/teacher/useFilterLogic'
 import { TeacherPageTemplate } from '@/components/shared/panels'
 import { DataTable, BaseModal, StatCard, SearchFilter, SelectInput, AlertMessage, LoadingSpinner } from '@/components/shared/common'
 import { AssessmentFormModal } from '@/components/teacher/shared'
@@ -115,6 +114,12 @@ const loading = ref(true)
 const components = ref([])
 const subjects = ref([])
 const filters = ref({ search: '', subject: '', type: '' })
+const searchQuery = computed({
+  get: () => filters.value.search,
+  set: (value) => {
+    filters.value.search = value || ''
+  }
+})
 
 const { alert, showModal, showDeleteModal, editMode, submitting, deleting, form, selectedItem: selectedComponent, openCreateModal, openEditModal, handleSubmit, confirmDelete, handleDelete } = useCrudModal({
   entityName: 'Assessment',
@@ -131,7 +136,7 @@ const tableColumns = [
   { key: 'name', label: 'Component' },
   { key: 'component_type', label: 'Type' },
   { key: 'weightage', label: 'Weightage', center: true },
-  { key: 'total_marks', label: 'Total Marks', center: true },
+  { key: 'max_marks', label: 'Total Marks', center: true },
   { key: 'graded', label: 'Progress', center: true },
   { key: 'actions', label: 'Actions', center: true }
 ]

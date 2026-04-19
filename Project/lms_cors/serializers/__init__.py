@@ -21,7 +21,7 @@ from .scheduling import (
     EventSerializer, HolidaySerializer, ExamSerializer, TimetableSerializer
 )
 from .management import FeeSerializer, ExpenseSerializer, AccountSerializer
-from .library import LibraryBookSerializer, BookBorrowingSerializer
+from .library import LibraryBookSerializer, BookBorrowingSerializer, LibraryBorrowPolicySerializer
 from .materials import MaterialSerializer, AnnouncementSerializer, ActivityLogSerializer
 from .grading import GradeComponentSerializer, StudentMarkSerializer, StudentGradeSummarySerializer
 
@@ -47,7 +47,7 @@ __all__ = [
     # Management
     'FeeSerializer', 'ExpenseSerializer', 'AccountSerializer',
     # Library
-    'LibraryBookSerializer', 'BookBorrowingSerializer',
+    'LibraryBookSerializer', 'BookBorrowingSerializer', 'LibraryBorrowPolicySerializer',
     # Materials
     'MaterialSerializer', 'AnnouncementSerializer', 'ActivityLogSerializer',
     # Grading

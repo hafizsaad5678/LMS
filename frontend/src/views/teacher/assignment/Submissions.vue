@@ -62,14 +62,74 @@
 
         <template #cell-actions="{ row }">
           <div class="d-flex gap-2 justify-content-center">
-            <button v-if="row.submission_file" @click="window.open(row.submission_file, '_blank')"
-              class="btn btn-sm btn-outline-primary btn-action" title="Download"><i class="bi bi-download"></i></button>
-            <button @click="openGradeModal(row)" class="btn btn-sm btn-outline-success btn-action"
-              :title="row.status === 'graded' ? 'Edit Grade' : 'Grade'"><i class="bi bi-check2-circle"></i></button>
+            <button @click="openDetailsModal(row)"
+              class="btn btn-sm btn-outline-secondary btn-action" title="View Details"><i class="bi bi-eye"></i></button>
           </div>
         </template>
       </DataTable>
     </div>
+
+    <!-- Submission Details Modal -->
+    <BaseModal v-model="showDetailsModal" title="Submission Details" :show-footer="false">
+      <div v-if="detailsSubmission" class="p-2">
+        <div class="bg-light p-3 rounded-4 mb-3 border-start border-4 border-primary">
+          <h6 class="fw-bold text-dark mb-1">{{ detailsSubmission.student_name }}</h6>
+          <p class="text-muted small mb-0">ROLL NO: {{ detailsSubmission.roll_no }}</p>
+        </div>
+
+        <div v-if="!detailsSubmission.submission_id" class="alert alert-warning py-2 px-3 mb-3" role="alert">
+          User has not submitted this assignment yet.
+        </div>
+
+        <div class="mb-3">
+          <div class="small text-muted text-uppercase fw-bold mb-1">Submitted At</div>
+          <div class="fw-medium">{{ detailsSubmission.submitted_at ? formatDateTime(detailsSubmission.submitted_at) : 'N/A' }}</div>
+        </div>
+
+        <div class="mb-3">
+          <div class="small text-muted text-uppercase fw-bold mb-1">Student Notes / Comments</div>
+          <div class="border rounded-3 p-3 bg-light-subtle" style="white-space: pre-wrap;">
+            {{ detailsSubmission.comments || 'No text/comments provided by student.' }}
+          </div>
+        </div>
+
+        <div class="mb-2">
+          <div class="small text-muted text-uppercase fw-bold mb-1">Attachment</div>
+          <div v-if="detailsSubmission.submission_file" class="d-flex align-items-center gap-2">
+            <button type="button" class="btn btn-outline-primary btn-sm" @click="downloadSubmissionFile(detailsSubmission.submission_file)">
+              <i class="bi bi-download me-1"></i>
+              Download File
+            </button>
+            <span class="small text-muted text-truncate">{{ getFileName(detailsSubmission.submission_file) }}</span>
+          </div>
+          <div v-else class="text-muted small">No attachment submitted.</div>
+        </div>
+
+        <div class="d-flex justify-content-end mt-3">
+          <button
+            v-if="detailsSubmission.submission_id"
+            type="button"
+            class="btn btn-outline-success"
+            @click="openGradeFromDetails"
+          >
+            <i class="bi bi-check2-circle me-1"></i>
+            {{ detailsSubmission.status === 'graded' ? 'Edit Grade' : 'Grade Submission' }}
+          </button>
+          <button
+            v-else-if="isAssignmentExpired"
+            type="button"
+            class="btn btn-outline-danger"
+            :disabled="markingZero"
+            @click="markZeroFromDetails"
+          >
+            <span v-if="markingZero" class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+            <i v-else class="bi bi-exclamation-circle me-1"></i>
+            Mark 0 (No Submission)
+          </button>
+          <span v-else class="text-muted small">Due date not expired yet.</span>
+        </div>
+      </div>
+    </BaseModal>
 
     <!-- Grading Modal -->
     <BaseModal v-model="showGradeModal" title="Grade Submission" @confirm="submitGrade" :loading="submitting"
@@ -80,8 +140,19 @@
           <p class="text-muted small mb-0">ROLL NO: {{ selectedSubmission.roll_no }}</p>
         </div>
         <div class="mb-4">
-          <BaseInput v-model.number="gradeForm.marks" label="Obtained Marks" type="number"
-            :max="assignment?.total_marks" min="0" required :placeholder="`Out of ${assignment?.total_marks}`" />
+          <BaseInput
+            v-model.number="gradeForm.marks"
+            :label="`Obtained Marks (Out of ${maxMarks.toFixed(2)})`"
+            type="number"
+            :max="maxMarks"
+            min="0"
+            required
+            placeholder="Enter obtained marks"
+          />
+          <div class="small mt-1" :class="marksRangeError ? 'text-danger' : 'text-muted'">
+            {{ Number(gradeForm.marks || 0) }} out of {{ maxMarks }}
+            <span v-if="marksRangeError" class="ms-1">(Marks must be between 0 and {{ maxMarks }})</span>
+          </div>
         </div>
         <div class="mb-2">
           <label class="form-label fw-bold text-dark small text-uppercase">Feedback</label>
@@ -101,6 +172,7 @@ import { DataTable, BaseModal, BaseInput, StatCard, SearchFilter, SelectInput, A
 import { useAlert } from '@/composables/shared'
 import { useFilterLogic } from '@/composables/teacher/useFilterLogic'
 import teacherPanelService from '@/services/teacher/teacherPanelService'
+import { api } from '@/services/shared'
 import { formatDateTime } from '@/utils/formatters'
 import { calculateLetterGrade } from '@/utils/badgeHelpers'
 import { TEACHER_SUBMISSION_STATUS_OPTIONS } from '@/utils/constants/options'
@@ -125,8 +197,21 @@ const submissions = ref([])
 const submitting = ref(false)
 const filters = ref({ status: '' })
 const showGradeModal = ref(false)
+const showDetailsModal = ref(false)
+const markingZero = ref(false)
 const selectedSubmission = ref(null)
+const detailsSubmission = ref(null)
 const gradeForm = ref({ marks: 0, feedback: '' })
+const maxMarks = computed(() => Number(assignment.value?.total_marks || 0))
+const isAssignmentExpired = computed(() => {
+  if (!assignment.value?.due_date) return false
+  const due = new Date(assignment.value.due_date)
+  return !Number.isNaN(due.getTime()) && due < new Date()
+})
+const marksRangeError = computed(() => {
+  const marks = Number(gradeForm.value?.marks ?? 0)
+  return Number.isFinite(marks) && (marks < 0 || marks > maxMarks.value)
+})
 
 const { searchQuery, filteredItems: searchFilteredSubmissions } = useFilterLogic(
   submissions,
@@ -186,6 +271,7 @@ async function loadData() {
         roll_no: student.enrollment_number || student.roll_no,
         submitted_at: submission?.submitted_at || null,
         submission_file: submission?.submission_file || null,
+        comments: submission?.comments || submission?.submission_text || '',
         status: submission ? (submission.grade ? 'graded' : 'submitted') : 'pending',
         obtained_marks: submission?.grade?.marks_obtained || null,
         feedback: submission?.grade?.feedback || '',
@@ -206,13 +292,77 @@ function openGradeModal(submission) {
   showGradeModal.value = true
 }
 
+function openDetailsModal(submission) {
+  detailsSubmission.value = submission
+  showDetailsModal.value = true
+}
+
+async function markZeroFromDetails() {
+  if (!detailsSubmission.value?.student || !assignmentId) return
+  if (!isAssignmentExpired.value) {
+    showAlert('warning', 'Cannot assign zero marks before due date expires.')
+    return
+  }
+
+  markingZero.value = true
+  try {
+    await teacherPanelService.markZeroForMissingSubmission(assignmentId, detailsSubmission.value.student)
+    showAlert('success', '0 marks assigned for non-submission.')
+    showDetailsModal.value = false
+    await loadData()
+  } catch (error) {
+    showAlert('error', error?.response?.data?.detail || 'Failed to assign 0 marks.')
+  } finally {
+    markingZero.value = false
+  }
+}
+
+function openGradeFromDetails() {
+  if (!detailsSubmission.value) return
+  showDetailsModal.value = false
+  openGradeModal(detailsSubmission.value)
+}
+
+function getFileName(fileUrl) {
+  if (!fileUrl) return 'Attachment'
+  try {
+    const cleanUrl = String(fileUrl).split('?')[0]
+    const parts = cleanUrl.split('/')
+    return decodeURIComponent(parts[parts.length - 1] || 'Attachment')
+  } catch {
+    return 'Attachment'
+  }
+}
+
+async function downloadSubmissionFile(fileUrl) {
+  if (!fileUrl) return
+  try {
+    const response = await api.get(fileUrl, { responseType: 'blob' })
+    const blob = response?.data
+    if (!blob) throw new Error('No file data received')
+
+    const objectUrl = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = objectUrl
+    link.download = getFileName(fileUrl)
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(objectUrl)
+  } catch {
+    // Fallback when direct blob download fails (e.g., browser/network restrictions).
+    window.open(fileUrl, '_blank', 'noopener')
+    showAlert('warning', 'Direct download was blocked. File opened in a new tab instead.')
+  }
+}
+
 async function submitGrade() {
   if (!selectedSubmission.value?.submission_id) return showAlert('warning', 'Cannot grade a submission that has not been submitted yet.')
-  if (gradeForm.value.marks < 0 || gradeForm.value.marks > assignment.value.total_marks) return showAlert('error', `Marks must be between 0 and ${assignment.value.total_marks}`)
+  if (marksRangeError.value) return showAlert('error', `Marks must be between 0 and ${maxMarks.value}`)
 
   submitting.value = true
   try {
-    const gradeData = { submission: selectedSubmission.value.submission_id, marks_obtained: gradeForm.value.marks, feedback: gradeForm.value.feedback, grade_value: calculateLetterGrade((gradeForm.value.marks / assignment.value.total_marks) * 100) }
+    const gradeData = { submission: selectedSubmission.value.submission_id, marks_obtained: gradeForm.value.marks, feedback: gradeForm.value.feedback, grade_value: calculateLetterGrade((gradeForm.value.marks / maxMarks.value) * 100) }
     if (selectedSubmission.value.grade_id) await teacherPanelService.updateGrade(selectedSubmission.value.grade_id, gradeData)
     else await teacherPanelService.submitGrades(gradeData)
     showAlert('success', 'Grade submitted successfully!')

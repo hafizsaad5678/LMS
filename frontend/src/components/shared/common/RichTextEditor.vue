@@ -132,27 +132,20 @@ onMounted(() => {
 // Sync modelValue -> innerHTML
 watch(() => props.modelValue, (newVal) => {
   if (editor.value && newVal !== editor.value.innerHTML) {
-    // Save selection if focused
-    const selection = window.getSelection()
-    let range = null
-    if (selection.rangeCount > 0 && document.activeElement === editor.value) {
-      range = selection.getRangeAt(0)
-    }
-
-    editor.value.innerHTML = newVal || ''
-
-    // Restore selection (primitive)
-    if (range && document.activeElement === editor.value) {
-      // Restore range logic can be complex, for simple v-model sync we usually 
-      // rely on the fact that if newVal comes from outside, it's a full replace.
+    // Only update if the sanitized version is actually different to avoid cursor jumps
+    const currentHTML = editor.value.innerHTML
+    if (newVal !== currentHTML) {
+      editor.value.innerHTML = newVal || ''
     }
   }
 })
 
 const onInput = () => {
-  const content = sanitize(editor.value.innerHTML)
-  emit('update:modelValue', content)
-  updateActiveStates()
+  if (editor.value) {
+    const content = sanitize(editor.value.innerHTML)
+    emit('update:modelValue', content)
+    updateActiveStates()
+  }
 }
 
 const onBlur = () => {

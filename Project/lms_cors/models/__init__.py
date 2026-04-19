@@ -9,7 +9,7 @@ from .assignments import Assignment, SubmissionHistory, Grade
 from .attendance import Attendance
 from .scheduling import Event, Holiday, Exam, Timetable
 from .management import Fee, Expense, Account
-from .library import LibraryBook, BookBorrowing
+from .library import LibraryBook, LibraryBorrowPolicy, BookBorrowing
 from .materials import Material, Announcement, ActivityLog
 from .grading import GradeComponent, StudentMark, StudentGradeSummary
 
@@ -30,7 +30,7 @@ __all__ = [
     # Management
     'Fee', 'Expense', 'Account',
     # Library
-    'LibraryBook', 'BookBorrowing',
+    'LibraryBook', 'LibraryBorrowPolicy', 'BookBorrowing',
     # Materials
     'Material', 'Announcement', 'ActivityLog',
     # Grading

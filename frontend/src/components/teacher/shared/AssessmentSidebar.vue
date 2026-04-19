@@ -1,12 +1,12 @@
 <template>
-  <div class="card border-0 shadow-sm h-100">
+  <div class="card border-0 shadow-sm overflow-hidden flex-grow-1">
     <div class="card-header bg-white border-bottom-0 pt-4 px-3 d-flex justify-content-between align-items-center">
       <h6 class="mb-0 fw-bold">{{ title }}</h6>
       <button @click="$emit('create')" class="btn btn-sm btn-teacher-light rounded-pill px-3">
         <i class="bi bi-plus-lg me-1"></i> New
       </button>
     </div>
-    <div class="card-body p-2 overflow-auto max-h-70vh">
+    <div class="card-body p-2 overflow-auto h-100">
       <div v-if="loading" class="text-center py-4">
         <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
       </div>
@@ -14,7 +14,7 @@
         <i :class="emptyIcon + ' display-6 mb-2 d-block'"></i>
         <p class="small">{{ emptyMessage }}</p>
       </div>
-      <div v-else class="d-flex flex-column gap-2">
+      <div v-else class="d-flex flex-column gap-2 pe-1">
         <div 
           v-for="item in items" 
           :key="item.id"
@@ -29,9 +29,9 @@
                 <i class="bi bi-three-dots"></i>
               </button>
               <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0">
-                <li><a class="dropdown-item small" href="#" @click.prevent="$emit('edit', item)"><i class="bi bi-pencil me-2"></i>Edit</a></li>
+                <li><a class="dropdown-item" href="#" @click.prevent="$emit('edit', item)"><i class="bi bi-pencil-square me-2"></i>Edit Assessment</a></li>
                 <li><hr class="dropdown-divider"></li>
-                <li><a class="dropdown-item small text-danger" href="#" @click.prevent="$emit('delete', item.id)"><i class="bi bi-trash me-2"></i>Delete</a></li>
+                <li><a class="dropdown-item text-danger" href="#" @click.prevent="$emit('delete', item.id)"><i class="bi bi-trash3 me-2"></i>Delete Forever</a></li>
               </ul>
             </div>
           </div>
@@ -93,3 +93,18 @@ const getProgress = (item) => {
     : 0
 }
 </script>
+
+<style scoped>
+.cursor-pointer {
+  cursor: pointer;
+}
+
+.cursor-pointer * {
+  pointer-events: auto;
+}
+
+.assessment-item .dropdown {
+  z-index: 10;
+}
+</style>
+

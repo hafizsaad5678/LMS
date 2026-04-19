@@ -28,8 +28,8 @@
     <div v-if="assignmentDetails" class="row justify-content-center mb-4">
       <div class="col-lg-8">
         <div class="card border-0 shadow-sm">
-          <div class="card-header bg-success bg-opacity-10 border-bottom border-success">
-            <h5 class="mb-0 text-success fw-semibold">Assignment Details</h5>
+          <div class="card-header bg-success border-0">
+            <h5 class="mb-0 text-white fw-semibold">Assignment Details</h5>
           </div>
           <div class="card-body">
             <div class="row g-3">
@@ -80,6 +80,18 @@
                   </div>
                 </div>
               </div>
+              <div v-if="assignmentDetails.material_file_url" class="col-12">
+                <div class="d-flex align-items-start">
+                  <i class="bi bi-paperclip text-success fs-4 me-3"></i>
+                  <div class="flex-grow-1">
+                    <small class="text-muted d-block">Attachment</small>
+                    <button type="button" class="btn btn-outline-success btn-sm mt-1" @click="openMaterial(assignmentDetails.material_file_url)">
+                      <i class="bi bi-download me-1"></i>
+                      {{ assignmentDetails.material_file_name || 'Download Material' }}
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -90,8 +102,8 @@
     <div v-if="selectedAssignment" class="row justify-content-center">
       <div class="col-lg-8">
         <div class="card border-0 shadow-sm">
-          <div class="card-header bg-success bg-opacity-10 border-bottom border-success">
-            <h5 class="mb-0 text-success fw-semibold">Submission Form</h5>
+          <div class="card-header bg-success border-0">
+            <h5 class="mb-0 text-white fw-semibold">Submission Form</h5>
           </div>
           <div class="card-body">
             <form @submit.prevent="submitAssignment">
@@ -109,12 +121,12 @@
               <div class="mb-4">
                 <label class="form-label fw-semibold">
                   <i class="bi bi-cloud-upload text-success me-2"></i>
-                  Upload File <span class="text-danger">*</span>
+                  Upload File
                 </label>
                 <input type="file" class="form-control" @change="onFileSelect" accept=".pdf,.doc,.docx,.zip,.rar"
-                  required>
+                >
                 <small class="text-muted">
-                  Accepted formats: PDF, DOC, DOCX, ZIP, RAR (Max 10MB)
+                  Accepted formats: PDF, DOC, DOCX, ZIP, RAR (Max 10MB). You can submit with text, file, or both.
                 </small>
 
                 <!-- File Preview -->
@@ -137,7 +149,7 @@
 
               <!-- Submit Button -->
               <div class="d-grid gap-2">
-                <button type="submit" class="btn btn-success btn-lg" :disabled="submitting || !submission.file">
+                <button type="submit" class="btn btn-success btn-lg" :disabled="submitting || (!submission.file && !submission.comments?.trim())">
                   <span v-if="submitting">
                     <span class="spinner-border spinner-border-sm me-2"></span>
                     Submitting...
@@ -166,7 +178,7 @@
     </div>
 
     <!-- Success Modal -->
-    <BaseModal v-model="showSuccessModal" title="Congratulations!">
+    <BaseModal v-model="showSuccessModal" title="Congratulations!" :show-footer="false">
       <div class="text-center py-4">
         <div class="mb-4">
           <i class="bi bi-check-circle-fill text-success display-1"></i>
@@ -235,13 +247,13 @@ const getDueDateClass = (a) => {
 }
 
 const submitAssignment = async () => {
-  if (!submission.value.file) {
-    showError('Please select a file', 'Required'); return
+  if (!submission.value.file && !submission.value.comments?.trim()) {
+    showError('Please add comments/notes or attach a file', 'Required'); return
   }
   submitting.value = true
   try {
     const fd = new FormData(); fd.append('assignment', selectedAssignment.value); fd.append('student', studentId)
-    fd.append('file_upload', submission.value.file)
+    if (submission.value.file) fd.append('file_upload', submission.value.file)
     if (submission.value.comments) fd.append('submission_text', submission.value.comments)
     await studentPanelService.submitAssignment(fd)
     showSuccessModal.value = true; submission.value = { comments: '', file: null }
@@ -254,6 +266,10 @@ const formatDate = (d) => formatDateTime(d)
 const removeFile = () => submission.value.file = null
 const resetForm = () => submission.value = { comments: '', file: null }
 const closeSuccessModal = () => { showSuccessModal.value = false; router.push(STUDENT_ROUTES.VIEW_ASSIGNMENTS.path) }
+const openMaterial = (url) => {
+  if (!url) return
+  window.open(url, '_blank', 'noopener')
+}
 
 onMounted(async () => {
   loadProfile()

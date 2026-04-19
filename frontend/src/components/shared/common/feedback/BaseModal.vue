@@ -23,7 +23,7 @@
           <div class="modal-body">
             <slot></slot>
           </div>
-          <div :class="['modal-footer', variant === 'student' ? 'modal-footer-student' : '']">
+          <div v-if="showFooter" :class="['modal-footer', variant === 'student' ? 'modal-footer-student' : '']">
             <slot name="footer">
               <button 
                 type="button" 
@@ -35,7 +35,7 @@
               </button>
               <button 
                 type="button" 
-                :class="['btn', confirmVariant]" 
+                :class="['btn', resolvedConfirmVariant]" 
                 @click="$emit('confirm')"
                 :disabled="loading"
               >
@@ -51,7 +51,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, watch } from 'vue'
+import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
 import Modal from 'bootstrap/js/dist/modal'
 
 const props = defineProps({
@@ -88,14 +88,18 @@ const props = defineProps({
     type: String,
     default: 'Cancel'
   },
+  showFooter: {
+    type: Boolean,
+    default: true
+  },
   confirmVariant: {
     type: String,
-    default: 'btn-primary'
+    default: ''
   },
   variant: {
     type: String,
-    default: '', // 'student' for green theme
-    validator: (value) => ['', 'student'].includes(value)
+    default: '', // '', 'teacher', or 'student'
+    validator: (value) => ['', 'teacher', 'student'].includes(value)
   }
 })
 
@@ -104,6 +108,48 @@ const emit = defineEmits(['update:modelValue', 'hidden', 'confirm'])
 const modalRef = ref(null)
 let modalInstance = null
 
+const isTeacherContext = computed(() => {
+  if (typeof window === 'undefined') return false
+  return window.location.pathname.startsWith('/teacher-dashboard')
+})
+
+const isStudentContext = computed(() => {
+  if (typeof window === 'undefined') return false
+  return window.location.pathname.startsWith('/student-dashboard')
+})
+
+const resolvedConfirmVariant = computed(() => {
+  if (props.confirmVariant) return props.confirmVariant
+
+  if (props.variant === 'teacher' || (!props.variant && isTeacherContext.value)) {
+    return 'btn-teacher-primary'
+  }
+
+  if (props.variant === 'student' || (!props.variant && isStudentContext.value)) {
+    return 'btn-student-primary'
+  }
+
+  return 'btn-primary'
+})
+
+const syncBodyModalState = () => {
+  const hasVisibleModal = Boolean(document.querySelector('.modal.show'))
+
+  if (hasVisibleModal) {
+    // Keep scroll lock while at least one modal is still open.
+    document.body.classList.add('modal-open')
+    document.body.style.overflow = 'hidden'
+    return
+  }
+
+  document.body.classList.remove('modal-open')
+  document.body.style.overflow = ''
+  document.body.style.paddingRight = ''
+
+  const backdrops = document.querySelectorAll('.modal-backdrop')
+  backdrops.forEach(backdrop => backdrop.remove())
+}
+
 onMounted(() => {
   if (modalRef.value) {
     modalInstance = new Modal(modalRef.value)
@@ -111,15 +157,8 @@ onMounted(() => {
     modalRef.value.addEventListener('hidden.bs.modal', () => {
       emit('update:modelValue', false)
       emit('hidden')
-      
-      // Ensure body classes are cleaned up
-      document.body.classList.remove('modal-open')
-      document.body.style.overflow = ''
-      document.body.style.paddingRight = ''
-      
-      // Remove any leftover backdrops
-      const backdrops = document.querySelectorAll('.modal-backdrop')
-      backdrops.forEach(backdrop => backdrop.remove())
+
+      syncBodyModalState()
     })
   }
 })
@@ -128,14 +167,9 @@ onUnmounted(() => {
   if (modalInstance) {
     modalInstance.dispose()
   }
-  
-  // Cleanup on unmount
-  document.body.classList.remove('modal-open')
-  document.body.style.overflow = ''
-  document.body.style.paddingRight = ''
-  
-  const backdrops = document.querySelectorAll('.modal-backdrop')
-  backdrops.forEach(backdrop => backdrop.remove())
+
+  // Cleanup only when no other modal is open.
+  syncBodyModalState()
 })
 
 watch(() => props.modelValue, (newVal) => {
