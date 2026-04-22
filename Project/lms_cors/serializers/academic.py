@@ -179,10 +179,6 @@ class SubjectSerializer(serializers.ModelSerializer):
         if semester and semester.session and getattr(semester.session, 'is_active', True) is False:
             raise serializers.ValidationError({'semester': 'Selected semester belongs to an inactive session.'})
 
-        semester_changed = self.instance is None or ('semester' in attrs)
-        if semester and semester_changed and str(getattr(semester, 'status', '')).lower() != 'active':
-            raise serializers.ValidationError({'semester': 'Only active semesters can be used to create/assign subjects.'})
-
         return attrs
 
 

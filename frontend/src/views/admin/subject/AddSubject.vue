@@ -34,7 +34,7 @@
           v-model="form"
           :departments="departments"
           :programs="programs"
-          :semesters="activeSemesters"
+          :semesters="semesters"
           :selected-department="selectedDepartment"
           :selected-program="selectedProgram"
           :loading-semesters="loadingSemesters"
@@ -51,7 +51,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { AdminPageTemplate } from '@/components/shared/panels'
 import { AlertMessage, ConfirmDialog } from '@/components/shared/common'
@@ -95,12 +95,6 @@ const {
 } = useCascadingDropdowns()
 
 const form = ref({ name: '', code: '', semester: '', credit_hours: 3, description: '' })
-
-const activeSemesters = computed(() => {
-  return (Array.isArray(semesters.value) ? semesters.value : []).filter(
-    (sem) => String(sem?.status || '').toLowerCase() === 'active'
-  )
-})
 
 const handleSubmit = async () => {
   if (!selectedDepartment.value) {
@@ -149,9 +143,7 @@ onMounted(async () => {
           selectedDepartment.value = deptId
           selectedProgram.value = progId
           await loadSemesters(progId)
-          if (String(sem.status || '').toLowerCase() === 'active') {
-            form.value.semester = semId
-          }
+          form.value.semester = semId
         }
       }
     } catch (e) {

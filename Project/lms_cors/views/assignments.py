@@ -21,6 +21,17 @@ class AssignmentViewSet(BaseViewSet):
     filterset_fields = ['subject', 'created_by', 'subject__semester', 'subject__semester__program']
     ordering_fields = ['due_date', 'created_at', 'title']
 
+    def _current_enrollments_for_student(self, student):
+        queryset = StudentSubject.objects.filter(student=student)
+
+        if getattr(student, 'session_id', None):
+            queryset = queryset.filter(semester__session_id=student.session_id)
+
+        if getattr(student, 'current_semester', None):
+            queryset = queryset.filter(semester__number=student.current_semester)
+
+        return queryset
+
     def get_queryset(self):
         qs = super().get_queryset()
         user = self.request.user
@@ -47,7 +58,7 @@ class AssignmentViewSet(BaseViewSet):
         # If user is a student, restrict to subjects they are enrolled in
         if hasattr(user, 'student_profile') and not user.is_staff and not hasattr(user, 'admin_profile'):
             student = user.student_profile
-            enrolled_subject_ids = StudentSubject.objects.filter(student=student).values_list('subject_id', flat=True)
+            enrolled_subject_ids = self._current_enrollments_for_student(student).values_list('subject_id', flat=True)
             return qs.filter(subject_id__in=enrolled_subject_ids)
 
         return qs

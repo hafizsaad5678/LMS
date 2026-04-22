@@ -59,6 +59,7 @@
                       <th>Subjects</th>
                       <th>Start Date</th>
                       <th>End Date</th>
+                      <th>Status</th>
                       <th>Actions</th>
                     </tr>
                   </thead>
@@ -69,6 +70,11 @@
                       <td><span class="badge bg-info">{{ sem.subject_count || 0 }}</span></td>
                       <td>{{ formatDate(sem.start_date) }}</td>
                       <td>{{ formatDate(sem.end_date) }}</td>
+                      <td>
+                        <span :class="['badge', getActiveBadgeClass(isSemesterActive(sem))]">
+                          {{ isSemesterActive(sem) ? 'Active' : 'Inactive' }}
+                        </span>
+                      </td>
                       <td>
                         <button @click="router.push({ name: ADMIN_ROUTES.SEMESTER_PROFILE.name, params: { id: sem.id } })" class="btn btn-sm btn-outline-primary" title="View Semester">
                           <i class="bi bi-eye"></i>
@@ -135,13 +141,13 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { AdminPageTemplate } from '@/components/shared/panels'
 import { ProfileHeader, InfoCard, StatsGrid } from '@/components/shared/profile'
 import { LoadingSpinner, EmptyState } from '@/components/shared/common'
 import { useProfileLoader } from '@/composables/shared'
-import { programService } from '@/services/shared'
+import { programService, subjectService } from '@/services/shared'
 import { formatDate } from '@/utils/formatters'
 import { ADMIN_ROUTES } from '@/utils/constants/routes'
 import { getActiveBadgeClass, getActiveStatusText } from '@/utils/badgeHelpers'
@@ -168,6 +174,89 @@ const { entityId, loading, entity, subData } = useProfileLoader({
 
 const semesters = computed(() => subData.value.semesters)
 const students = computed(() => subData.value.students)
+const subjectCreditsTotal = ref(null)
+
+const normalizeToArray = (payload) => {
+  if (Array.isArray(payload)) return payload
+  if (Array.isArray(payload?.results)) return payload.results
+  if (Array.isArray(payload?.data)) return payload.data
+  if (Array.isArray(payload?.data?.results)) return payload.data.results
+  return []
+}
+
+const fetchSubjectCreditsAcrossSemesters = async (semesterList) => {
+  if (!Array.isArray(semesterList) || semesterList.length === 0) {
+    subjectCreditsTotal.value = 0
+    return
+  }
+
+  try {
+    const results = await Promise.allSettled(
+      semesterList.map((semester) => subjectService.getAllSubjects({ semester: semester.id }))
+    )
+
+    const total = results.reduce((sum, result) => {
+      if (result.status !== 'fulfilled') return sum
+      const subjects = normalizeToArray(result.value)
+      return sum + subjects.reduce((subjectSum, subject) => {
+        const credits = Number(subject.credit_hours)
+        return subjectSum + (Number.isFinite(credits) ? credits : 0)
+      }, 0)
+    }, 0)
+
+    subjectCreditsTotal.value = total
+  } catch (error) {
+    console.error('Failed to compute subject credits for program profile:', error)
+    subjectCreditsTotal.value = null
+  }
+}
+
+watch(
+  semesters,
+  (value) => {
+    fetchSubjectCreditsAcrossSemesters(value)
+  },
+  { immediate: true }
+)
+
+const parseDateValue = (value) => {
+  if (!value) return null
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? null : date
+}
+
+const activeSemesterId = computed(() => {
+  const list = Array.isArray(semesters.value) ? semesters.value : []
+  if (list.length === 0) return null
+
+  const explicitlyActive = list.filter((sem) => String(sem.status || '').toLowerCase() === 'active')
+  if (explicitlyActive.length > 0) {
+    return explicitlyActive
+      .slice()
+      .sort((a, b) => Number(b.number || 0) - Number(a.number || 0))[0]?.id || null
+  }
+
+  const now = new Date()
+  const dateActive = list.filter((sem) => {
+    const start = parseDateValue(sem.start_date)
+    const end = parseDateValue(sem.end_date)
+    if (!start || !end) return false
+    return start <= now && now <= end
+  })
+
+  if (dateActive.length > 0) {
+    return dateActive
+      .slice()
+      .sort((a, b) => Number(b.number || 0) - Number(a.number || 0))[0]?.id || null
+  }
+
+  return null
+})
+
+const isSemesterActive = (semester) => {
+  if (!semester?.id) return false
+  return String(semester.id) === String(activeSemesterId.value)
+}
 
 const profileBadges = computed(() => {
   const badges = [{ text: `${entity.value.duration_years} Years`, class: 'bg-admin' }]
@@ -185,7 +274,17 @@ const courseInfoItems = computed(() => [
 
 const statsData = computed(() => {
   const totalSubjects = semesters.value.reduce((sum, s) => sum + (s.subject_count || 0), 0)
-  const totalCredits = entity.value.total_credits || semesters.value.reduce((sum, s) => sum + (s.credit_hours || 0), 0)
+  const creditsFromSubjects = Number(subjectCreditsTotal.value)
+  const programCredits = Number(
+    entity.value.total_credits
+    ?? entity.value.total_credit_hours
+    ?? entity.value.max_credit_hours
+    ?? entity.value.min_credit_hours
+  )
+
+  const totalCredits = Number.isFinite(creditsFromSubjects) && creditsFromSubjects > 0
+    ? creditsFromSubjects
+    : (Number.isFinite(programCredits) && programCredits > 0 ? programCredits : 0)
   return [
     { value: semesters.value.length, label: 'Semesters', icon: 'bi bi-calendar3', bgClass: 'bg-admin-light', iconColor: 'text-admin' },
     { value: totalSubjects, label: 'Total Subjects', icon: 'bi bi-book', bgClass: 'bg-success-light', iconColor: 'text-success' },

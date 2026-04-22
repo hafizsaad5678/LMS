@@ -306,6 +306,17 @@ class StudentViewSet(BaseProfileViewSet):
     def get_serializer_class(self):
         return StudentDetailSerializer if self.action == 'retrieve' else StudentSerializer
 
+    def _current_enrollments(self, student):
+        queryset = student.enrolled_subjects.all()
+
+        if getattr(student, 'session_id', None):
+            queryset = queryset.filter(semester__session_id=student.session_id)
+
+        if getattr(student, 'current_semester', None):
+            queryset = queryset.filter(semester__number=student.current_semester)
+
+        return queryset
+
     @staticmethod
     def _grade_point_from_percentage(percentage):
         if percentage >= 85:
@@ -579,8 +590,8 @@ class StudentViewSet(BaseProfileViewSet):
         )
         
         if request.query_params.get('current_only') == 'true':
-            if hasattr(student, 'current_semester_ref') and student.current_semester_ref:
-                queryset = queryset.filter(semester=student.current_semester_ref)
+            current_qs = self._current_enrollments(student).values_list('id', flat=True)
+            queryset = queryset.filter(id__in=current_qs)
         return Response(StudentSubjectSerializer(queryset, many=True).data)
     
     @action(detail=True)
@@ -592,8 +603,8 @@ class StudentViewSet(BaseProfileViewSet):
         
         student = self.get_object()
         
-        # Get all subjects the student is enrolled in
-        enrolled_subject_ids = student.enrolled_subjects.values_list('subject_id', flat=True)
+        # Keep announcements scoped to the student's current semester enrollment.
+        enrolled_subject_ids = self._current_enrollments(student).values_list('subject_id', flat=True)
         
         # Get announcements for those subjects + general announcements (no subject)
         announcements = Announcement.objects.filter(
@@ -610,7 +621,7 @@ class StudentViewSet(BaseProfileViewSet):
     @action(detail=True)
     def class_schedule(self, request, pk=None):
         student = self.get_object()
-        enrolled_subject_ids = student.enrolled_subjects.values_list('subject_id', flat=True)
+        enrolled_subject_ids = self._current_enrollments(student).values_list('subject_id', flat=True)
         from ..models import Timetable
         timetable = Timetable.objects.filter(subject_id__in=enrolled_subject_ids, is_active=True).select_related('subject', 'teacher')
         from ..serializers import TimetableSerializer
@@ -619,7 +630,7 @@ class StudentViewSet(BaseProfileViewSet):
     @action(detail=True)
     def exam_schedule(self, request, pk=None):
         student = self.get_object()
-        enrolled_subject_ids = student.enrolled_subjects.values_list('subject_id', flat=True)
+        enrolled_subject_ids = self._current_enrollments(student).values_list('subject_id', flat=True)
         from ..models import Exam
         exams = Exam.objects.filter(subject_id__in=enrolled_subject_ids).select_related('subject')
         from ..serializers import ExamSerializer
