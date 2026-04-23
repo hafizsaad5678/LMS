@@ -171,6 +171,9 @@ export const STUDENT_ROUTES = {
     // Communication
     ANNOUNCEMENTS: { name: 'StudentAnnouncements', path: '/student-dashboard/announcements' },
 
+    // Productivity
+    PRODUCTIVITY_TODO: { name: 'StudentTodoList', path: '/student-dashboard/todo' },
+
     // Account
     ACCOUNT: { name: 'StudentMyAccount', path: '/student-dashboard/account' }
 }

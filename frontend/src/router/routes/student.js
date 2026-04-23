@@ -47,6 +47,8 @@ export const studentRoutes = {
         { path: 'quizzes', name: 'StudentQuizList', component: () => import('../../views/student/quizzes/QuizList.vue') },
         { path: 'quizzes/:id', name: 'StudentTakeQuiz', component: () => import('../../views/student/quizzes/TakeQuiz.vue') },
 
+        { path: 'todo', name: 'StudentTodoList', component: () => import('../../views/student/productivity/TodoList.vue') },
+
         // Library routes
         { path: 'library', name: 'StudentLibraryCatalog', component: () => import('../../views/student/library/LibraryCatalog.vue') },
         { path: 'library/my-books', name: 'StudentMyBooks', component: () => import('../../views/student/library/MyBooks.vue') }

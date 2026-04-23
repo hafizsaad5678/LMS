@@ -14,12 +14,11 @@ const createMenuItem = (name, path, icon) => ({
 })
 
 export const mainNav = [
-  createMenuItem('Dashboard', '', null),
-  createMenuItem('My Subjects', '/resources/subjects', null),
-  createMenuItem('Assignments', '/assignments', null),
   createMenuItem('Quizzes', '/quizzes', null),
-  createMenuItem('Grades', '/grades', null),
-  createMenuItem('Attendance', '/attendance', null)
+  createMenuItem('Attendance', '/attendance', null),
+  createMenuItem('Todo List', '/todo', null),
+  createMenuItem('Library', '/library', null)
+
 ]
 
 export const sidebarSections = [
@@ -37,7 +36,7 @@ export const sidebarSections = [
       createMenuItem('Online Quizzes', '/quizzes', '🧩'),
       createMenuItem('My Grades', '/grades', '⭐'),
       createMenuItem('Grade Report', '/grades/report', '📈'),
-      createMenuItem('GPA / CGPA Calculator', '/grades/gpa-cgpa-calculator', '🧮')
+      createMenuItem('CGPA Calculator', '/grades/gpa-cgpa-calculator', '🧮')
     ]
   },
   {

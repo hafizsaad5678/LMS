@@ -76,11 +76,12 @@ import { ActivityFeed, QuickActionCard, StatCard } from '@/components/shared/com
 import studentPanelService from '@/services/student/studentPanelService'
 import { useStudentBase } from '@/composables/student/useStudentBase'
 import { STUDENT_ROUTES } from '@/utils/constants/routes'
-import { STORAGE_KEYS } from '@/utils/constants/storage'
 
 const { studentId, studentName, loadProfile } = useStudentBase()
 const loading = ref(true); const loadingActivities = ref(true)
 const activities = ref([]); const stats = ref(studentPanelService._getDefaultStats())
+const activeTodos = ref(0)
+const TODO_STORAGE_KEY = 'student_productivity_tasks_v2'
 
 const handleAIChat = () => {
   window.dispatchEvent(new CustomEvent('toggle-ai-chat', { 
@@ -88,18 +89,20 @@ const handleAIChat = () => {
   }))
 }
 
-// Persisted GPA from Calculator
-const manualGpa = ref(null)
-
-const currentGpaDisplay = computed(() => {
-  if (manualGpa.value !== null) return manualGpa.value
-  return stats.value.gpa || '0.00'
-})
+const refreshActiveTodoCount = () => {
+  try {
+    const raw = localStorage.getItem(TODO_STORAGE_KEY)
+    const list = raw ? JSON.parse(raw) : []
+    activeTodos.value = Array.isArray(list) ? list.filter((task) => !task.completed).length : 0
+  } catch {
+    activeTodos.value = 0
+  }
+}
 
 const dashboardStats = computed(() => [
   { value: stats.value.enrolledCourses, title: 'Enrolled Subjects', icon: 'bi bi-book-fill', type: 'student', variant: 'glass', route: STUDENT_ROUTES.ENROLLED_SUBJECTS.path },
   { value: stats.value.pendingAssignments, title: 'Pending Assignments', icon: 'bi bi-clipboard-check-fill', type: 'finance', variant: 'glass', route: STUDENT_ROUTES.VIEW_ASSIGNMENTS.path },
-  { value: currentGpaDisplay.value, title: 'Current GPA', icon: 'bi bi-mortarboard-fill', type: 'teacher', variant: 'glass', route: STUDENT_ROUTES.GPA_CGPA_CALCULATOR.path },
+  { value: activeTodos.value, title: 'Active Todos', icon: 'bi bi-list-check', type: 'teacher', variant: 'glass', route: STUDENT_ROUTES.PRODUCTIVITY_TODO.path },
   { value: stats.value.attendance, title: 'Attendance', icon: 'bi bi-calendar-check-fill', type: 'department', variant: 'glass', route: STUDENT_ROUTES.MY_ATTENDANCE.path }
 ])
 
@@ -107,10 +110,7 @@ const loadDashboard = async () => {
   try {
     await loadProfile()
     if (!studentId) return
-
-    // Check for manually set GPA in storage
-    const storedGpa = localStorage.getItem(STORAGE_KEYS.CURRENT_GPA(studentId))
-    if (storedGpa) manualGpa.value = storedGpa
+    refreshActiveTodoCount()
 
     const [dStats, activityList] = await Promise.all([
       studentPanelService.getDashboardStats(studentId),
