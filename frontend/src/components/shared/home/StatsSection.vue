@@ -1,37 +1,51 @@
 <template>
-  <section id="stats" class="py-4 bg-dark home-stats border-top border-bottom border-secondary">
+  <section id="stats" class="py-5 bg-white home-stats border-top border-bottom border-light-subtle">
     <div class="container">
+      <div class="row mb-5 text-center">
+        <div class="col-lg-8 mx-auto">
+          <h2 class="display-6 fw-bold mb-3 text-dark">Enterprise Impact at Scale</h2>
+          <p class="lead text-secondary mb-0" style="font-size: 1.1rem;">Live performance metrics from our global multi-tenant infrastructure.</p>
+        </div>
+      </div>
       <div class="row g-4 text-center">
         <div class="col-md-3 col-6">
           <div class="p-3 rounded-4 h-100 home-stat-card">
-            <div class="mb-2"><i class="bi bi-people-fill text-info fs-4"></i></div>
-            <h5 class="text-info fw-bold mb-1">{{ stats.activeStudents.toLocaleString() }}+</h5>
-            <small class="text-light-emphasis">Active Users</small>
+            <div class="d-inline-flex align-items-center justify-content-center bg-white border shadow-sm rounded-circle mb-3" style="width: 50px; height: 50px;">
+              <i class="bi bi-people-fill text-primary fs-4"></i>
+            </div>
+            <h5 class="text-primary fw-bold mb-1">{{ stats.activeStudents.toLocaleString() }}+</h5>
+            <small class="text-secondary">Active Users</small>
           </div>
         </div>
         <div class="col-md-3 col-6">
           <div class="p-3 rounded-4 h-100 home-stat-card">
-            <div class="mb-2"><i class="bi bi-person-workspace text-warning fs-4"></i></div>
-            <h5 class="text-warning fw-bold mb-1">{{ stats.expertTeachers.toLocaleString() }}+</h5>
-            <small class="text-light-emphasis">Expert Mentors</small>
+            <div class="d-inline-flex align-items-center justify-content-center bg-white border shadow-sm rounded-circle mb-3" style="width: 50px; height: 50px;">
+               <i class="bi bi-person-workspace text-primary fs-4"></i>
+            </div>
+            <h5 class="text-primary fw-bold mb-1">{{ stats.expertTeachers.toLocaleString() }}+</h5>
+            <small class="text-secondary">Expert Mentors</small>
           </div>
         </div>
         <div class="col-md-3 col-6">
           <div class="p-3 rounded-4 h-100 home-stat-card">
-            <div class="mb-2"><i class="bi bi-book-half text-success fs-4"></i></div>
+            <div class="d-inline-flex align-items-center justify-content-center bg-white border shadow-sm rounded-circle mb-3" style="width: 50px; height: 50px;">
+               <i class="bi bi-book-half text-success fs-4"></i>
+            </div>
             <h5 class="text-success fw-bold mb-1">{{ stats.totalCourses.toLocaleString() }}+</h5>
-            <small class="text-light-emphasis">Organizations</small>
+            <small class="text-secondary">Organizations</small>
           </div>
         </div>
         <div class="col-md-3 col-6">
           <div class="p-3 rounded-4 h-100 home-stat-card">
-            <div class="mb-2"><i class="bi bi-cloud-check-fill text-primary fs-4"></i></div>
+            <div class="d-inline-flex align-items-center justify-content-center bg-white border shadow-sm rounded-circle mb-3" style="width: 50px; height: 50px;">
+               <i class="bi bi-cloud-check-fill text-primary fs-4"></i>
+            </div>
             <h5 class="text-primary fw-bold mb-1">{{ stats.platformUptime }}%</h5>
-            <small class="text-light-emphasis">Platform Uptime</small>
+            <small class="text-secondary">Platform Uptime</small>
           </div>
         </div>
       </div>
-      <div v-if="loading" class="text-center mt-3 text-light-emphasis small">
+      <div v-if="loading" class="text-center mt-3 text-secondary small">
         <span class="spinner-grow spinner-grow-sm me-2" role="status" aria-hidden="true"></span>
         Connecting to live feed...
       </div>

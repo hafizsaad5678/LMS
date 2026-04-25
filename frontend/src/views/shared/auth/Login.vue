@@ -9,7 +9,7 @@
               <div class="badge bg-primary-subtle text-primary-emphasis border border-primary-subtle mb-3 px-3 py-2 fw-semibold">
                 Account Access
               </div>
-              <h1 class="h3 fw-bold text-dark mb-2">College LMS</h1>
+              <h1 class="h3 fw-bold text-dark mb-2">LearnMS</h1>
               <p class="text-muted mb-0">Sign in to continue your classes and coursework.</p>
             </div>
 

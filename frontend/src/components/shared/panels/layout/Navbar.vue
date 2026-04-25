@@ -23,8 +23,8 @@
           <div class="bg-white rounded p-2 d-none d-sm-flex" style="width: 40px; height: 40px; align-items: center; justify-content: center;">
             <span class="fs-5">📚</span>
           </div>
-          <span class="d-none d-sm-inline">College LMS</span>
-          <span class="d-sm-none">LMS</span>
+          <span class="d-none d-sm-inline">LearnMS</span>
+          <span class="d-sm-none">LearnMS</span>
         </a>
         
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">

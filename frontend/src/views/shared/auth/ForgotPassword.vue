@@ -9,7 +9,7 @@
               <div class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle mb-3 px-3 py-2 fw-semibold">
                 Account Recovery
               </div>
-              <h1 class="h3 fw-bold text-dark mb-2">College LMS</h1>
+              <h1 class="h3 fw-bold text-dark mb-2">LearnMS</h1>
               <p class="text-muted mb-0">Securely recover your account access in a few steps.</p>
             </div>
 

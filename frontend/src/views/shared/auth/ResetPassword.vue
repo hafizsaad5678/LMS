@@ -6,7 +6,7 @@
           <!-- Left Side - Form -->
           <div class="col-lg-6 p-5 p-lg-5">
             <div class="text-center text-lg-start mb-5">
-              <h1 class="h3 fw-bold text-dark mb-2">College LMS</h1>
+              <h1 class="h3 fw-bold text-dark mb-2">LearnMS</h1>
               <p class="text-muted">Learning Management System</p>
             </div>
 

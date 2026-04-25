@@ -4,12 +4,13 @@ import { authRoutes } from './routes/auth'
 import { adminRoutes } from './routes/admin'
 import { teacherRoutes } from './routes/teacher'
 import { studentRoutes } from './routes/student'
+import { publicRoutes } from './routes/public'
 import { ADMIN_ROUTES, TEACHER_ROUTES, STUDENT_ROUTES } from '@/utils/constants/routes'
-import { USER_ROLES } from '@/utils/constants/config'
-import { API_BASE_URL } from '@/utils/constants/config'
+import { USER_ROLES, API_BASE_URL } from '@/utils/constants/config'
 
 const routes = [
   ...authRoutes,
+  ...publicRoutes,
   adminRoutes,
   teacherRoutes,
   studentRoutes,
