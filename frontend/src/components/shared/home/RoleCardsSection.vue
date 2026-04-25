@@ -136,6 +136,16 @@ const testimonials = [
     halfStar: false,
   },
   {
+    bgImage: motivationQuote2,
+    initials: 'EJ',
+    avatarClass: 'bg-success',
+    name: 'Sefraz Chugtai',
+    role: 'Corporate Trainer',
+    quote: 'Moving from a traditional LMS to this multi-tier ecosystem made our global rollouts 3x faster.',
+    stars: 4,
+    halfStar: true,
+  },
+  {
     bgImage: motivationQuote3,
     initials: 'RD',
     avatarClass: 'bg-warning text-dark',
