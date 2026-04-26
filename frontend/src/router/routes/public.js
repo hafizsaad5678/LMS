@@ -8,8 +8,10 @@ import Help from '@/components/shared/home/Help.vue'
 import About from '@/components/shared/home/About.vue'
 import Careers from '@/components/shared/home/Careers.vue'
 import GetStarted from '@/components/shared/home/GetStarted.vue'
+import Presentation from '@/views/shared/public/Presentation.vue'
 
 export const publicRoutes = [
+    { path: '/presentation', name: 'Presentation', component: Presentation },
     { path: '/capabilities', name: 'Capabilities', component: Capabilities },
     { path: '/solutions', name: 'Solutions', component: Solutions },
     { path: '/customers', name: 'Customers', component: Customers },

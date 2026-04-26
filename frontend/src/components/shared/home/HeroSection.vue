@@ -10,12 +10,15 @@
           <p class="lead text-white mb-5 opacity-75" style="max-width: 500px; font-size: 1.1rem;">
             A unified platform to streamline admissions, elevate training, and empower educators with data-driven insights.
           </p>
-          <div class="d-flex justify-content-start gap-3 mb-4">
+          <div class="d-flex justify-content-start gap-3 flex-wrap mb-4">
             <button @click="$emit('primary-action')" class="btn btn-warning px-5 py-2 rounded-pill fw-bold shadow-sm text-dark home-bg-warning">
               {{ primaryActionLabel }}
             </button>
             <router-link to="/features" class="btn btn-outline-light px-4 py-2 rounded-pill fw-semibold border-white border-opacity-25">
               See Features
+            </router-link>
+            <router-link to="/presentation" class="btn btn-outline-warning px-4 py-2 rounded-pill fw-semibold">
+              <i class="bi bi-easel me-1"></i>Presentation
             </router-link>
           </div>
           
