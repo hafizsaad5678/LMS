@@ -37,6 +37,7 @@ INSTALLED_APPS = [
     'authapp',
     'lms_cors',
     'ai_core',
+    'institution_profile',
 ]
 
 MIDDLEWARE = [

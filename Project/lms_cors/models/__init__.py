@@ -1,8 +1,12 @@
 # Models Package - Import all models for Django to discover them
 from .base import BaseProfile, validate_profile_image_size, profile_image_path
 from .academic import (
-    Institution, Department, Program, AcademicSession, 
+    Department, Program, AcademicSession, 
     Semester, Subject, generate_sequential_id
+)
+from institution_profile.models import (
+    Institution, InstitutionGallery, InstitutionFeature, InstitutionEvent,
+    InstitutionAdmissionInfo, InstitutionContact, InstitutionTestimonial
 )
 from .people import Student, StudentSemesterHistory, Teacher, Admin, TeacherSubject, StudentSubject
 from .assignments import Assignment, SubmissionHistory, Grade
@@ -17,8 +21,9 @@ __all__ = [
     # Base
     'BaseProfile', 'validate_profile_image_size', 'profile_image_path',
     # Academic
-    'Institution', 'Department', 'Program', 'AcademicSession', 
-    'Semester', 'Subject', 'generate_sequential_id',
+    'Institution', 'InstitutionGallery', 'InstitutionFeature', 'InstitutionEvent',
+    'InstitutionAdmissionInfo', 'InstitutionContact', 'Department', 'Program', 'AcademicSession', 
+    'Semester', 'Subject', 'generate_sequential_id', 'InstitutionTestimonial',
     # People
     'Student', 'StudentSemesterHistory', 'Teacher', 'Admin', 'TeacherSubject', 'StudentSubject',
     # Assignments

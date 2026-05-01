@@ -1,5 +1,6 @@
 from django.db import models
 import uuid
+from institution_profile.models import Institution
 
 
 def generate_sequential_id(model_class, field_name, prefix, filter_field=None, filter_value=None):
@@ -42,47 +43,6 @@ def generate_sequential_id(model_class, field_name, prefix, filter_field=None, f
     return f"{prefix}{suffix}"
 
 
-class Institution(models.Model):
-    """
-    Institution model - The top-level entity representing a college/university.
-    All departments belong to an institution.
-    """
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    name = models.CharField(max_length=300, help_text="Full name of the institution")
-    short_name = models.CharField(max_length=50, blank=True, help_text="Abbreviation e.g., MIT, NUST")
-    code = models.CharField(max_length=20, unique=True, help_text="Unique institution code")
-    
-    # Contact Information
-    email = models.EmailField(blank=True, null=True)
-    phone = models.CharField(max_length=20, blank=True, null=True)
-    website = models.URLField(max_length=200, blank=True, null=True)
-    
-    # Address
-    address = models.TextField(blank=True, null=True)
-    city = models.CharField(max_length=100, blank=True, null=True)
-    state = models.CharField(max_length=100, blank=True, null=True)
-    country = models.CharField(max_length=100, default='Pakistan')
-    postal_code = models.CharField(max_length=20, blank=True, null=True)
-    
-    # Additional Info
-    established_year = models.IntegerField(null=True, blank=True)
-    logo = models.ImageField(upload_to='institution_logos/', blank=True, null=True)
-    description = models.TextField(blank=True, null=True)
-    
-    # Status
-    is_active = models.BooleanField(default=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    
-    class Meta:
-        ordering = ['name']
-        db_table = 'institutions'
-        verbose_name = 'Institution'
-        verbose_name_plural = 'Institutions'
-    
-    def __str__(self):
-        return f"{self.name} ({self.code})"
-
 
 class Department(models.Model):
     """Department model for academic departments - belongs to an Institution"""
@@ -100,7 +60,12 @@ class Department(models.Model):
     head_of_department = models.CharField(max_length=200, blank=True, null=True)
     email = models.EmailField(blank=True, null=True)
     phone = models.CharField(max_length=20, blank=True, null=True)
+    image = models.ImageField(upload_to='department_images/', blank=True, null=True)
     description = models.TextField(blank=True)
+    vision = models.TextField(blank=True, help_text="Department's future goals and vision")
+    mission = models.TextField(blank=True, help_text="Department's core mission and purpose")
+    academic_focus = models.TextField(blank=True, help_text="Main research or academic areas")
+    facilities = models.TextField(blank=True, help_text="Labs, libraries, and other facilities")
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

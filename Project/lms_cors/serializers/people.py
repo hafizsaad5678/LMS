@@ -300,3 +300,16 @@ class TeacherDetailSerializer(TeacherSerializer):
     teaching_subjects = TeacherSubjectSerializer(many=True, read_only=True)
     created_assignments = AssignmentSerializer(many=True, read_only=True)
     marked_attendance = AttendanceSerializer(many=True, read_only=True)
+    
+    assignments_count = serializers.SerializerMethodField()
+    classes_this_week = serializers.SerializerMethodField()
+
+    def get_assignments_count(self, obj):
+        return obj.created_assignments.count()
+
+    def get_classes_this_week(self, obj):
+        from ..models import Timetable
+        return Timetable.objects.filter(
+            teacher=obj,
+            is_active=True
+        ).count()

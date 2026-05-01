@@ -6,6 +6,7 @@ from rest_framework import status
 from rest_framework.throttling import SimpleRateThrottle
 from django.core.validators import validate_email
 from django.core.exceptions import ValidationError
+from django.shortcuts import get_object_or_404
 
 from ..models.people import Student, Teacher
 from ..models.academic import Subject, Institution
@@ -57,6 +58,9 @@ def public_stats(request):
         "institutions": institutions_count,
         "platformUptime": 99.98
     })
+
+
+
 
 @api_view(['POST'])
 @permission_classes([AllowAny])

@@ -89,6 +89,6 @@ urlpatterns = [
     path('public/stats/', public_stats, name='public-stats'),
     path('public/contact/', submit_contact, name='public-contact'),
     path('public/feedback/', submit_feedback, name='public-feedback'),
-    
+
     path('', include(router.urls)),
 ]

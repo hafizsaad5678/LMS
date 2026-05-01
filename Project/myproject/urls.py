@@ -10,6 +10,7 @@ urlpatterns = [
     path(os.environ.get('ADMIN_URL', 'admin/'), admin.site.urls),
     path('api/', include('authapp.urls')),
     path('api/', include('lms_cors.urls')),
+    path('api/institution/', include('institution_profile.urls')),
     path('api/ai/', include('ai_core.urls')),
 ]
 

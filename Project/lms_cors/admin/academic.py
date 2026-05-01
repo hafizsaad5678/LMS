@@ -1,18 +1,10 @@
 from django.contrib import admin
-from ..models import Institution, Department, Program, AcademicSession, Semester, Subject
-
-
-@admin.register(Institution)
-class InstitutionAdmin(admin.ModelAdmin):
-    list_display = ['name', 'short_name', 'code', 'city', 'country', 'department_count', 'is_active']
-    list_filter = ['is_active', 'country', 'city', 'established_year']
-    search_fields = ['name', 'short_name', 'code', 'email', 'city']
-    list_editable = ['is_active']
-    list_per_page = 20
-    
-    @admin.display(description='Departments')
-    def department_count(self, obj):
-        return obj.departments.count()
+from django.utils import timezone
+from institution_profile.models import Institution
+from ..models import (
+    Department, Program,
+    AcademicSession, Semester, Subject
+)
 
 
 @admin.register(Department)
@@ -50,12 +42,29 @@ class ProgramAdmin(admin.ModelAdmin):
 
 @admin.register(AcademicSession)
 class AcademicSessionAdmin(admin.ModelAdmin):
-    list_display = ['session_name', 'session_code', 'program', 'status', 'start_year', 'end_year', 'is_active']
+    list_display = [
+        'session_name', 'session_code', 'program', 'status', 'start_year', 'end_year',
+        'admission_start_date', 'admission_end_date', 'admissions_open', 'is_active'
+    ]
     list_filter = ['status', 'is_active', 'program', 'program__department']
     search_fields = ['session_name', 'session_code', 'program__name']
     list_editable = ['status', 'is_active']
     ordering = ['-start_year']
     list_per_page = 20
+
+    @admin.display(description='Admissions Open', boolean=True)
+    def admissions_open(self, obj):
+        today = timezone.now().date()
+        start_date = obj.admission_start_date
+        end_date = obj.admission_end_date
+
+        if start_date and end_date:
+            return start_date <= today <= end_date
+        if start_date and not end_date:
+            return today >= start_date
+        if end_date and not start_date:
+            return today <= end_date
+        return False
 
 
 @admin.register(Semester)

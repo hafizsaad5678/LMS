@@ -1,8 +1,7 @@
 # Admin Package - Import all admin classes
 from .base import BaseAdmin
 from .academic import (
-    InstitutionAdmin, DepartmentAdmin, ProgramAdmin,
-    AcademicSessionAdmin, SemesterAdmin, SubjectAdmin
+    DepartmentAdmin, ProgramAdmin, AcademicSessionAdmin, SemesterAdmin, SubjectAdmin
 )
 from .people import StudentAdmin, TeacherAdmin, AdminAdmin, TeacherSubjectAdmin, StudentSubjectAdmin
 from .assignments import AssignmentAdmin, SubmissionHistoryAdmin, GradeAdmin

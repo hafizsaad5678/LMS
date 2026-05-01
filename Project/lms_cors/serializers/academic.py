@@ -1,7 +1,9 @@
 from rest_framework import serializers
 from ..models import (
-    Institution, Department, Program, AcademicSession, Semester, Subject,
-    Student, Teacher, TeacherSubject, Timetable, Grade, StudentMark
+    Institution, InstitutionGallery, InstitutionFeature, InstitutionEvent,
+    InstitutionAdmissionInfo, InstitutionContact, Department, Program,
+    AcademicSession, Semester, Subject, Student, Teacher, TeacherSubject,
+    Timetable, Grade, StudentMark, InstitutionTestimonial
 )
 
 
@@ -18,12 +20,14 @@ class InstitutionSerializer(serializers.ModelSerializer):
         return obj.departments.count()
 
 
+
 class DepartmentSerializer(serializers.ModelSerializer):
     institution_name = serializers.CharField(source='institution.name', read_only=True)
     institution_code = serializers.CharField(source='institution.code', read_only=True)
     program_count = serializers.SerializerMethodField()
     teacher_count = serializers.SerializerMethodField()
     student_count = serializers.SerializerMethodField()
+    image = serializers.ImageField(required=False, allow_null=True)
     
     class Meta:
         model = Department
