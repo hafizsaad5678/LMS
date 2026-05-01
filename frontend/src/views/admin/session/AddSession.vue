@@ -89,6 +89,14 @@
               <label class="form-label">Total Capacity <span class="text-danger">*</span></label>
               <input v-model.number="formData.total_capacity" type="number" class="form-control" min="1" placeholder="60" required>
             </div>
+            <div class="col-md-6">
+              <BaseInput v-model="formData.admission_start_date" type="date" label="Admission Start Date" />
+              <small class="text-muted">When applications open</small>
+            </div>
+            <div class="col-md-6">
+              <BaseInput v-model="formData.admission_end_date" type="date" label="Admission End Date" />
+              <small class="text-muted">When applications close</small>
+            </div>
             <div class="col-12">
               <label class="form-label">Description</label>
               <textarea v-model="formData.description" class="form-control" rows="2" placeholder="Additional notes..."></textarea>
@@ -120,6 +128,7 @@
                   <p class="mb-2"><strong>Code:</strong> {{ formData.session_code }}</p>
                   <p class="mb-2"><strong>Duration:</strong> {{ formData.start_year }} - {{ formData.end_year || suggestedEndYear }}</p>
                   <p class="mb-0"><strong>Capacity:</strong> {{ formData.total_capacity }} students</p>
+                  <p class="mt-2 mb-0"><strong>Admissions:</strong> {{ formData.admission_start_date || 'Not set' }} - {{ formData.admission_end_date || 'Not set' }}</p>
                 </div>
               </div>
             </div>
@@ -161,7 +170,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useAlert } from '@/composables/shared'
 import { useRouter } from 'vue-router'
 import { AdminPageTemplate } from '@/components/shared/panels'
-import { AlertMessage } from '@/components/shared/common'
+import { AlertMessage, BaseInput } from '@/components/shared/common'
 import { sessionService, programService, cacheService } from '@/services/shared'
 import { ADMIN_ROUTES } from '@/utils/constants/routes'
 
@@ -191,7 +200,9 @@ const formData = ref({
   end_year: null,
   total_capacity: 60,
   status: 'upcoming',
-  description: ''
+  description: '',
+  admission_start_date: null,
+  admission_end_date: null
 })
 
 const selectedProgram = computed(() => programs.value.find(p => p.id === formData.value.program))

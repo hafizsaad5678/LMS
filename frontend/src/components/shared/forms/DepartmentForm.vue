@@ -56,6 +56,19 @@
           <textarea v-model="modelValue.description" class="form-control" rows="4" placeholder="Enter department description..."></textarea>
         </div>
 
+        <!-- Department Photo -->
+        <div class="mb-4">
+          <h6 class="text-dark fw-semibold mb-3 pb-2 border-bottom">
+            <i class="bi bi-image me-2"></i>Department Photo
+          </h6>
+          <ImageUpload 
+            v-model="modelValue.image" 
+            label="Upload Photo" 
+            :existing-image-url="typeof modelValue.image === 'string' ? getFileUrl(modelValue.image) : ''"
+          />
+          <small class="text-muted d-block mt-2">This photo will be used as a background on the institution profile.</small>
+        </div>
+
         <!-- Status (Edit Mode) -->
         <div v-if="isEditMode" class="mb-4">
           <div class="form-check form-switch">
@@ -80,7 +93,8 @@
 </template>
 
 <script setup>
-import { BaseInput } from '@/components/shared/common'
+import { BaseInput, ImageUpload } from '@/components/shared/common'
+import { getFileUrl } from '@/utils/constants/config'
 
 defineProps({
   modelValue: { type: Object, required: true },

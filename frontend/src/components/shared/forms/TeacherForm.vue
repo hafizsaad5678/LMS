@@ -22,6 +22,15 @@
       </div>
 
       <form @submit.prevent="$emit('submit')">
+        <!-- Profile Image -->
+        <div class="mb-4 text-center">
+          <ImageUpload 
+            v-model="formData.profile_image" 
+            label="Profile Picture" 
+            :existing-image-url="typeof formData.profile_image === 'string' ? getFileUrl(formData.profile_image) : ''"
+          />
+        </div>
+
         <!-- Personal Information -->
         <div class="mb-4">
           <h6 class="text-dark fw-semibold mb-3 pb-2 border-bottom">
@@ -158,7 +167,8 @@
 
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { BaseInput, SelectInput } from '@/components/shared/common'
+import { BaseInput, SelectInput, ImageUpload } from '@/components/shared/common'
+import { getFileUrl } from '@/utils/constants/config'
 import { useCascadingDropdowns } from '@/composables/shared'
 import { GENDER_OPTIONS, DESIGNATION_OPTIONS } from '@/utils/constants/options'
 import { api } from '@/services/shared'

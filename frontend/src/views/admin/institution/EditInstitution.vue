@@ -51,8 +51,7 @@ import { AdminPageTemplate } from '@/components/shared/panels'
 import { AlertMessage, LoadingSpinner } from '@/components/shared/common'
 import { InstitutionForm } from '@/components/shared/forms'
 import { useEntityForm } from '@/composables/shared'
-import { institutionService } from '@/services/shared'
-import { cacheService } from '@/services/shared'
+import { institutionService, cacheService, toFormData } from '@/services/shared'
 import { ADMIN_ROUTES } from '@/utils/constants/routes'
 
 const router = useRouter()
@@ -78,9 +77,11 @@ const { alert, loading, submitting, showAlert, goToList } = useEntityForm({
 loading.value = true
 
 const form = ref({
-  name: '', short_name: '', code: '', established_year: null, website: '',
+  name: '', short_name: '', code: '', slug: '', established_year: null, website: '',
   email: '', phone: '', address: '', city: '', state: '', postal_code: '',
-  country: 'Pakistan', description: '', is_active: true
+  country: 'Pakistan', description: '', is_active: true,
+  tagline: '', theme_color: '#3b82f6', logo: null, cover_image: null,
+  principal_name: '', principal_message: '', principal_image: null
 })
 
 const loadInstitution = async () => {
@@ -90,12 +91,16 @@ const loadInstitution = async () => {
   try {
     const inst = await institutionService.getInstitutionById(id)
     Object.assign(form.value, {
-      name: inst.name || '', short_name: inst.short_name || '', code: inst.code || '',
+      name: inst.name || '', short_name: inst.short_name || '', code: inst.code || '', slug: inst.slug || '',
       established_year: inst.established_year || null, website: inst.website || '',
       email: inst.email || '', phone: inst.phone || '', address: inst.address || '',
       city: inst.city || '', state: inst.state || '', postal_code: inst.postal_code || '',
       country: inst.country || 'Pakistan', description: inst.description || '',
-      is_active: inst.is_active !== false
+      is_active: inst.is_active !== false,
+      tagline: inst.tagline || '', theme_color: inst.theme_color || '#3b82f6',
+      logo: inst.logo || null, cover_image: inst.cover_image || null,
+      principal_name: inst.principal_name || '', principal_message: inst.principal_message || '',
+      principal_image: inst.principal_image || null
     })
   } catch (error) {
     showAlert('error', 'Failed to load institution', 'Error')
@@ -107,16 +112,24 @@ const handleSubmit = async () => {
   submitting.value = true
   try {
     const data = { ...form.value }
-    Object.keys(data).forEach(key => {
-      if ((data[key] === '' || data[key] === null) && key !== 'is_active') delete data[key]
-    })
-    await institutionService.updateInstitution(institutionId.value, data)
+    
+    // Don't send existing image URLs as strings - DRF expects Files or null
+    if (typeof data.logo === 'string') delete data.logo
+    if (typeof data.cover_image === 'string') delete data.cover_image
+    if (typeof data.principal_image === 'string') delete data.principal_image
+    
+    // Convert to FormData for image handling
+    const formData = toFormData(data)
+    
+    await institutionService.updateInstitution(institutionId.value, formData)
+    
     cacheService.clear('institutions_list')
     cacheService.clearPattern('institution')
     showAlert('success', 'Institution updated successfully!', 'Success!')
     setTimeout(() => router.push(ADMIN_ROUTES.INSTITUTION_LIST.path), 1500)
   } catch (error) {
-    showAlert('error', error.response?.data?.detail || 'Failed to update institution.', 'Error!')
+    console.error('Update Error:', error.response?.data)
+    showAlert('error', error.response?.data?.detail || 'Failed to update institution. Please check image fields.', 'Error!')
   } finally { submitting.value = false }
 }
 

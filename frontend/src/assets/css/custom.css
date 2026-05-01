@@ -1969,3 +1969,188 @@ body {
 .rounded-4 {
     border-radius: 1rem !important;
 }
+
+/* ==================== PUBLIC INSTITUTION PROFILE ==================== */
+/* Unified Design System for Institutional Profile */
+
+:root {
+    --brand-rgb: 74, 144, 226; /* Default Blue RGB */
+}
+
+/* Global Public Utilities */
+.py-10 { padding-top: 6rem; padding-bottom: 6rem; }
+.pb-10 { padding-bottom: 6rem; }
+.pt-10 { padding-top: 6rem; }
+.mb-10 { margin-bottom: 5rem; }
+.title-font { font-family: 'Playfair Display', serif; }
+.letter-spacing-1 { letter-spacing: 0.1em; }
+.letter-spacing-2 { letter-spacing: 0.2em; }
+.tracking-widest { letter-spacing: 0.2em; }
+.tracking-wider { letter-spacing: 0.1em; }
+.tracking-tighter { letter-spacing: -0.02em; }
+.transition-all { transition: all 0.5s ease; }
+.hover-scale { cursor: pointer; transition: all 0.5s cubic-bezier(0.165, 0.84, 0.44, 1); }
+.hover-scale:hover { transform: scale(1.05); box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1) !important; }
+.hover-scale:hover img { transform: scale(1.1); }
+.hover-lift { transition: transform 0.2s ease, box-shadow 0.2s ease; }
+.hover-lift:hover { transform: translateY(-5px); box-shadow: 0 10px 25px rgba(0,0,0,0.1) !important; }
+
+/* Section Headers */
+.section-header .subtitle { letter-spacing: 0.2em; font-size: 0.75rem; color: var(--brand); font-weight: 700; text-transform: uppercase; margin-bottom: 1rem; }
+.header-line { width: 60px; height: 4px; background-color: var(--brand); border-radius: 2px; margin-top: 1.5rem; }
+
+/* Buttons */
+.btn-brand-primary { background-color: var(--brand); color: white; border: none; transition: all 0.3s ease; }
+.btn-brand-primary:hover { filter: brightness(0.9); color: white; transform: translateY(-2px); box-shadow: 0 10px 20px rgba(var(--brand-rgb), 0.2); }
+.btn-brand-outline { border: 2px solid var(--brand); color: var(--brand); background: transparent; transition: all 0.3s ease; }
+.btn-brand-outline:hover { background: var(--brand); color: white; }
+.btn-brand-lg { background-color: var(--brand); color: white; border: none; transition: all 0.3s ease; padding: 1rem 3rem; font-weight: 700; border-radius: 50rem; }
+.btn-brand-lg:hover { transform: translateY(-3px); box-shadow: 0 10px 20px rgba(var(--brand-rgb), 0.3); color: white; }
+.btn-outline-dark-lg { border: 2px solid #212529; color: #212529; transition: all 0.3s ease; padding: 1rem 3rem; font-weight: 700; border-radius: 50rem; }
+.btn-outline-dark-lg:hover { background: #212529; color: white; transform: translateY(-3px); }
+
+/* Features & Highlights */
+.feature-card { background: white; border-radius: 24px; border: 1px solid #f1f5f9; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); transition: all 0.3s ease; }
+.feature-card:hover { transform: translateY(-10px); box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); border-color: var(--brand-soft); }
+.feature-icon-box { width: 70px; height: 70px; border-radius: 20px; background-color: var(--brand-soft); color: var(--brand); transition: all 0.4s ease; display: flex; align-items: center; justify-content: center; }
+.feature-card:hover .feature-icon-box { background-color: var(--brand); color: white; transform: rotate(10deg); }
+
+/* Hero Section */
+.institution-hero { position: relative; overflow: hidden; }
+.hero-bg { background-size: cover; background-position: center; transition: transform 1.2s ease; position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+.hero-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(135deg, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.4) 100%); z-index: 1; }
+.hero-overlay-dark { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(135deg, rgba(15, 23, 42, 0.85) 0%, rgba(15, 23, 42, 0.7) 100%); z-index: 1; }
+.hero-accent-line { width: 40px; height: 2px; background-color: var(--brand); }
+.hero-line { width: 80px; height: 4px; background-color: white; border-radius: 2px; }
+
+.hero-title { font-family: 'Playfair Display', serif; letter-spacing: -0.02em; line-height: 1.1; }
+.hero-description { max-width: 600px; line-height: 1.8; }
+.stats-card-floating { position: absolute; width: 200px; z-index: 2; animation: float 6s ease-in-out infinite; background: white; border-radius: 1rem; box-shadow: 0 10px 25px rgba(0,0,0,0.1); border: 0; padding: 1.5rem; }
+.stats-card-floating.card-1 { top: -100px; right: 0; animation-delay: 0s; }
+.stats-card-floating.card-2 { top: 50px; right: -50px; animation-delay: 2s; }
+.stats-card-floating.card-3 { top: 200px; right: 50px; animation-delay: 4s; }
+@keyframes float { 0% { transform: translateY(0px); } 50% { transform: translateY(-20px); } 100% { transform: translateY(0px); } }
+
+/* About Section */
+.principal-portrait { background: white; transition: all 0.3s ease; }
+.principal-img { width: 100%; height: auto; max-height: 400px; object-fit: cover; display: block; }
+.message-title { color: #1e293b; font-family: 'Playfair Display', serif; font-size: 2rem; letter-spacing: -0.01em; }
+.message-content { line-height: 1.6; font-size: 0.95rem; color: #475569 !important; }
+.message-signature { color: #1e293b; font-family: 'Playfair Display', serif; font-size: 1.25rem; }
+.description-text { white-space: pre-wrap; }
+.logo-placeholder { height: 450px; width: 100%; background-color: #f8f9fa; display: flex; align-items: center; justify-content: center; }
+.placeholder-icon { font-size: 5rem; color: #6c757d; }
+
+/* Admissions Section */
+.program-admission-card { background: linear-gradient(135deg, rgba(var(--brand-rgb), 0.08), rgba(15, 23, 42, 0.02)); transition: transform 0.3s ease; border-radius: 1rem; border: 0; }
+.program-admission-card:hover { transform: translateY(-5px); }
+
+/* Department & Programs */
+.dept-subtitle { color: var(--brand); letter-spacing: 0.12em; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; }
+.dept-title { font-family: 'Playfair Display', 'Georgia', serif; font-size: clamp(1.7rem, 3vw, 2.4rem); }
+.badge-dept { background-color: var(--brand-soft); color: var(--brand); font-size: 0.85rem; font-weight: 600; border-radius: 50rem; padding: 0.5rem 1rem; }
+.dept-description { line-height: 1.6; min-height: 60px; overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
+.program-description { display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden; -webkit-line-clamp: 3; line-height: 1.5; font-size: 0.8rem; }
+.admission-panel { background: linear-gradient(135deg, rgba(var(--brand-rgb), 0.08), rgba(15, 23, 42, 0.02)); border: 1px solid rgba(15, 23, 42, 0.08); padding: 1rem; border-radius: 0.75rem; }
+.department-card.has-image { background-image: var(--bg-image); background-size: cover; background-position: center; }
+.card-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(to bottom, rgba(15, 23, 42, 0.85), rgba(15, 23, 42, 0.95)); z-index: 0; }
+
+/* Faculty Section */
+.faculty-hero { height: 350px; position: relative; background-size: cover; background-position: center; background-attachment: fixed; display: flex; align-items: center; }
+.directory-image-box { height: 350px; border: 5px solid #fff; border-radius: 1rem; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+.directory-image-box img { height: 100%; width: 100%; object-fit: cover; }
+.directory-title { font-weight: 800; letter-spacing: 0.02em; font-size: 1.8rem; }
+.dept-link-btn { color: #4a5568; font-weight: 500; font-size: 0.95rem; transition: all 0.2s ease; position: relative; padding: 0.5rem 0; }
+.dept-link-btn:hover, .dept-link-btn.active { color: #00bcd4; }
+.dept-link-btn.active { font-weight: 700; }
+.dept-link-btn.active::after { content: ''; position: absolute; bottom: 5px; left: 32px; width: calc(100% - 32px); height: 1px; background: #00bcd4; }
+.line-1 { height: 2px; background: #00bcd4; width: 60%; }
+.line-2 { height: 2px; background: #00bcd4; width: 100%; }
+
+.faculty-modern-card { background: white; transition: all 0.4s cubic-bezier(0.165, 0.84, 0.44, 1); height: 100%; display: flex; flex-direction: column; border-radius: 1rem; overflow: hidden; }
+.faculty-modern-card:hover { transform: translateY(-10px); box-shadow: 0 30px 60px -12px rgba(0,0,0,0.12) !important; }
+.card-image-section { height: 220px; overflow: hidden; background: #f1f5f9; }
+.faculty-img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.6s ease; }
+.faculty-placeholder { height: 100%; width: 100%; display: flex; align-items: center; justify-content: center; color: #cbd5e1; }
+.faculty-placeholder i { font-size: 5rem; }
+.faculty-modern-card:hover .faculty-img { transform: scale(1.08); }
+
+.dept-badge-custom { background-color: var(--brand-soft); color: #1e293b; border: 1px solid rgba(var(--brand-rgb), 0.2); font-weight: 700; padding: 0.25rem 1rem; border-radius: 50rem; }
+.designation-pill { background-color: var(--brand-soft); color: var(--brand); font-weight: 600; letter-spacing: 0.02em; padding: 0.25rem 1rem; border-radius: 50rem; }
+
+/* Search Styles */
+.search-container { transition: all 0.3s ease; border: 1px solid #e2e8f0 !important; max-width: 300px; }
+.search-container:focus-within { border-color: var(--brand) !important; box-shadow: 0 10px 25px -5px rgba(var(--brand-rgb), 0.1) !important; }
+
+
+/* Events Section */
+.event-subtitle { color: var(--brand); letter-spacing: 0.12em; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; }
+.event-title { font-family: 'Playfair Display', 'Georgia', serif; font-size: clamp(1.7rem, 3vw, 2.4rem); }
+.badge-event { background-color: var(--brand-soft); color: var(--brand); font-size: 0.85rem; font-weight: 600; border-radius: 50rem; padding: 0.5rem 1rem; }
+
+/* Gallery Section */
+.gallery-item-card { cursor: pointer; transition: all 0.4s cubic-bezier(0.165, 0.84, 0.44, 1); border-radius: 1rem; overflow: hidden; }
+.gallery-item-card:hover { transform: translateY(-8px); box-shadow: 0 15px 30px -10px rgba(0,0,0,0.15) !important; }
+.gallery-overlay { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: linear-gradient(to top, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0) 60%); opacity: 0; transition: opacity 0.3s ease; display: flex; flex-direction: column; justify-content: flex-end; padding: 1rem; }
+.gallery-item-card:hover .gallery-overlay { opacity: 1; }
+.gallery-lightbox { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.95); z-index: 9999; display: flex; align-items: center; justify-content: center; padding: 20px; }
+.lightbox-content { max-width: 90%; max-height: 85%; position: relative; }
+.lightbox-close { position: absolute; top: 30px; right: 30px; background: none; border: none; color: white; font-size: 2.5rem; cursor: pointer; z-index: 10001; }
+.lightbox-nav { position: absolute; top: 50%; transform: translateY(-50%); background: rgba(255, 255, 255, 0.1); border: none; color: white; width: 60px; height: 60px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 2rem; cursor: pointer; transition: all 0.3s ease; z-index: 10001; }
+.lightbox-nav:hover { background: rgba(255, 255, 255, 0.2); }
+.lightbox-nav.prev { left: 40px; }
+.lightbox-nav.next { right: 40px; }
+
+/* Testimonials */
+.testimonial-section { background-color: var(--brand-soft); }
+.testimonial-subtitle { color: var(--brand); letter-spacing: 0.12em; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; }
+.testimonial-title { font-family: 'Playfair Display', 'Georgia', serif; font-size: clamp(1.7rem, 3vw, 2.4rem); }
+.testimonial-content { line-height: 1.7; font-style: italic; min-height: 80px; color: #475569 !important; }
+.profile-img, .profile-placeholder { width: 54px; height: 54px; border-radius: 50%; }
+
+/* Navbar */
+.nav-logo-wrap { width: 48px; }
+.nav-logo { object-fit: contain; max-height: 48px; }
+.nav-name { font-family: 'Times New Roman', Times, serif; text-transform: uppercase; font-size: 0.95rem; letter-spacing: 0.02em; font-weight: 700; }
+.nav-link-custom { font-size: 0.8rem; }
+.btn-login { background-color: var(--brand) !important; border: none; color: white !important; transition: all 0.3s ease; font-size: 0.75rem; }
+.btn-login:hover { background-color: var(--brand) !important; color: white !important; filter: brightness(1.2); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(var(--brand-rgb), 0.3); }
+.nav-hover-brand { position: relative; padding-bottom: 0.2rem; transition: color 0.25s ease; }
+.nav-hover-brand::after { content: ''; position: absolute; left: 0; bottom: 0; width: 0; height: 2px; background: var(--brand); transition: width 0.25s ease; }
+.nav-hover-brand:hover::after, .nav-hover-brand.active::after { width: 100%; }
+
+/* Footer */
+.footer-main { background-color: #0f172a; color: #ffffff; }
+.branding-office-card { background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.05); padding: 1.5rem; border-radius: 1rem; }
+.social-icon { width: 32px; height: 32px; background: rgba(255, 255, 255, 0.05); color: white; border-radius: 8px; display: flex; align-items: center; justify-content: center; text-decoration: none; transition: all 0.3s ease; border: 1px solid rgba(255, 255, 255, 0.1); }
+.social-icon:hover { background: white; color: #0f172a; }
+.crest-circle { width: 80px; height: 80px; background: white; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center; padding: 2px; border: 4px solid rgba(255, 255, 255, 0.1); }
+.footer-crest-img { width: 100%; height: 100%; object-fit: contain; }
+.contact-item { background: rgba(255, 255, 255, 0.02); border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.05); padding: 0.75rem; transition: all 0.2s ease; }
+.contact-item:hover { background: rgba(255, 255, 255, 0.05); border-color: rgba(255, 255, 255, 0.1); }
+
+.footer-dept-title { font-size: 0.85rem; font-weight: 700; color: white; letter-spacing: 0.02em; }
+
+
+/* Forms */
+.form-control:focus, .form-select:focus { border-color: var(--brand); box-shadow: 0 0 0 0.25rem rgba(var(--brand-rgb), 0.1); }
+
+/* Additional Utilities for Strict Cleanup */
+.fs-clamp-lg { font-size: clamp(1.7rem, 3vw, 2.4rem); }
+.fs-clamp-md { font-size: clamp(1.3rem, 2.4vw, 2rem); }
+.extra-small { font-size: 0.7rem; }
+.extra-extra-small { font-size: 0.6rem; }
+.size-64 { width: 64px; height: 64px; }
+.lh-1-7 { line-height: 1.7; }
+.ls-05 { letter-spacing: 0.05em; }
+.tracking-wide { letter-spacing: 0.05em; }
+.white-space-pre { white-space: pre-wrap; }
+
+/* Admin UI Components */
+.btn-icon { width: 32px; height: 32px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border: none; transition: all 0.2s ease; }
+.btn-icon:hover { transform: translateY(-2px); box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+.btn-light-danger { background-color: #fff5f5; color: #dc3545; }
+.btn-light-danger:hover { background-color: #dc3545; color: white !important; }
+.status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.bg-admin-soft { background-color: rgba(220, 53, 69, 0.08); }
+

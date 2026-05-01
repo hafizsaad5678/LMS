@@ -28,6 +28,19 @@ export const institutionService = {
     },
 
     /**
+     * Get public institution profile by slug
+     */
+    async getInstitutionProfileBySlug(slug) {
+        try {
+            const response = await api.get(`/institution/${slug}/`)
+            return response.data
+        } catch (error) {
+            console.error(`Error fetching institution profile ${slug}:`, error.response?.data || error.message)
+            throw error
+        }
+    },
+
+    /**
      * Create a new institution
      */
     async createInstitution(data) {

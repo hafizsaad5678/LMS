@@ -71,56 +71,54 @@
       empty-subtitle="Create your first session to get started"
     >
       <template #cell-session_name="{ row }">
-        <div class="d-flex align-items-center session-cell">
-          <div class="avatar-circle avatar-session me-2">{{ row.session_code?.substring(0, 2) || 'AS' }}</div>
-          <div>
-            <div class="fw-semibold text-dark">{{ row.session_name }}</div>
-            <small class="text-muted">{{ row.session_code }}</small>
-          </div>
+        <div class="py-1">
+          <div class="fw-bold text-dark mb-0">{{ row.session_name }}</div>
+          <div class="text-muted small lh-1">{{ row.session_code }}</div>
         </div>
       </template>
 
       <template #cell-program_name="{ row }">
-        <div class="program-cell">
-          <div class="program-name">{{ row.program_name }}</div>
-          <span :class="getProgramLevelBadgeClass(row.program_level)">{{ row.program_level_display }}</span>
+        <div class="py-1">
+          <div class="text-dark fw-semibold mb-1 small">{{ row.program_name }}</div>
+          <span class="badge bg-primary rounded-pill px-3 py-1 fw-bold" style="font-size: 0.65rem; letter-spacing: 0.02em;">
+            {{ row.program_level_display }}
+          </span>
         </div>
       </template>
 
       <template #cell-years="{ row }">
-        <span class="text-nowrap">{{ row.start_year }} - {{ row.end_year }}</span>
+        <span class="text-dark fw-medium">{{ row.start_year }} - {{ row.end_year }}</span>
       </template>
 
       <template #cell-capacity="{ row }">
-        <div class="capacity-indicator">
-          <div class="d-flex justify-content-between mb-1 capacity-meta">
-            <small>{{ row.current_enrollment }}/{{ row.total_capacity }}</small>
-            <small>{{ Math.round(row.capacity_percentage) }}%</small>
+        <div class="d-flex align-items-center gap-2" style="min-width: 150px;">
+          <small class="text-muted fw-bold" style="font-size: 0.7rem;">{{ row.current_enrollment }}/{{ row.total_capacity }}</small>
+          <div class="progress flex-grow-1" style="height: 5px; background-color: #eaeff4;">
+            <div class="progress-bar bg-success transition-all" :style="{ width: row.capacity_percentage + '%' }"></div>
           </div>
-          <div class="progress progress-h-6">
-            <div class="progress-bar" :class="getCapacityClass(row.capacity_percentage)" :style="{ width: row.capacity_percentage + '%' }"></div>
-          </div>
+          <small class="text-muted fw-bold" style="font-size: 0.7rem;">{{ Math.round(row.capacity_percentage) }}%</small>
         </div>
       </template>
 
       <template #cell-semester_count="{ row }">
-        <span class="badge bg-info semester-pill">{{ row.semester_count }}/{{ row.total_semesters }}</span>
+        <span class="badge bg-info rounded-pill px-3 py-1 fw-bold">
+          {{ row.semester_count }}/
+        </span>
       </template>
 
       <template #cell-status="{ row }">
-        <span :class="getStatusBadgeClass(row.status)" class="status-pill">{{ row.status }}</span>
+        <span class="badge bg-success rounded-pill px-3 py-1 fw-bold text-capitalize">
+          {{ row.status }}
+        </span>
       </template>
 
       <template #cell-actions="{ row }">
-        <ActionButtons
-          :item="row"
-          :show-toggle="false"
-          @view="router.push({ name: ADMIN_ROUTES.SESSION_PROFILE.name, params: { id: row.id } })"
-          @edit="router.push({ name: ADMIN_ROUTES.SESSION_EDIT.name, params: { id: row.id } })"
-          @delete="confirmDelete(row)"
-        >
-          <button v-if="row.semester_count === 0" @click="setupSemesters(row)" class="btn btn-sm btn-success" title="Setup Semesters"><i class="bi bi-gear"></i></button>
-        </ActionButtons>
+        <div class="d-flex align-items-center gap-2 justify-content-center">
+          <button @click="router.push({ name: ADMIN_ROUTES.SESSION_PROFILE.name, params: { id: row.id } })" class="btn btn-outline-info btn-sm rounded-3 p-0 d-flex align-items-center justify-content-center shadow-sm" style="width: 34px; height: 34px;"><i class="bi bi-eye"></i></button>
+          <button @click="router.push({ name: ADMIN_ROUTES.SESSION_EDIT.name, params: { id: row.id } })" class="btn btn-outline-primary btn-sm rounded-3 p-0 d-flex align-items-center justify-content-center shadow-sm" style="width: 34px; height: 34px;"><i class="bi bi-pencil"></i></button>
+          <button @click="confirmDelete(row)" class="btn btn-outline-danger btn-sm rounded-3 p-0 d-flex align-items-center justify-content-center shadow-sm" style="width: 34px; height: 34px;"><i class="bi bi-trash"></i></button>
+          <button v-if="row.semester_count === 0" @click="setupSemesters(row)" class="btn btn-success btn-sm rounded-3 p-0 d-flex align-items-center justify-content-center shadow-sm" style="width: 34px; height: 34px;"><i class="bi bi-gear-fill"></i></button>
+        </div>
       </template>
     </DataTable>
 
@@ -263,14 +261,31 @@ const resetFilters = () => {
   baseResetFilters()
 }
 
+const percentageColor = (percentage) => {
+  if (percentage >= 90) return 'text-danger'
+  if (percentage >= 75) return 'text-warning'
+  return 'text-success'
+}
+
 const getProgramLevelBadgeClass = (level) => {
-  const classes = { bachelor: 'badge bg-primary', master: 'badge bg-purple', intermediate: 'badge bg-warning', phd: 'badge bg-danger', diploma: 'badge bg-success' }
-  return classes[level] || 'badge bg-secondary'
+  const classes = { 
+    bachelor: 'bg-primary-subtle text-primary border border-primary-subtle', 
+    master: 'bg-info-subtle text-info border border-info-subtle', 
+    intermediate: 'bg-warning-subtle text-warning border border-warning-subtle', 
+    phd: 'bg-danger-subtle text-danger border border-danger-subtle', 
+    diploma: 'bg-success-subtle text-success border border-success-subtle' 
+  }
+  return classes[level] || 'bg-secondary-subtle text-secondary border border-secondary-subtle'
 }
 
 const getStatusBadgeClass = (status) => {
-  const classes = { upcoming: 'badge bg-warning', active: 'badge bg-success', completed: 'badge bg-secondary', archived: 'badge bg-dark' }
-  return classes[status] || 'badge bg-info'
+  const classes = { 
+    upcoming: 'bg-warning-subtle text-warning border border-warning-subtle', 
+    active: 'bg-success-subtle text-success border border-success-subtle', 
+    completed: 'bg-info-subtle text-info border border-info-subtle', 
+    archived: 'bg-dark-subtle text-dark border border-dark-subtle' 
+  }
+  return classes[status] || 'bg-primary-subtle text-primary border border-primary-subtle'
 }
 
 const getCapacityClass = (percentage) => {

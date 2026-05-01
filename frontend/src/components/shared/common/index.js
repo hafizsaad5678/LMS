@@ -9,6 +9,7 @@ export { default as BaseInput } from './ui/BaseInput.vue'
 export { default as SelectInput } from './ui/SelectInput.vue'
 export { default as LoadingSpinner } from './ui/LoadingSpinner.vue'
 export { default as OptimizedImage } from './ui/OptimizedImage.vue'
+export { default as ImageUpload } from './ui/ImageUpload.vue'
 
 // Layout & Data
 export { default as DataTable } from './layout/DataTable.vue'

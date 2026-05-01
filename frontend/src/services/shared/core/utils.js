@@ -94,6 +94,35 @@ export const debounce = (func, wait = 300) => {
  * @param {any} response - API response (can be array, object with results, or axios response)
  * @returns {Array} - Normalized array
  */
+/**
+ * Convert JSON object to FormData for multipart/form-data requests
+ * @param {Object} obj - Object to convert
+ * @returns {FormData} - FormData object
+ */
+export const toFormData = (obj) => {
+    const formData = new FormData()
+    Object.keys(obj).forEach(key => {
+        const value = obj[key]
+        if (value === null || value === undefined) return
+        
+        if (Array.isArray(value)) {
+            value.forEach(item => formData.append(key, item))
+        } else if (value instanceof File) {
+            formData.append(key, value)
+        } else if (typeof value === 'object' && !(value instanceof File)) {
+            // Only append if it's not a generic object we should ignore
+            // or handle specific sub-objects if needed
+            if (value.id) formData.append(key, value.id)
+            else formData.append(key, JSON.stringify(value))
+        } else if (typeof value === 'boolean') {
+            formData.append(key, value ? 'true' : 'false')
+        } else {
+            formData.append(key, value)
+        }
+    })
+    return formData
+}
+
 export const normalizeToArray = (response) => {
     if (Array.isArray(response)) return response
     if (response?.results) return response.results
@@ -107,5 +136,6 @@ export default {
     validateCNIC,
     extractErrorMessage,
     debounce,
-    normalizeToArray
+    normalizeToArray,
+    toFormData
 }

@@ -51,7 +51,7 @@ import { AdminPageTemplate } from '@/components/shared/panels'
 import { AlertMessage, ConfirmDialog } from '@/components/shared/common'
 import { TeacherForm } from '@/components/shared/forms'
 import { useEntityForm, assignSubjectsToTeacher } from '@/composables/shared'
-import { teacherService } from '@/services/shared'
+import { teacherService, toFormData } from '@/services/shared'
 import { ADMIN_ROUTES } from '@/utils/constants/routes'
 import { getErrorMessage } from '@/utils/errorMap'
 
@@ -102,7 +102,8 @@ const form = ref({
   experience_years: 0,
   teaching_subjects: [],
   address: '',
-  city: ''
+  city: '',
+  profile_image: null
 })
 
 const generateTemporaryPassword = (length = 16) => {
@@ -145,10 +146,13 @@ const handleSubmit = async () => {
       joining_date: form.value.joining_date || null,
       experience_years: form.value.experience_years || 0,
       address: form.value.address || null,
-      city: form.value.city || null
+      city: form.value.city || null,
+      profile_image: form.value.profile_image || null,
+      is_active: form.value.is_active
     }
 
-    const createdTeacher = await teacherService.createTeacher(teacherData)
+    const payload = teacherData.profile_image instanceof File ? toFormData(teacherData) : teacherData
+    const createdTeacher = await teacherService.createTeacher(payload)
     
     // Assign subjects using composable
     if (form.value.teaching_subjects.length > 0) {

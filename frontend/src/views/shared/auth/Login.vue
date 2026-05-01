@@ -1,5 +1,5 @@
 <template>
-  <div class="login-page min-vh-100 d-flex align-items-center justify-content-center">
+  <div class="login-page min-vh-100 d-flex align-items-center justify-content-center py-3 mt-1">
     <div class="w-100 max-w-1200">
       <div class="card shadow-lg border-0 overflow-hidden login-card">
         <div class="row g-0">

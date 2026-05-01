@@ -49,7 +49,7 @@ import { AdminPageTemplate } from '@/components/shared/panels'
 import { AlertMessage, ConfirmDialog } from '@/components/shared/common'
 import { InstitutionForm } from '@/components/shared/forms'
 import { useEntityForm } from '@/composables/shared'
-import { institutionService } from '@/services/shared'
+import { institutionService, toFormData } from '@/services/shared'
 import { ADMIN_ROUTES } from '@/utils/constants/routes'
 
 const router = useRouter()
@@ -71,26 +71,27 @@ const { alert, confirmDialog, submitting, showAlert, handleCancel, clearCaches }
 })
 
 const form = ref({
-  name: '', short_name: '', code: '', established_year: null, website: '',
+  name: '', short_name: '', code: '', slug: '', established_year: null, website: '',
   email: '', phone: '', address: '', city: '', state: '', postal_code: '',
-  country: 'Pakistan', description: '', is_active: true
+  country: 'Pakistan', description: '', is_active: true,
+  tagline: '', theme_color: '#3b82f6', logo: null, cover_image: null,
+  principal_name: '', principal_message: '', principal_image: null
 })
 
 const handleSubmit = async () => {
   submitting.value = true
   try {
     const data = { ...form.value }
-    Object.keys(data).forEach(key => {
-      if (data[key] === '' || data[key] === null) {
-        if (key !== 'is_active') delete data[key]
-      }
-    })
-    await institutionService.createInstitution(data)
+    
+    // Convert to FormData for image handling
+    const formData = toFormData(data)
+    
+    await institutionService.createInstitution(formData)
     clearCaches()
     showAlert('success', 'Institution has been added successfully!', 'Success!')
     setTimeout(() => router.push({ path: ADMIN_ROUTES.INSTITUTION_LIST.path, query: { refresh: Date.now() } }), 1500)
   } catch (error) {
-    const msg = error.response?.data?.detail || error.response?.data?.code?.[0] || 'Failed to add institution.'
+    const msg = error.response?.data?.detail || error.response?.data?.code?.[0] || 'Failed to add institution. Check image formats.'
     showAlert('error', msg, 'Error!')
   } finally {
     submitting.value = false

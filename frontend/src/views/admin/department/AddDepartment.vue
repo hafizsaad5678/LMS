@@ -50,7 +50,7 @@ import { AdminPageTemplate } from '@/components/shared/panels'
 import { AlertMessage, ConfirmDialog } from '@/components/shared/common'
 import { DepartmentForm } from '@/components/shared/forms'
 import { useEntityForm, useCascadingDropdowns } from '@/composables/shared'
-import { departmentService } from '@/services/shared'
+import { departmentService, toFormData } from '@/services/shared'
 import { ADMIN_ROUTES } from '@/utils/constants/routes'
 
 const router = useRouter()
@@ -76,7 +76,7 @@ const { alert, confirmDialog, submitting, showAlert, handleCancel, clearCaches }
 const { institutions, loadInstitutions } = useCascadingDropdowns()
 
 const form = ref({
-  name: '', code: '', institution: '', head_of_department: '', email: '', phone: '', description: ''
+  name: '', code: '', institution: '', head_of_department: '', email: '', phone: '', description: '', image: null
 })
 
 const onSubmit = async () => {
@@ -87,7 +87,7 @@ const onSubmit = async () => {
 
   submitting.value = true
   try {
-    const data = { ...form.value }
+    const data = form.value.image instanceof File ? toFormData(form.value) : { ...form.value }
     await departmentService.createDepartment(data)
     clearCaches()
     showAlert('success', 'Department has been added successfully!', 'Success!')

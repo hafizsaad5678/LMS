@@ -250,11 +250,16 @@ const confirmDeleteEvent = async () => {
 const saveEvent = async () => {
   saving.value = true
   try {
+    // Clean payload: convert empty strings to null for optional fields
+    const payload = { ...eventForm.value }
+    if (!payload.event_time) payload.event_time = null
+    if (!payload.location) payload.location = null
+
     if (editingEvent.value) {
-      await eventService.update(editingEvent.value.id, eventForm.value)
+      await eventService.update(editingEvent.value.id, payload)
       showAlert('success', 'Event updated successfully', 'Success')
     } else {
-      await eventService.create(eventForm.value)
+      await eventService.create(payload)
       showAlert('success', 'Event added successfully', 'Success')
     }
     closeModal()

@@ -64,7 +64,7 @@ import { AdminPageTemplate } from '@/components/shared/panels'
 import { AlertMessage, ConfirmDialog, LoadingSpinner } from '@/components/shared/common'
 import { DepartmentForm } from '@/components/shared/forms'
 import { useEntityForm, useCascadingDropdowns } from '@/composables/shared'
-import { departmentService } from '@/services/shared'
+import { departmentService, toFormData } from '@/services/shared'
 import { cacheService } from '@/services/shared'
 import { ADMIN_ROUTES } from '@/utils/constants/routes'
 
@@ -94,7 +94,7 @@ const { institutions, loadInstitutions } = useCascadingDropdowns()
 loading.value = true
 
 const form = ref({
-  name: '', code: '', institution: '', head_of_department: '', email: '', phone: '', description: '', is_active: true
+  name: '', code: '', institution: '', head_of_department: '', email: '', phone: '', description: '', is_active: true, image: null
 })
 
 const loadDepartment = async () => {
@@ -110,7 +110,8 @@ const loadDepartment = async () => {
     Object.assign(form.value, {
       name: dept.name || '', code: dept.code || '', institution: instId,
       head_of_department: dept.head_of_department || '', email: dept.email || '',
-      phone: dept.phone || '', description: dept.description || '', is_active: dept.is_active !== false
+      phone: dept.phone || '', description: dept.description || '', is_active: dept.is_active !== false,
+      image: dept.image || null
     })
   } catch (error) {
     showAlert('error', 'Failed to load department', 'Error')
@@ -123,14 +124,48 @@ const handleSubmit = async () => {
   try {
     const data = { ...form.value }
     if (!data.institution) delete data.institution
-    await departmentService.updateDepartment(departmentId.value, data)
+    
+    // Explicitly handle image field
+    // If it's a string (URL) and not a File, we don't want to send it back as a string
+    // because DRF ImageField expects a file or null for clearing.
+    // If we want to keep the existing image, we can just omit it from the payload
+    // in a PATCH request, but here we are using PUT.
+    
+    const payload = data.image instanceof File ? toFormData(data) : { ...data }
+    
+    // If using PUT and image is a URL string, DRF might complain if it's not a file.
+    // Let's remove it if it's just the URL string to avoid validation errors.
+    if (!(data.image instanceof File) && typeof data.image === 'string') {
+        delete payload.image
+    }
+    
+    if (data.image instanceof File) {
+        await departmentService.updateDepartment(departmentId.value, payload)
+    } else {
+        // Use patch if no new image to be safer with PUT constraints
+        await departmentService.patchDepartment(departmentId.value, payload)
+    }
+    
     cacheService.clear('departments_list')
     cacheService.clear('departments_dropdown')
     cacheService.clearPattern('department')
     showAlert('success', 'Department updated successfully!', 'Success!')
     setTimeout(() => router.push({ name: ADMIN_ROUTES.DEPARTMENT_LIST.name }), 1500)
   } catch (error) {
-    showAlert('error', error.response?.data?.detail || 'Failed to update department.', 'Error!')
+    const errorData = error.response?.data
+    let errorMessage = 'Failed to update department.'
+    
+    if (errorData && typeof errorData === 'object') {
+      const messages = []
+      for (const [field, errors] of Object.entries(errorData)) {
+        const fieldName = field.charAt(0).toUpperCase() + field.slice(1)
+        const fieldErrors = Array.isArray(errors) ? errors.join(', ') : errors
+        messages.push(`${fieldName}: ${fieldErrors}`)
+      }
+      if (messages.length > 0) errorMessage = messages.join('\n')
+    }
+    
+    showAlert('error', errorMessage, 'Error!')
   } finally { submitting.value = false }
 }
 

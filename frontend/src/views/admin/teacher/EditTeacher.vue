@@ -68,7 +68,7 @@ import { AdminPageTemplate } from '@/components/shared/panels'
 import { AlertMessage, ConfirmDialog, LoadingSpinner } from '@/components/shared/common'
 import { TeacherForm } from '@/components/shared/forms'
 import { useEntityForm, syncTeacherSubjects, getTeacherSubjectIds } from '@/composables/shared'
-import { teacherService } from '@/services/shared'
+import { teacherService, toFormData } from '@/services/shared'
 import { cacheService } from '@/services/shared'
 import { ADMIN_ROUTES } from '@/utils/constants/routes'
 
@@ -128,7 +128,8 @@ const form = ref({
   experience_years: 0,
   teaching_subjects: [],
   address: '',
-  city: ''
+  city: '',
+  profile_image: null
 })
 
 const loadTeacher = async () => {
@@ -158,6 +159,7 @@ const loadTeacher = async () => {
     form.value.experience_years = teacher.experience_years || 0
     form.value.address = teacher.address || ''
     form.value.city = teacher.city || ''
+    form.value.profile_image = teacher.profile_image || null
     
     // Load teaching subjects using composable
     form.value.teaching_subjects = await getTeacherSubjectIds(id)
@@ -195,10 +197,13 @@ const handleSubmit = async () => {
       joining_date: form.value.joining_date || null,
       experience_years: form.value.experience_years || 0,
       address: form.value.address || null,
-      city: form.value.city || null
+      city: form.value.city || null,
+      profile_image: form.value.profile_image || null,
+      is_active: form.value.is_active
     }
 
-    await teacherService.updateTeacher(teacherId.value, teacherData)
+    const payload = teacherData.profile_image instanceof File ? toFormData(teacherData) : teacherData
+    await teacherService.patchTeacher(teacherId.value, payload)
     
     // Sync subject assignments using composable
     await syncTeacherSubjects(teacherId.value, form.value.teaching_subjects)

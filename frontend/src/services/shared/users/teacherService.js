@@ -33,8 +33,8 @@ export const teacherService = {
         apiPost(`/teachers/${id}/deactivate/`, null, `deactivating teacher ${id}`),
 
     async toggleStatus(id) {
-        const teacher = await this.getTeacher(id)
-        return teacher.is_active ? this.deactivateTeacher(id) : this.activateTeacher(id)
+        const teacher = await teacherService.getTeacher(id)
+        return teacher.is_active ? teacherService.deactivateTeacher(id) : teacherService.activateTeacher(id)
     },
 
     uploadProfileImage: (id, imageFile) => {

@@ -87,6 +87,12 @@
                     <input v-model.number="formData.total_capacity" type="number" class="form-control" min="1" required>
                     <small class="text-muted">Current: {{ session.current_enrollment || 0 }} enrolled</small>
                   </div>
+                  <div class="col-md-6">
+                    <BaseInput v-model="formData.admission_start_date" type="date" label="Admission Start Date" />
+                  </div>
+                  <div class="col-md-6">
+                    <BaseInput v-model="formData.admission_end_date" type="date" label="Admission End Date" />
+                  </div>
                   <div class="col-md-4">
                     <SelectInput
                       v-model="formData.status"
@@ -125,7 +131,7 @@ import { ref, onMounted, watch, computed } from 'vue'
 import { useAlert } from '@/composables/shared'
 import { useRouter, useRoute } from 'vue-router'
 import { AdminPageTemplate } from '@/components/shared/panels'
-import { AlertMessage, LoadingSpinner, SelectInput } from '@/components/shared/common'
+import { AlertMessage, BaseInput, LoadingSpinner, SelectInput } from '@/components/shared/common'
 import { sessionService, cacheService } from '@/services/shared'
 import { ADMIN_ROUTES } from '@/utils/constants/routes'
 import { SESSION_STATUS_OPTIONS } from '@/utils/constants/options'
@@ -156,7 +162,9 @@ const formData = ref({
   end_year: null,
   total_capacity: 0,
   status: 'upcoming',
-  description: ''
+  description: '',
+  admission_start_date: null,
+  admission_end_date: null
 })
 
 
@@ -180,6 +188,8 @@ const loadSession = async () => {
     formData.value.total_capacity = sessionData.total_capacity || 0
     formData.value.status = sessionData.status || 'upcoming'
     formData.value.description = sessionData.description || ''
+    formData.value.admission_start_date = sessionData.admission_start_date || null
+    formData.value.admission_end_date = sessionData.admission_end_date || null
   } catch (error) {
     console.error('Error loading session:', error)
     showAlert('error', 'Failed to load session data', 'Error!')
@@ -198,7 +208,9 @@ const updateSession = async () => {
       end_year: formData.value.end_year,
       total_semesters: session.value.total_semesters,
       total_capacity: formData.value.total_capacity,
-      status: formData.value.status
+      status: formData.value.status,
+      admission_start_date: formData.value.admission_start_date || null,
+      admission_end_date: formData.value.admission_end_date || null
     }
     
     if (formData.value.description) updateData.description = formData.value.description
