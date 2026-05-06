@@ -1,66 +1,66 @@
 <template>
   <TeacherPageTemplate title="Student Attendance History" subtitle="View attendance records and statistics"
     icon="bi bi-calendar-check" :breadcrumbs="breadcrumbs" :actions="actions" :show-content-card="false">
+    <template v-if="studentId && !loading" #stats>
+      <StudentInfoCard :student-info="studentInfo" class="mb-4" />
+      <div class="row g-3">
+        <div v-for="stat in statsCards" :key="stat.title" class="col-md-3 col-6">
+          <StatCard v-bind="stat" />
+        </div>
+      </div>
+    </template>
+
+    <template v-if="studentId && !loading" #filters>
+      <div class="row g-3 align-items-end">
+        <div class="col-md-4 col-12">
+          <select v-model="filters.dateRange" class="form-select">
+            <option value="all">All Time</option>
+            <option value="thisMonth">This Month</option>
+            <option value="lastMonth">Last Month</option>
+            <option value="thisWeek">This Week</option>
+            <option value="lastWeek">Last Week</option>
+          </select>
+        </div>
+        <div class="col-md-4 col-12">
+          <select v-model="filters.subject" class="form-select">
+            <option value="">All Subjects</option>
+            <option v-for="subject in subjects" :key="subject.id" :value="subject.id">
+              {{ subject.name }} ({{ subject.code }})
+            </option>
+          </select>
+        </div>
+        <div class="col-md-4 col-12 d-flex justify-content-end">
+          <div class="d-flex gap-2">
+            <button @click="loadAttendance" class="btn btn-teacher-outline" type="button">
+              <i class="bi bi-arrow-clockwise me-2"></i>Refresh
+            </button>
+            <button @click="resetFilters" class="btn btn-outline-secondary" type="button">
+              <i class="bi bi-x-circle me-2"></i>Reset
+            </button>
+          </div>
+        </div>
+      </div>
+    </template>
+
     <!-- No student ID provided -->
-    <div v-if="!studentId" class="text-center py-5">
-      <i class="bi bi-calendar-check display-1 text-muted"></i>
-      <h4 class="text-muted mt-3">Please Select a Student</h4>
-      <p class="text-muted">Choose a student to view their attendance history.</p>
-      <button @click="router.push({ name: TEACHER_ROUTES.STUDENT_LIST.name })" class="btn btn-teacher-primary mt-3">
-        <i class="bi bi-list-ul me-2"></i>Go to Student List
-      </button>
-    </div>
+    <EmptyState v-if="!studentId" icon="bi bi-calendar-check" title="Please Select a Student"
+      subtitle="Choose a student to view their attendance history." button-text="Go to Student List"
+      button-icon="bi bi-list-ul" button-variant="btn-teacher-primary"
+      @action="router.push({ name: TEACHER_ROUTES.STUDENT_LIST.name })" />
 
     <LoadingSpinner v-else-if="loading" text="Loading attendance records..." theme="teacher" />
 
     <div v-else>
-      <!-- Student Info Header -->
-      <StudentInfoCard :student-info="studentInfo" class="mb-4" />
-
-      <!-- Attendance Statistics -->
-      <StatsRow :stats="statsData" />
-
-      <!-- Filters -->
-      <SearchFilter v-model="searchQuery" :show-card="true" :show-status-filter="false" :show-refresh="true"
-        :show-reset="true" :show-labels="false" search-placeholder="Search records..." search-col-size="col-md-3"
-        actions-col-size="col-md-3" theme="teacher" @refresh="loadAttendance" @reset="resetFilters">
-        <template #filters>
-          <div class="col-md-2">
-            <select v-model="filters.dateRange" class="form-select">
-              <option value="all">All Time</option>
-              <option value="thisMonth">This Month</option>
-              <option value="lastMonth">Last Month</option>
-              <option value="thisWeek">This Week</option>
-              <option value="lastWeek">Last Week</option>
-            </select>
-          </div>
-          <div class="col-md-2">
-            <SelectInput v-model="filters.status" :options="ATTENDANCE_STATUS_OPTIONS" placeholder="All Status" />
-          </div>
-          <div class="col-md-2">
-            <select v-model="filters.subject" class="form-select">
-              <option value="">All Subjects</option>
-              <option v-for="subject in subjects" :key="subject.id" :value="subject.id">
-                {{ subject.name }} ({{ subject.code }})
-              </option>
-            </select>
-          </div>
-        </template>
-      </SearchFilter>
-
       <!-- Attendance Records -->
       <div class="card border-0 shadow-sm">
-        <div class="card-header bg-gradient-blue border-0">
-          <h5 class="mb-0">
+        <div class="card-header bg-teacher-light border-0">
+          <h5 class="mb-0 fw-bold text-teacher">
             <i class="bi bi-list-ul me-2"></i>Attendance Records
           </h5>
         </div>
         <div class="card-body p-0">
-          <div v-if="filteredAttendance.length === 0" class="text-center py-5">
-            <i class="bi bi-calendar-x display-1 text-muted"></i>
-            <h5 class="text-muted mt-3">No Attendance Records Found</h5>
-            <p class="text-muted">No attendance records match your current filters.</p>
-          </div>
+          <EmptyState v-if="filteredAttendance.length === 0" icon="bi bi-calendar-x"
+            title="No Attendance Records Found" subtitle="No attendance records match your current filters." />
           <div v-else class="table-responsive">
             <table class="table table-hover mb-0">
               <thead class="table-light">
@@ -109,7 +109,8 @@
 
       <!-- Other Students Section -->
       <StudentListCard :students="otherStudents" :loading="loadingOtherStudents" :current-student-id="studentId"
-        title="Other Students" icon="bi bi-people" empty-message="No other students found" class="mt-4">
+        title="Other Students" icon="bi bi-people" empty-message="No other students found" class="mt-4"
+        header-class="bg-teacher-light" header-text-class="text-teacher fw-bold">
         <template #actions="{ student }">
           <button @click="viewStudentAttendance(student)" class="btn btn-sm flex-grow-1"
             :class="student.id.toString() === studentId ? 'btn-teacher-primary' : 'btn-teacher-outline'"
@@ -117,7 +118,7 @@
             <i class="bi bi-calendar-check me-1"></i>
             {{ student.id.toString() === studentId ? 'Current Student' : 'View Attendance' }}
           </button>
-          <button @click="viewStudentProfile(student)" class="btn btn-sm btn-outline-secondary">
+          <button @click="viewStudentProfile(student)" class="btn btn-sm btn-teacher-outline">
             <i class="bi bi-person me-1"></i>Profile
           </button>
         </template>
@@ -127,11 +128,11 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { TeacherPageTemplate } from '@/components/shared/panels'
-import { SearchFilter, SelectInput, LoadingSpinner } from '@/components/shared/common'
-import { StudentInfoCard, StudentListCard, StatsRow } from '@/components/teacher/shared'
+import { LoadingSpinner, StatCard, EmptyState } from '@/components/shared/common'
+import { StudentInfoCard, StudentListCard } from '@/components/teacher/shared'
 import { useStudentData } from '@/composables/teacher/useStudentData'
 import { useAttendanceData } from '@/composables/teacher/useAttendanceData'
 import { useFilterLogic } from '@/composables/teacher/useFilterLogic'
@@ -144,9 +145,9 @@ const router = useRouter()
 const route = useRoute()
 const { studentInfo, loadStudentInfo, loadAllStudents, getEnrolledSubjects } = useStudentData()
 const { attendanceRecords, loading, calculateStats, loadStudentAttendance } = useAttendanceData()
-const { searchQuery, filters, filteredItems: filteredAttendance, resetFilters } = useFilterLogic(
+const { filters, filteredItems: filteredAttendance, resetFilters } = useFilterLogic(
   attendanceRecords,
-  { searchFields: ['subject_name', 'subject_code'], dateField: 'session_date', statusField: 'status', subjectField: 'subject_id' }
+  { dateField: 'session_date', subjectField: 'subject_id' }
 )
 
 const studentId = computed(() => route.params.id || route.query.student)
@@ -178,11 +179,11 @@ const actions = computed(() => [
 
 const attendanceStats = computed(() => calculateStats(attendanceRecords.value))
 
-const statsData = computed(() => [
-  { label: 'Total Classes', value: attendanceStats.value.totalClasses, icon: 'bi bi-calendar-check', bgClass: 'bg-gradient-blue', colClass: 'col-md-3 col-6' },
-  { label: 'Present', value: attendanceStats.value.presentCount, icon: 'bi bi-check-circle', bgClass: 'bg-gradient-teal', colClass: 'col-md-3 col-6' },
-  { label: 'Absent', value: attendanceStats.value.absentCount, icon: 'bi bi-x-circle', bgClass: 'bg-gradient-amber', colClass: 'col-md-3 col-6' },
-  { label: 'Attendance Rate', value: `${attendanceStats.value.percentage}%`, icon: 'bi bi-percent', bgClass: 'bg-gradient-cyan', colClass: 'col-md-3 col-6' }
+const statsCards = computed(() => [
+  { title: 'Total Classes', value: attendanceStats.value.totalClasses, icon: 'bi bi-calendar-check', bgColor: 'bg-teacher-light', iconColor: 'text-teacher' },
+  { title: 'Present', value: attendanceStats.value.presentCount, icon: 'bi bi-check-circle', bgColor: 'bg-teacher-light', iconColor: 'text-success' },
+  { title: 'Absent', value: attendanceStats.value.absentCount, icon: 'bi bi-x-circle', bgColor: 'bg-teacher-light', iconColor: 'text-danger' },
+  { title: 'Attendance Rate', value: `${attendanceStats.value.percentage}%`, icon: 'bi bi-percent', bgColor: 'bg-teacher-light', iconColor: 'text-teacher' }
 ])
 
 const loadAttendance = async () => {

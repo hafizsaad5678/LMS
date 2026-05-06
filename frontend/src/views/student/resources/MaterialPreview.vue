@@ -26,7 +26,17 @@
       </div>
       <div class="card-body p-0 bg-light text-center min-h-500">
         <!-- PDF Preview -->
-        <iframe v-if="isPdf" :src="fileUrl" class="w-100 h-80vh border-none"></iframe>
+        <div v-if="isPdf" class="py-5">
+          <div class="display-1 text-muted mb-3">
+            <i class="bi bi-file-earmark-pdf"></i>
+          </div>
+          <h4>PDF preview opens in a new tab</h4>
+          <p class="text-muted mb-4">Your browser blocked inline preview. Open the PDF in a separate tab instead.</p>
+          <a class="btn btn-primary" :href="fileUrl" target="_blank" rel="noopener">
+            <i class="bi bi-box-arrow-up-right me-2"></i>
+            Open PDF
+          </a>
+        </div>
 
         <!-- Image Preview -->
         <img v-else-if="isImage" :src="fileUrl" class="img-fluid p-3 h-80vh" alt="Preview">
@@ -115,32 +125,12 @@ const downloadFile = async () => {
   // Track in background
   studentPanelService.trackMaterialDownload(materialId)
 
-  try {
-    // Fetch the file as a blob to force download
-    const response = await fetch(fileUrl.value)
-    const blob = await response.blob()
-
-    // Create blob URL and trigger download
-    const blobUrl = window.URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = blobUrl
-    link.download = material.value.title || 'download'
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-
-    // Clean up blob URL
-    window.URL.revokeObjectURL(blobUrl)
-  } catch (error) {
-    console.error('Download error:', error)
-    // Fallback to simple download link
-    const link = document.createElement('a')
-    link.href = fileUrl.value
-    link.download = material.value.title || 'download'
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-  }
+  const link = document.createElement('a')
+  link.href = fileUrl.value
+  link.download = material.value.title || 'download'
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
 }
 
 onMounted(() => {

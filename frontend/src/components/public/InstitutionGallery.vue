@@ -104,47 +104,24 @@ const props = defineProps({
   }
 })
 
-// Mock categories for demonstration/fallback
-const MOCK_CATEGORIES = ['sports', 'events', 'labs', 'campus', 'classroom']
-
 const activeCategory = ref('all')
 
-// Dynamically extract unique categories and merge with mock categories for variety
+// Dynamically extract unique categories from real data
 const categories = computed(() => {
   const cats = new Set(['all'])
   
-  // Add from real data
   props.galleryItems.forEach(item => {
     if (item.category) cats.add(item.category.toLowerCase())
   })
-  
-  // If no real categories exist yet, show the mock ones to the user
-  if (cats.size === 1) {
-    MOCK_CATEGORIES.forEach(c => cats.add(c))
-  }
   
   return Array.from(cats)
 })
 
 const filteredGallery = computed(() => {
-  const items = props.galleryItems.length > 0 ? props.galleryItems : MOCK_GALLERY
+  if (activeCategory.value === 'all') return props.galleryItems
   
-  if (activeCategory.value === 'all') return items
-  
-  return items.filter(item => item.category?.toLowerCase() === activeCategory.value)
+  return props.galleryItems.filter(item => item.category?.toLowerCase() === activeCategory.value)
 })
-
-// Mock data for initial presentation
-const MOCK_GALLERY = [
-  { id: 1, image: 'https://images.unsplash.com/photo-1541339907198-e08756ebafe3?q=80&w=800', category: 'campus', caption: 'Historic Main Building' },
-  { id: 2, image: 'https://images.unsplash.com/photo-1523050853064-8504f2f3cae6?q=80&w=800', category: 'labs', caption: 'Advanced Computer Laboratory' },
-  { id: 3, image: 'https://images.unsplash.com/photo-1524178232363-1fb28f74b671?q=80&w=800', category: 'classroom', caption: 'Interactive Learning Sessions' },
-  { id: 4, image: 'https://images.unsplash.com/photo-1504159506876-f8338247a14a?q=80&w=800', category: 'sports', caption: 'Annual Sports Tournament' },
-  { id: 5, image: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?q=80&w=800', category: 'events', caption: 'Cultural Festival 2024' },
-  { id: 6, image: 'https://images.unsplash.com/photo-1562774053-701939374585?q=80&w=800', category: 'campus', caption: 'Students Recreation Area' },
-  { id: 7, image: 'https://images.unsplash.com/photo-1498243639351-a6c9bd99a5c8?q=80&w=800', category: 'labs', caption: 'Physics Research Wing' },
-  { id: 8, image: 'https://images.unsplash.com/photo-1577891729319-f69ea1af659a?q=80&w=800', category: 'events', caption: 'Graduation Ceremony' }
-]
 
 
 const lightbox = ref({

@@ -124,19 +124,10 @@ const recentActivities = ref([])
 
 const loadDashboard = async () => {
   try {
-    // Load stats and activities in parallel
-    const [dashboardStats, activities] = await Promise.all([
-      teacherPanelService.getDashboardStats({ forceRefresh: true }),
-      teacherPanelService.getRecentActivities()
-    ])
+    const { stats: dStats, activities: activityList } = await teacherPanelService.getDashboardStats({ forceRefresh: false })
     
-    stats.value = {
-      totalClasses: dashboardStats.totalClasses || 0,
-      totalStudents: dashboardStats.totalStudents || 0,
-      pendingReviews: dashboardStats.pendingReviews || 0,
-      upcomingDeadlines: dashboardStats.upcomingDeadlines || 0
-    }
-    recentActivities.value = activities
+    stats.value = dStats
+    recentActivities.value = activityList
     
     loading.value = false
     loadingActivities.value = false

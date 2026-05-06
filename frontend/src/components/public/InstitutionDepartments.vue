@@ -219,23 +219,14 @@
                   <div v-else class="admission-meta text-muted">
                     Admissions schedule not announced yet.
                   </div>
-                  <div v-if="hasApplyActions" class="d-flex flex-wrap gap-2 mt-3">
-                    <a
-                      v-if="applyUrl"
-                      :href="applyUrl"
-                      target="_blank"
-                      rel="noopener"
-                      class="btn btn-sm btn-success rounded-pill fw-semibold"
+                  <div class="d-flex flex-wrap gap-2 mt-3">
+                    <router-link
+                      v-if="getAdmissionInfo(program).status === 'open' && institution?.show_admissions"
+                      :to="{ name: 'InstitutionAdmissions', params: { slug: route.params.slug } }"
+                      class="btn btn-sm btn-success rounded-pill fw-semibold shadow-sm"
                     >
-                      Apply Now
-                    </a>
-                    <a
-                      v-if="applyEmail"
-                      :href="getMailtoLink(program)"
-                      class="btn btn-sm btn-outline-secondary rounded-pill fw-semibold"
-                    >
-                      Email Admissions
-                    </a>
+                      Apply Admission
+                    </router-link>
                   </div>
                 </div>
                 

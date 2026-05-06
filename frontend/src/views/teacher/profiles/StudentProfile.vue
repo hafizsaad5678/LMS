@@ -80,9 +80,22 @@ const breadcrumbs = computed(() => [
   { name: student.value.name || 'Student Profile' }
 ])
 
-const actions = computed(() => [
-  { label: 'Back to Students', icon: 'bi bi-arrow-left', variant: 'btn-teacher-outline', onClick: () => router.push({ name: TEACHER_ROUTES.STUDENT_LIST.name }) }
-])
+const actions = computed(() => {
+  const items = [
+    { label: 'Back to Students', icon: 'bi bi-arrow-left', variant: 'btn-teacher-outline', onClick: () => router.push({ name: TEACHER_ROUTES.STUDENT_LIST.name }) }
+  ]
+
+  if (studentId.value) {
+    items.unshift({
+      label: 'Attendance History',
+      icon: 'bi bi-calendar-check',
+      variant: 'btn-teacher-outline',
+      onClick: () => router.push({ name: TEACHER_ROUTES.STUDENT_ATTENDANCE.name, params: { id: studentId.value } })
+    })
+  }
+
+  return items
+})
 
 const displaySemester = computed(() => {
   const value = student.value.current_semester || student.value.semester_number || student.value.semester

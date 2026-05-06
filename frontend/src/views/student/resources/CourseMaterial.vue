@@ -113,8 +113,7 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
-import { useRouter } from 'vue-router'
-import { studentService } from '@/services/shared'
+import { api, studentService } from '@/services/shared'
 import { StudentPageTemplate } from '@/components/shared/panels'
 import { AlertMessage, SearchFilter, SelectInput, LoadingSpinner } from '@/components/shared/common'
 import studentPanelService from '@/services/student/studentPanelService'
@@ -123,7 +122,6 @@ import { useEntityList, usePagination, useAlert } from '@/composables/shared'
 import { useStudentBase } from '@/composables/student/useStudentBase'
 import { STUDENT_ROUTES } from '@/utils/constants/routes'
 
-const router = useRouter()
 const { studentId, loadProfile } = useStudentBase()
 const subjects = ref([])
 const { alert, showError } = useAlert()
@@ -157,9 +155,30 @@ const breadcrumbs = [{ name: 'Dashboard', href: STUDENT_ROUTES.DASHBOARD.path },
 
 
 
+const getMaterialUrl = (m) => studentPanelService.getFileUrl(m.file_upload || m.file_url)
+
+const openInNewTab = (url) => {
+  const link = document.createElement('a')
+  link.href = url
+  link.target = '_blank'
+  link.rel = 'noopener'
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+}
+
+const downloadDirect = (url, name) => {
+  const link = document.createElement('a')
+  link.href = url
+  link.download = name || 'download'
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+}
+
 const downloadMaterial = async (m) => {
   if (!m.id) return
-  const url = studentPanelService.getFileUrl(m.file_upload || m.file_url)
+  const url = getMaterialUrl(m)
   if (!url) {
     showError('File URL not found')
     return
@@ -169,34 +188,24 @@ const downloadMaterial = async (m) => {
   studentPanelService.trackMaterialDownload(m.id)
 
   try {
-    // Fetch the file as a blob to force download
-    const response = await fetch(url)
-    const blob = await response.blob()
-
-    // Create blob URL and trigger download
-    const blobUrl = window.URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = blobUrl
-    link.download = m.title || 'download'
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-
-    // Clean up blob URL
+    const response = await api.get(url, { responseType: 'blob' })
+    const blobUrl = window.URL.createObjectURL(response.data)
+    downloadDirect(blobUrl, m.title)
     window.URL.revokeObjectURL(blobUrl)
   } catch (error) {
     console.error('Download error:', error)
-    // Fallback to simple download link if fetch fails
-    const link = document.createElement('a')
-    link.href = url
-    link.download = m.title || 'download'
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
+    openInNewTab(url)
   }
 }
 
-const viewMaterial = (m) => router.push(`${STUDENT_ROUTES.COURSE_MATERIAL.path}/preview/${m.id}`)
+const viewMaterial = (m) => {
+  const url = getMaterialUrl(m)
+  if (!url) {
+    showError('File URL not found')
+    return
+  }
+  openInNewTab(url)
+}
 const resetFilters = () => { filters.value = { search: '', subject: '' } }
 
 const subjectOptions = computed(() => subjects.value.map(sub => ({

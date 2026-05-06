@@ -86,12 +86,7 @@ class AssignmentViewSet(BaseViewSet):
             # Check if teacher created this assignment OR teaches the subject
             if assignment.subject_id not in teacher_subjects and assignment.created_by != teacher:
                 return Response(
-                    {
-                        'detail': 'You do not have permission to view submissions for this assignment.',
-                        'assignment_subject': str(assignment.subject_id),
-                        'your_subjects': list(teacher_subjects),
-                        'created_by': str(assignment.created_by) if assignment.created_by else None
-                    }, 
+                    {'detail': 'You do not have permission to view submissions for this assignment.'}, 
                     status=status.HTTP_403_FORBIDDEN
                 )
         

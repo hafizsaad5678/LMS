@@ -177,8 +177,11 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
 import { BaseInput } from '@/components/shared/common'
+import { useAuth } from '@/store/auth'
+import { STORAGE_KEYS } from '@/utils/constants/storage'
 
-const STORAGE_KEY = 'student_productivity_tasks_v2'
+const authStore = useAuth()
+const STORAGE_KEY = computed(() => STORAGE_KEYS.TODO_LIST(authStore.userId || 'guest'))
 const FILTERS = ['All', 'Active', 'Completed']
 
 const tasks = ref([])
@@ -189,7 +192,7 @@ const editingId = ref(null)
 const editTitle = ref('')
 
 onMounted(() => {
-	const saved = localStorage.getItem(STORAGE_KEY)
+	const saved = localStorage.getItem(STORAGE_KEY.value)
 	if (!saved) return
 	try {
 		const parsed = JSON.parse(saved)
@@ -200,7 +203,7 @@ onMounted(() => {
 })
 
 watch(tasks, (value) => {
-	localStorage.setItem(STORAGE_KEY, JSON.stringify(value))
+	localStorage.setItem(STORAGE_KEY.value, JSON.stringify(value))
 }, { deep: true })
 
 const filteredTasks = computed(() => {

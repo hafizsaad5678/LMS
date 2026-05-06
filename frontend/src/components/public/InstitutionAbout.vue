@@ -3,7 +3,7 @@
     <div class="container position-relative">
       <div class="row g-4 align-items-start">
         <!-- Image Column -->
-        <div class="col-lg-4 text-center text-lg-start">
+        <div class="col-lg-4 text-center text-lg-start pt-lg-4">
           <div class="position-relative d-inline-block w-100">
             <!-- Principal Image -->
             <div v-if="principalImageUrl" class="principal-portrait shadow-sm border rounded-2 overflow-hidden">
@@ -62,6 +62,7 @@
 
 <script setup>
 import { computed } from 'vue'
+import { getFileUrl } from '@/utils/constants/config'
 
 const props = defineProps({
   institution: {
@@ -79,8 +80,7 @@ const principalImageUrl = computed(() => {
     // Professional Placeholder for Principal
     return 'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&q=80&w=800'
   }
-  if (props.institution.principal_image.startsWith('http')) return props.institution.principal_image
-  return `${import.meta.env.VITE_API_BASE_URL.replace('/api', '')}${props.institution.principal_image}`
+  return getFileUrl(props.institution.principal_image)
 })
 </script>
 

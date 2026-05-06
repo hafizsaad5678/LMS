@@ -177,8 +177,10 @@ const handleToggle = async (student) => {
 const loadProgramCount = async () => {
   try {
     // This will return cached stats if available, or fetch them if missing
-    const stats = await adminPanelService.getDashboardStats()
-    totalPrograms.value = stats.programs || 0
+    const { stats: dashboardStats } = await adminPanelService.getDashboardStats()
+    if (dashboardStats) {
+      totalPrograms.value = dashboardStats.programs || 0
+    }
   } catch (error) {
     console.error('Failed to load program count:', error)
   }

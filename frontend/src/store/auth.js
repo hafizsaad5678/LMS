@@ -4,7 +4,7 @@ import router from '@/router'
 import { validateUserId, safeStorage } from '@/utils/security'
 import { USER_ROLES } from '@/utils/constants/config'
 import { ADMIN_ROUTES, TEACHER_ROUTES, STUDENT_ROUTES } from '@/utils/constants/routes'
-import { STORAGE_KEYS } from '@/utils/constants/storage'
+import { STORAGE_KEYS, clearAuthData } from '@/utils/constants/storage'
 
 export const useAuth = defineStore('auth', {
   state: () => ({
@@ -173,7 +173,7 @@ export const useAuth = defineStore('auth', {
       this.userRole = null
       this.userEmail = null
       this.user = null
-      safeStorage.clear()
+      clearAuthData()
       router.push({ name: 'Login' })
     },
 
@@ -184,22 +184,13 @@ export const useAuth = defineStore('auth', {
       try {
         if (userRole === USER_ROLES.ADMIN) {
           const { default: adminPanelService } = await import('@/services/admin/adminPanelService')
-          await Promise.all([
-            adminPanelService.getDashboardStats(),
-            adminPanelService.getRecentActivities()
-          ])
+          await adminPanelService.getDashboardStats()
         } else if (userRole === USER_ROLES.TEACHER) {
           const { default: teacherPanelService } = await import('@/services/teacher/teacherPanelService')
-          await Promise.all([
-            teacherPanelService.getDashboardStats(),
-            teacherPanelService.getRecentActivities()
-          ])
+          await teacherPanelService.getDashboardStats()
         } else if (userRole === USER_ROLES.STUDENT && userId) {
           const { default: studentPanelService } = await import('@/services/student/studentPanelService')
-          await Promise.all([
-            studentPanelService.getDashboardStats(userId),
-            studentPanelService.getActivities(userId)
-          ])
+          await studentPanelService.getDashboardStats(userId)
         }
       } catch {
         // Silently fail - dashboard will load normally if preload fails

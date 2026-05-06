@@ -161,13 +161,18 @@ const loadDashboard = async (forceRefresh = false) => {
   }
 
   try {
-    if (!cachedStats) loading.value = true
-    const dashboardStats = await adminPanelService.getDashboardStats(forceRefresh)
-    stats.value = dashboardStats
-    loading.value = false
+    if (!cachedStats) {
+      loading.value = true
+      loadingActivities.value = true
+    }
 
-    // Load activities in parallel (no setTimeout needed)
-    loadActivities(forceRefresh)
+    const { stats: dashboardStats, activities } = await adminPanelService.getDashboardStats(forceRefresh)
+    
+    stats.value = dashboardStats
+    recentActivities.value = activities
+    
+    loading.value = false
+    loadingActivities.value = false
   } catch (error) {
     console.error('Dashboard error:', error)
     loading.value = false

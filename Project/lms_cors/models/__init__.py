@@ -6,7 +6,8 @@ from .academic import (
 )
 from institution_profile.models import (
     Institution, InstitutionGallery, InstitutionFeature, InstitutionEvent,
-    InstitutionAdmissionInfo, InstitutionContact, InstitutionTestimonial
+    InstitutionAdmissionInfo, InstitutionContact, InstitutionTestimonial,
+    InstitutionAdmissionFeatured
 )
 from .people import Student, StudentSemesterHistory, Teacher, Admin, TeacherSubject, StudentSubject
 from .assignments import Assignment, SubmissionHistory, Grade
@@ -23,7 +24,7 @@ __all__ = [
     # Academic
     'Institution', 'InstitutionGallery', 'InstitutionFeature', 'InstitutionEvent',
     'InstitutionAdmissionInfo', 'InstitutionContact', 'Department', 'Program', 'AcademicSession', 
-    'Semester', 'Subject', 'generate_sequential_id', 'InstitutionTestimonial',
+    'Semester', 'Subject', 'generate_sequential_id', 'InstitutionTestimonial', 'InstitutionAdmissionFeatured',
     # People
     'Student', 'StudentSemesterHistory', 'Teacher', 'Admin', 'TeacherSubject', 'StudentSubject',
     # Assignments

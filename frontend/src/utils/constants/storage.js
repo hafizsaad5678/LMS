@@ -17,6 +17,7 @@ export const STORAGE_KEYS = {
     READ_ANNOUNCEMENTS: (userId) => `read_announcements_${userId}`,
     VISITED_ANNOUNCEMENTS: (userId) => `visited_announcements_${userId}`,
     CURRENT_GPA: (userId) => `current_gpa_${userId}`,
+    TODO_LIST: (userId) => `student_todo_list_${userId}`,
 
     // Cache prefixes
     CACHE_PREFIX: {
@@ -59,14 +60,22 @@ export const setUserId = (id) => {
 }
 
 /**
- * Clear all auth data
+ * Clear all auth data without nuking user-specific productivity data
  */
 export const clearAuthData = () => {
-    Object.values(STORAGE_KEYS).forEach(key => {
-        if (typeof key === 'string') {
-            localStorage.removeItem(key)
+    // Clear top-level string keys
+    Object.values(STORAGE_KEYS).forEach(value => {
+        if (typeof value === 'string') {
+            localStorage.removeItem(value)
         }
     })
+
+    // Clear cache prefixes
+    if (STORAGE_KEYS.CACHE_PREFIX) {
+        Object.values(STORAGE_KEYS.CACHE_PREFIX).forEach(prefix => {
+            localStorage.removeItem(prefix)
+        })
+    }
 }
 
 export default STORAGE_KEYS

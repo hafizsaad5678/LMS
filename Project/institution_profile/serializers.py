@@ -3,7 +3,8 @@ from django.db.models import Q
 from django.utils import timezone
 from .models import (
     Institution, InstitutionGallery, InstitutionFeature, InstitutionEvent,
-    InstitutionAdmissionInfo, InstitutionContact, InstitutionTestimonial
+    InstitutionAdmissionInfo, InstitutionContact, InstitutionTestimonial,
+    InstitutionAdmissionFeatured
 )
 from lms_cors.models import Department, Program, Teacher, Event, AcademicSession
 
@@ -12,7 +13,7 @@ class InstitutionGallerySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = InstitutionGallery
-        fields = ['id', 'image', 'caption', 'is_featured', 'order']
+        fields = ['id', 'image', 'category', 'caption', 'is_featured', 'order']
         read_only_fields = ['id']
 
 
@@ -40,6 +41,14 @@ class InstitutionAdmissionInfoSerializer(serializers.ModelSerializer):
     class Meta:
         model = InstitutionAdmissionInfo
         fields = ['id', 'title', 'description', 'apply_url', 'apply_email']
+        read_only_fields = ['id']
+
+
+class InstitutionAdmissionFeaturedSerializer(serializers.ModelSerializer):
+    """Serializer for featured admission promotional cards."""
+    class Meta:
+        model = InstitutionAdmissionFeatured
+        fields = ['id', 'title', 'description', 'image', 'badge_text', 'link_url', 'admission_start_date', 'admission_end_date', 'order']
         read_only_fields = ['id']
 
 
@@ -165,17 +174,20 @@ class InstitutionPublicProfileSerializer(serializers.ModelSerializer):
     faculty = serializers.SerializerMethodField()
     testimonials = serializers.SerializerMethodField()
     all_contacts = serializers.SerializerMethodField()
+    featured_admissions = serializers.SerializerMethodField()
 
     class Meta:
         model = Institution
         fields = [
             'id', 'name', 'slug', 'short_name', 'established_year',
             'description', 'mission', 'vision', 'tagline', 'footer_text',
+            'show_admissions',
             'email', 'phone', 'website', 'city', 'state', 'country',
             'facebook_url', 'twitter_url', 'linkedin_url', 'instagram_url', 'youtube_url',
             'logo', 'cover_image', 'theme_color', 'secondary_color',
             'principal_name', 'principal_image', 'principal_message',
-            'departments', 'gallery', 'features', 'events', 'admissions', 'contact', 'all_contacts', 'faculty', 'testimonials'
+            'departments', 'gallery', 'features', 'events', 'admissions', 'contact', 
+            'all_contacts', 'faculty', 'testimonials', 'featured_admissions'
         ]
         read_only_fields = ['id']
 
@@ -300,3 +312,7 @@ class InstitutionPublicProfileSerializer(serializers.ModelSerializer):
     def get_testimonials(self, obj):
         testimonials = obj.testimonials.filter(is_active=True)
         return InstitutionTestimonialSerializer(testimonials, many=True).data
+
+    def get_featured_admissions(self, obj):
+        featured = obj.featured_admissions.filter(is_active=True)
+        return InstitutionAdmissionFeaturedSerializer(featured, many=True).data

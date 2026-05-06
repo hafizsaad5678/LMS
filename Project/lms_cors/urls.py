@@ -21,6 +21,7 @@ from .views.materials import (
     create_material, create_announcement, activity_logs, ping
 )
 from .views.public import public_stats, submit_contact, submit_feedback
+from .views.statistics import admin_dashboard_stats, teacher_dashboard_stats, student_dashboard_stats
 
 router = DefaultRouter()
 
@@ -84,6 +85,9 @@ urlpatterns = [
     path('teacher/announcements/create/', create_announcement, name='create-announcement'),
     path('ping/', ping, name='ping'),
     path('admin/activity-logs/', activity_logs, name='activity-logs'),
+    path('admin/dashboard-stats/', admin_dashboard_stats, name='admin-dashboard-stats'),
+    path('teacher/dashboard-stats/', teacher_dashboard_stats, name='teacher-dashboard-stats'),
+    path('student/dashboard-stats/', student_dashboard_stats, name='student-dashboard-stats'),
     
     # Public Stats / Forms
     path('public/stats/', public_stats, name='public-stats'),

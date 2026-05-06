@@ -217,6 +217,28 @@ export const sidebarSections = [
     ]
   },
   {
+    title: 'Institute Profile',
+    items: [
+      {
+        name: 'Profile Management',
+        href: '#',
+        icon: '🏢',
+        submenu: [
+          { 
+            name: 'Admissions', 
+            href: `${BASE_PATH}/management/admissions`, 
+            icon: '📢' 
+          },
+          { 
+            name: 'Profile Settings', 
+            href: `${BASE_PATH}/management/institution-settings`, 
+            icon: '⚙️' 
+          }
+        ]
+      }
+    ]
+  },
+  {
     title: 'Management',
     items: [
       {

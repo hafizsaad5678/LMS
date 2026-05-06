@@ -17,12 +17,39 @@ export function useStudentData() {
         loading.value = true
         error.value = null
         try {
-            const foundStudent = await teacherPanelService.getStudentFromClasses(studentId)
-            if (foundStudent) {
-                studentInfo.value = foundStudent
-                return foundStudent
+            const [foundStudent, detailedStudent] = await Promise.all([
+                teacherPanelService.getStudentFromClasses(studentId).catch(() => null),
+                teacherPanelService.getStudentDetail(studentId).catch(() => null)
+            ])
+
+            const baseStudent = foundStudent || detailedStudent
+            if (!baseStudent) return null
+
+            const programName =
+                detailedStudent?.program_name ||
+                detailedStudent?.program?.name ||
+                foundStudent?.program_name ||
+                foundStudent?.program?.name ||
+                'N/A'
+
+            const departmentName =
+                detailedStudent?.department_name ||
+                detailedStudent?.program?.department?.name ||
+                foundStudent?.department_name ||
+                foundStudent?.program?.department?.name ||
+                'N/A'
+
+            const normalizedStudent = {
+                ...foundStudent,
+                ...detailedStudent,
+                name: baseStudent.name || baseStudent.full_name || 'Student',
+                roll_no: baseStudent.roll_no || baseStudent.enrollment_number || 'N/A',
+                program_name: programName,
+                department_name: departmentName
             }
-            return null
+
+            studentInfo.value = normalizedStudent
+            return normalizedStudent
         } catch (e) {
             error.value = e.message
             console.error('Error loading student info:', e)

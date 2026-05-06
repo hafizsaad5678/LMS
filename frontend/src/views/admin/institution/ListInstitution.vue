@@ -186,7 +186,7 @@ const confirmDeleteInstitution = async () => {
     refresh(fetchInstitutions)
   } catch (error) {
     console.error('Error deleting institution:', error)
-    showAlert('danger', 'Failed to delete institution', 'Error')
+    showAlert('error', 'Failed to delete institution', 'Error')
   } finally {
     showConfirmDialog.value = false
     institutionToDelete.value = null

@@ -1,5 +1,6 @@
 from django.db import models
 import uuid
+import logging
 from django.contrib.auth.models import User
 from django.core.validators import EmailValidator
 from django.utils import timezone
@@ -8,6 +9,8 @@ import os
 import secrets
 import string
 from authapp.utils import send_welcome_email
+
+logger = logging.getLogger(__name__)
 
 
 def validate_profile_image_size(value):
@@ -174,7 +177,7 @@ class BaseProfile(models.Model):
                 try:
                     send_welcome_email(existing_user, temp_password)
                 except Exception as e:
-                    print(f"Failed to send welcome email to existing user: {e}")
+                    logger.error("Failed to send welcome email to existing user: %s", e)
                 
                 return False, existing_user
             
@@ -213,7 +216,7 @@ class BaseProfile(models.Model):
             try:
                 send_welcome_email(user, password)
             except Exception as e:
-                print(f"Failed to send welcome email: {e}")
+                logger.error("Failed to send welcome email: %s", e)
             
             return True, user
             

@@ -60,55 +60,41 @@ export const teacherPanelService = {
     async getDashboardStats(options = {}) {
         const { forceRefresh = false } = options
 
-        if (forceRefresh) {
-            cacheService.clear(CACHE_KEYS.DASHBOARD_STATS)
-            pendingRequests.delete(CACHE_KEYS.DASHBOARD_STATS)
+        if (!forceRefresh) {
+            const stats = cacheService.get(CACHE_KEYS.DASHBOARD_STATS)
+            if (stats) {
+                const activities = cacheService.get(CACHE_KEYS.ACTIVITIES_RECENT) || []
+                return { stats, activities }
+            }
         }
 
-        const cached = cacheService.get(CACHE_KEYS.DASHBOARD_STATS)
-        if (cached) return cached
-
         try {
-            const [classesResult, assignmentsResult] = await Promise.allSettled([
-                this.getMyClasses({}, { forceRefresh }),
-                this.getMyAssignments({ forceRefresh })
-            ])
-
-            let totalClasses = 0, totalStudents = 0
-            if (classesResult.status === 'fulfilled') {
-                const classes = classesResult.value
-                const classesArray = normalizeToArray(classes)
-                totalClasses = classes.count || classesArray.length || 0
-                totalStudents = classesArray.reduce((sum, cls) => sum + (cls.student_count || 0), 0)
+            const response = await api.get('/teacher/dashboard-stats/')
+            const data = response.data
+            
+            const stats = {
+                totalClasses: data.counts.classes,
+                totalStudents: data.counts.students,
+                totalAssignments: data.counts.assignments,
+                pendingReviews: data.counts.pending_reviews,
+                upcomingDeadlines: data.counts.upcoming_deadlines
             }
 
-            let totalAssignments = 0, pendingReviews = 0, upcomingDeadlines = 0
-            if (assignmentsResult.status === 'fulfilled') {
-                const assignments = assignmentsResult.value
-                const assignmentsArray = normalizeToArray(assignments)
-                totalAssignments = assignments.count || assignmentsArray.length || 0
+            const activities = (data.recent_activities || []).map(a => ({
+                ...a,
+                time: getTimeAgo(a.time_iso)
+            }))
 
-                pendingReviews = assignmentsArray.reduce((sum, a) => {
-                    if (typeof a.pending_review_count === 'number') {
-                        return sum + a.pending_review_count
-                    }
-                    const submissionCount = a.submission_count ?? a.submitted ?? 0
-                    const gradedCount = a.graded_count ?? 0
-                    return sum + Math.max(0, submissionCount - gradedCount)
-                }, 0)
-
-                const today = new Date()
-                upcomingDeadlines = assignmentsArray.filter(a => {
-                    return isDateWithinNextDays(a.due_date, 7, today)
-                }).length
-            }
-
-            const stats = { totalClasses, totalStudents, totalAssignments, pendingReviews, upcomingDeadlines }
             cacheService.set(CACHE_KEYS.DASHBOARD_STATS, stats)
-            return stats
+            cacheService.set(CACHE_KEYS.ACTIVITIES_RECENT, activities)
+            
+            return { stats, activities }
         } catch (error) {
             console.error('Dashboard stats error:', error)
-            return { totalClasses: 0, totalStudents: 0, totalAssignments: 0, pendingReviews: 0, upcomingDeadlines: 0 }
+            return {
+                stats: { totalClasses: 0, totalStudents: 0, totalAssignments: 0, pendingReviews: 0, upcomingDeadlines: 0 },
+                activities: []
+            }
         }
     },
 
@@ -741,35 +727,15 @@ export const teacherPanelService = {
         if (cached) return cached
 
         try {
-            // These should hit cache if getDashboardStats was called first
-            const [assignmentsRes, classesRes] = await Promise.all([
-                this.getMyAssignments(),
-                this.getMyClasses()
-            ])
+            // Usually dashboard stats call already populated this
+            const response = await api.get('/teacher/dashboard-stats/')
+            const activities = (response.data.recent_activities || []).map(a => ({
+                ...a,
+                time: getTimeAgo(a.time_iso)
+            }))
 
-            const activities = []
-            const assignmentsArray = normalizeToArray(assignmentsRes)
-            const classesArray = normalizeToArray(classesRes)
-
-            assignmentsArray.slice(0, 3).forEach(a => {
-                activities.push({
-                    id: `assign-${a.id}`,
-                    message: `Assignment "${a.title}" - ${a.submission_count || a.submitted || 0}/${a.total_students} submitted`,
-                    time: getTimeAgo(a.created_at)
-                })
-            })
-
-            classesArray.slice(0, 2).forEach(c => {
-                activities.push({
-                    id: `class-${c.id}`,
-                    message: `${c.subject_name} - ${c.student_count} students enrolled`,
-                    time: 'Active'
-                })
-            })
-
-            const result = activities.slice(0, 5)
-            cacheService.set(CACHE_KEYS.ACTIVITIES_RECENT, result)
-            return result
+            cacheService.set(CACHE_KEYS.ACTIVITIES_RECENT, activities)
+            return activities
         } catch {
             return []
         }

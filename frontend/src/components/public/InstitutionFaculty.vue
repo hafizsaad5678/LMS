@@ -106,8 +106,6 @@
                   {{ teacher.designation || 'Lecturer' }}
                 </div>
               </div>
-
-
             </div>
           </div>
         </div>

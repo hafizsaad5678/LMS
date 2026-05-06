@@ -72,6 +72,8 @@ export const ADMIN_ROUTES = {
     ACCOUNTS: { name: 'Accounts', path: '/admin-dashboard/accounts' },
     FEES: { name: 'FeesCollection', path: '/admin-dashboard/fees-collection' },
     EXPENSES: { name: 'Expenses', path: '/admin-dashboard/expenses' },
+    ADMISSIONS_MANAGEMENT: { name: 'AdmissionsManagement', path: '/admin-dashboard/management/admissions' },
+    INSTITUTION_SETTINGS: { name: 'InstitutionSettings', path: '/admin-dashboard/management/institution-settings' },
 
     // Academic
     EVENTS: { name: 'Events', path: '/admin-dashboard/events' },

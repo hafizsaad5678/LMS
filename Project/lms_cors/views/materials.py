@@ -1,5 +1,5 @@
 from rest_framework import status
-from rest_framework.decorators import api_view, permission_classes, action
+from rest_framework.decorators import api_view, permission_classes, action, throttle_classes
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.exceptions import PermissionDenied
@@ -124,9 +124,13 @@ class AnnouncementViewSet(BaseViewSet):
     ordering_fields = ['created_at', 'title', 'priority', 'views']
     
     def get_queryset(self):
+        user = self.request.user
+        # Admins can see all announcements
+        if user.is_staff or user.is_superuser or hasattr(user, 'admin_profile'):
+            return self.queryset.all()
         # Teachers can only see announcements for subjects they teach
-        if hasattr(self.request.user, 'teacher_profile'):
-            teacher = self.request.user.teacher_profile
+        if hasattr(user, 'teacher_profile'):
+            teacher = user.teacher_profile
             teacher_subjects = TeacherSubject.objects.filter(
                 teacher=teacher, is_active=True
             ).values_list('subject', flat=True)
@@ -151,6 +155,7 @@ class AnnouncementViewSet(BaseViewSet):
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
+@throttle_classes([])  # Uses default DRF throttle rates from settings
 def ping(request):
     return Response({'message': 'pong', 'time': timezone.now()})
 
@@ -307,7 +312,8 @@ def activity_logs(request):
     """
     Returns activity logs for admin dashboard.
     """
-    logs = ActivityLog.objects.all().select_related('user').order_by('-created_at')[:100]
+    limit = min(int(request.query_params.get('limit', 100)), 500)
+    logs = ActivityLog.objects.all().select_related('user').order_by('-created_at')[:limit]
     
     log_data = []
     for log in logs:

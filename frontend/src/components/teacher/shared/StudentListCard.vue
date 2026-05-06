@@ -1,7 +1,7 @@
 <template>
   <div class="card border-0 shadow-sm">
-    <div class="card-header bg-gradient-blue border-0">
-      <h5 class="mb-0">
+    <div class="card-header border-0" :class="headerClass">
+      <h5 class="mb-0" :class="headerTextClass">
         <i :class="icon + ' me-2'"></i>{{ title }}
       </h5>
     </div>
@@ -81,6 +81,14 @@ const props = defineProps({
   icon: {
     type: String,
     default: 'bi bi-people'
+  },
+  headerClass: {
+    type: String,
+    default: 'bg-gradient-blue'
+  },
+  headerTextClass: {
+    type: String,
+    default: ''
   },
   emptyMessage: {
     type: String,

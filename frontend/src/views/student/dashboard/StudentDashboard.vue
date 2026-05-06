@@ -76,22 +76,25 @@ import { ActivityFeed, QuickActionCard, StatCard } from '@/components/shared/com
 import studentPanelService from '@/services/student/studentPanelService'
 import { useStudentBase } from '@/composables/student/useStudentBase'
 import { STUDENT_ROUTES } from '@/utils/constants/routes'
+import { STORAGE_KEYS } from '@/utils/constants/storage'
 
 const { studentId, studentName, loadProfile } = useStudentBase()
-const loading = ref(true); const loadingActivities = ref(true)
-const activities = ref([]); const stats = ref(studentPanelService._getDefaultStats())
-const activeTodos = ref(0)
-const TODO_STORAGE_KEY = 'student_productivity_tasks_v2'
 
+const loading = ref(true);
+const loadingActivities = ref(true)
+const activities = ref([]);
+const stats = ref(studentPanelService._getDefaultStats())
+const activeTodos = ref(0)
 const handleAIChat = () => {
-  window.dispatchEvent(new CustomEvent('toggle-ai-chat', { 
-    detail: { action: 'open', focus: true } 
+  window.dispatchEvent(new CustomEvent('toggle-ai-chat', {
+    detail: { action: 'open', focus: true }
   }))
 }
 
 const refreshActiveTodoCount = () => {
   try {
-    const raw = localStorage.getItem(TODO_STORAGE_KEY)
+    const key = STORAGE_KEYS.TODO_LIST(studentId || 'guest')
+    const raw = localStorage.getItem(key)
     const list = raw ? JSON.parse(raw) : []
     activeTodos.value = Array.isArray(list) ? list.filter((task) => !task.completed).length : 0
   } catch {
@@ -112,11 +115,9 @@ const loadDashboard = async () => {
     if (!studentId) return
     refreshActiveTodoCount()
 
-    const [dStats, activityList] = await Promise.all([
-      studentPanelService.getDashboardStats(studentId),
-      studentPanelService.getActivities(studentId)
-    ])
-    stats.value = dStats; activities.value = activityList
+    const { stats: dStats, activities: activityList } = await studentPanelService.getDashboardStats(studentId)
+    stats.value = dStats
+    activities.value = activityList
   } finally { loading.value = false; loadingActivities.value = false }
 }
 

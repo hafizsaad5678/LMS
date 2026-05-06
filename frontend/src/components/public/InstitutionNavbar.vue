@@ -33,7 +33,7 @@
           <li class="nav-item">
             <router-link :to="`/i/${slug}/faculty`" class="nav-link fw-bold text-dark text-uppercase nav-hover-brand nav-link-custom" active-class="active">FACULTY</router-link>
           </li>
-          <li class="nav-item">
+          <li class="nav-item" v-if="institution.show_admissions">
             <router-link :to="`/i/${slug}/admissions`" class="nav-link fw-bold text-dark text-uppercase nav-hover-brand nav-link-custom" active-class="active">ADMISSIONS</router-link>
           </li>
           <li class="nav-item">

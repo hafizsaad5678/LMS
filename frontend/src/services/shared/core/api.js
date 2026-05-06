@@ -12,6 +12,32 @@ const api = axios.create({
   }
 })
 
+// Global request de-duplication for GET requests
+const activeRequests = new Map()
+const originalRequest = api.request.bind(api)
+
+api.request = (config) => {
+  // Only de-duplicate GET requests
+  const method = (config.method || 'get').toLowerCase()
+  if (method === 'get') {
+    // Generate a unique key based on URL and params
+    const key = `${config.url}?${JSON.stringify(config.params || {})}`
+    
+    if (activeRequests.has(key)) {
+      return activeRequests.get(key)
+    }
+    
+    const promise = originalRequest(config).finally(() => {
+      activeRequests.delete(key)
+    })
+    
+    activeRequests.set(key, promise)
+    return promise
+  }
+  
+  return originalRequest(config)
+}
+
 // Add token to requests
 api.interceptors.request.use((config) => {
   const token = safeStorage.get(STORAGE_KEYS.ACCESS_TOKEN)

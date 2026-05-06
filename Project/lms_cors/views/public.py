@@ -34,22 +34,22 @@ def public_stats(request):
     try:
         students_count = Student.objects.count()
     except Exception:
-        students_count = 500
+        students_count = 0
         
     try:
         teachers_count = Teacher.objects.count()
     except Exception:
-        teachers_count = 50
+        teachers_count = 0
         
     try:
         subjects_count = Subject.objects.count()
     except Exception:
-        subjects_count = 100
+        subjects_count = 0
         
     try:
         institutions_count = Institution.objects.count()
     except Exception:
-        institutions_count = 10
+        institutions_count = 0
     
     return Response({
         "activeStudents": students_count,

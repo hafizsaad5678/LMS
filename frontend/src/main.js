@@ -20,6 +20,7 @@ import './assets/css/student-panel.css'
 // Shared homepage styles
 import './assets/css/home-screen.css'
 
+
 // Ensure reloads always start at the top of the page (avoids browser restoring bottom scroll)
 if ('scrollRestoration' in window.history) {
 	window.history.scrollRestoration = 'manual'

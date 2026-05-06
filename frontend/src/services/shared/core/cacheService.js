@@ -101,8 +101,11 @@ class CacheService {
      * Clear cache by pattern
      */
     clearPattern(pattern) {
+        if (typeof pattern !== 'string' || pattern.length === 0) return
+
         Array.from(this.cache.keys()).forEach(key => {
-            if (key.includes(pattern)) {
+            const keyStr = typeof key === 'string' ? key : String(key)
+            if (keyStr.includes(pattern)) {
                 this.clear(key)
             }
         })

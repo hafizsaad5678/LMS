@@ -9,7 +9,7 @@
       :is-home="true"
     />
 
-    <!-- Facilities Highlights -->
+
     <section id="features" class="pt-10 pb-2 bg-white">
       <div class="container">
         <div class="section-header text-center mb-5" data-aos="fade-up">
@@ -24,43 +24,12 @@
     <!-- About Section -->
     <InstitutionAbout :institution="institution" :logoUrl="logoUrl" />
 
-    <!-- Upcoming Events -->
-    <InstitutionEvents 
-      v-if="displayEvents && displayEvents.length > 0" 
-      :items="displayEvents" 
-    />
-
     <!-- Testimonials -->
     <InstitutionTestimonials 
       v-if="displayTestimonials && displayTestimonials.length > 0" 
       :testimonials="displayTestimonials" 
     />
 
-    <!-- Quick Gallery Preview -->
-    <section v-if="galleryItems && galleryItems.length > 0" class="py-10 bg-light">
-      <div class="container text-center">
-        <div class="section-header text-center mb-5">
-          <p class="subtitle text-brand fw-bold text-uppercase mb-3">Campus Life</p>
-          <h2 class="display-5 fw-bold title-font">Inside Our Campus</h2>
-          <div class="header-line mx-auto"></div>
-        </div>
-        
-        <div class="row g-3 mb-5">
-          <div v-for="item in galleryItems.slice(0, 4)" :key="item.id" class="col-sm-6 col-md-3">
-            <div class="ratio ratio-1x1 rounded-4 overflow-hidden shadow-sm hover-scale">
-              <img :src="fileUrl(item.image)" :alt="item.caption" class="object-fit-cover transition-all" />
-            </div>
-          </div>
-        </div>
-        
-        <router-link 
-          :to="{ name: 'InstitutionGallery', params: { slug: institution.slug } }" 
-          class="btn btn-brand-outline px-5 py-3 rounded-pill fw-bold"
-        >
-          View Full Gallery <i class="bi bi-arrow-right ms-2"></i>
-        </router-link>
-      </div>
-    </section>
   </div>
 </template>
 
@@ -72,6 +41,7 @@ import InstitutionAbout from '@/components/public/InstitutionAbout.vue'
 import InstitutionTestimonials from '@/components/public/InstitutionTestimonials.vue'
 import InstitutionDepartments from '@/components/public/InstitutionDepartments.vue'
 import InstitutionEvents from '@/components/public/InstitutionEvents.vue'
+import { getFileUrl } from '@/utils/constants/config'
 
 const props = defineProps({
   institution: Object,

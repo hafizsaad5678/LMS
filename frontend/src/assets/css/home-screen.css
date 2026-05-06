@@ -264,3 +264,116 @@
     max-height: 280px;
   }
 }
+
+/* ============================================================
+   INSTITUTION PUBLIC & SHARED STYLES
+   (Consolidated from institution-public.css)
+   ============================================================ */
+
+/* Utilities */
+.line-clamp-1 {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+  line-clamp: 1;
+  overflow: hidden;
+}
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+}
+.line-clamp-3 {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
+}
+
+.bg-success-soft { background-color: rgba(25, 135, 84, 0.1) !important; }
+.bg-brand-soft { background-color: var(--brand-soft) !important; }
+.bg-brand-primary { background-color: var(--brand) !important; }
+
+.border-dashed { border-style: dashed !important; }
+
+.size-32 { width: 32px !important; height: 32px !important; }
+.size-48 { width: 48px !important; height: 48px !important; }
+.size-64 { width: 64px !important; height: 64px !important; }
+
+/* Admission Cards */
+.admission-card-hover-popup {
+  transition: all 0.3s ease;
+  border: 1px solid rgba(0,0,0,0.05) !important;
+}
+
+.admission-card-hover-popup:hover {
+  transform: translateY(-5px);
+  border-color: var(--brand) !important;
+  box-shadow: 0 15px 30px rgba(0,0,0,0.1) !important;
+}
+
+/* Image Preview Modal */
+.hover-image-popup-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(4px);
+  z-index: 9999;
+  cursor: pointer;
+}
+
+.popup-content {
+  max-width: 800px;
+  width: 90%;
+  background: white;
+  transform-origin: center;
+}
+
+.popup-content img {
+  width: 100%;
+  max-height: 80vh;
+  object-fit: contain;
+}
+
+/* Transitions */
+.pop-enter-active, .pop-leave-active {
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.pop-enter-from, .pop-leave-to {
+  opacity: 0;
+  transform: scale(0.8) translateY(20px);
+}
+
+/* Form Components (Used in Settings) */
+.custom-switch .form-check-input {
+  width: 3.5em;
+  height: 1.75em;
+  cursor: pointer;
+}
+
+.custom-switch .form-check-input:checked {
+  background-color: var(--brand, #dc3545);
+  border-color: var(--brand, #dc3545);
+}
+
+.featured-card-item {
+  transition: all 0.2s ease;
+  border-style: dashed !important;
+}
+
+.featured-card-item:hover {
+  border-style: solid !important;
+  border-color: var(--brand, #dc3545) !important;
+  background-color: #f8fafc;
+}
+

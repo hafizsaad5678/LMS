@@ -14,6 +14,7 @@ import {
     programService,
     subjectService
 } from '@/services/shared'
+import api from '@/services/shared/core/api'
 import { feeService } from './managementService'
 
 // Cache key constants for consistency
@@ -29,52 +30,87 @@ const CACHE_KEYS = {
     ACTIVITIES_RECENT: 'admin:activities:recent'
 }
 
+const pendingRequests = new Map()
+
 export const adminPanelService = {
     /**
      * Get dashboard statistics with caching
      */
     async getDashboardStats(forceRefresh = false) {
-        const cached = forceRefresh ? null : cacheService.get(CACHE_KEYS.DASHBOARD_STATS)
-        if (cached) return cached
-
-        try {
-            const [studentsRes, teachersRes, deptsRes, feeStatsRes, sessionsRes, programsRes, subjectsRes] = await Promise.allSettled([
-                this.getStudentCount(forceRefresh),
-                this.getTeacherCount(forceRefresh),
-                this.getDepartmentCount(forceRefresh),
-                this.getFeeStatistics(forceRefresh),
-                this.getSessionCount(forceRefresh),
-                this.getProgramCount(forceRefresh),
-                this.getSubjectCount(forceRefresh)
-            ])
-
-            const students = studentsRes.status === 'fulfilled' ? studentsRes.value : 0
-            const teachers = teachersRes.status === 'fulfilled' ? teachersRes.value : 0
-            const depts = deptsRes.status === 'fulfilled' ? deptsRes.value : 0
-            const feeStats = feeStatsRes.status === 'fulfilled' ? feeStatsRes.value : { total_collected: 0 }
-            const sessions = sessionsRes.status === 'fulfilled' ? sessionsRes.value : 0
-            const programs = programsRes.status === 'fulfilled' ? programsRes.value : 0
-            const subjects = subjectsRes.status === 'fulfilled' ? subjectsRes.value : 0
-
-            const stats = {
-                students,
-                teachers,
-                departments: depts,
-                revenue: feeStats.total_collected || 0,
-                sessions,
-                programs,
-                subjects
-            }
-
-            cacheService.set(CACHE_KEYS.DASHBOARD_STATS, stats)
-            return stats
-        } catch (error) {
-            console.error('Dashboard stats error:', error)
-            return {
-                students: 0, teachers: 0, departments: 0,
-                revenue: 0, sessions: 0, programs: 0, subjects: 0
+        if (!forceRefresh) {
+            const stats = cacheService.get(CACHE_KEYS.DASHBOARD_STATS)
+            if (stats) {
+                const activities = cacheService.get(CACHE_KEYS.ACTIVITIES_RECENT) || []
+                return { stats, activities }
             }
         }
+
+        if (pendingRequests.has(CACHE_KEYS.DASHBOARD_STATS)) {
+            return pendingRequests.get(CACHE_KEYS.DASHBOARD_STATS)
+        }
+
+        const fetchPromise = (async () => {
+            try {
+                const response = await api.get('/admin/dashboard-stats/')
+                const data = response.data
+
+                const stats = {
+                    students: data.counts.students,
+                    teachers: data.counts.teachers,
+                    departments: data.counts.departments,
+                    revenue: data.revenue || 0,
+                    sessions: data.counts.sessions,
+                    programs: data.counts.programs,
+                    subjects: data.counts.subjects,
+                    // Extended management counts
+                    holidays: data.counts.holidays,
+                    exams: data.counts.exams,
+                    events: data.counts.events,
+                    timetables: data.counts.timetables,
+                    expenses: data.counts.expenses,
+                    accounts: data.counts.accounts,
+                    library_books: data.counts.library_books,
+                    borrowings: data.counts.borrowings
+                }
+
+                let activities = []
+                if (data.recent_activities) {
+                    activities = data.recent_activities.map(a => ({
+                        ...a,
+                        time: getTimeAgo(a.time_iso)
+                    }))
+                    cacheService.set(CACHE_KEYS.ACTIVITIES_RECENT, activities)
+                }
+
+                cacheService.set(CACHE_KEYS.DASHBOARD_STATS, stats)
+                
+                // Populate individual counts in cache too to prevent redundant separate calls
+                cacheService.set(CACHE_KEYS.STUDENTS_COUNT, stats.students)
+                cacheService.set(CACHE_KEYS.TEACHERS_COUNT, stats.teachers)
+                cacheService.set(CACHE_KEYS.DEPARTMENTS_COUNT, stats.departments)
+                cacheService.set(CACHE_KEYS.SESSIONS_COUNT, stats.sessions)
+                cacheService.set(CACHE_KEYS.PROGRAMS_COUNT, stats.programs)
+                cacheService.set(CACHE_KEYS.SUBJECTS_COUNT, stats.subjects)
+
+                return { stats, activities }
+            } catch (error) {
+                console.error('Dashboard stats error:', error)
+                return {
+                    stats: {
+                        students: 0, teachers: 0, departments: 0,
+                        revenue: 0, sessions: 0, programs: 0, subjects: 0,
+                        holidays: 0, exams: 0, events: 0, timetables: 0,
+                        expenses: 0, accounts: 0, library_books: 0, borrowings: 0
+                    },
+                    activities: []
+                }
+            } finally {
+                pendingRequests.delete(CACHE_KEYS.DASHBOARD_STATS)
+            }
+        })()
+
+        pendingRequests.set(CACHE_KEYS.DASHBOARD_STATS, fetchPromise)
+        return fetchPromise
     },
 
     /**
@@ -170,162 +206,20 @@ export const adminPanelService = {
         if (cached) return cached
 
         try {
-            const [
-                recentStudentsRes,
-                recentTeachersRes,
-                recentDepartmentsRes,
-                recentProgramsRes,
-                recentSessionsRes,
-                recentSubjectsRes,
-                recentFeesRes,
-                recentAssignmentsRes
-            ] = await Promise.allSettled([
-                studentService.getAllStudents({ ordering: '-updated_at', page_size: 5 }),
-                teacherService.getAllTeachers({ ordering: '-updated_at', page_size: 5 }),
-                departmentService.getAllDepartments({ ordering: '-updated_at', page_size: 5 }),
-                programService.getAllPrograms({ ordering: '-updated_at', page_size: 5 }),
-                sessionService.getSessions({ ordering: '-updated_at', page_size: 5 }),
-                subjectService.getAllSubjects({ ordering: '-updated_at', page_size: 5 }),
-                feeService.getAll({ ordering: '-updated_at', page_size: 5 }),
-                assignmentService.getAllAssignments({ ordering: '-updated_at', page_size: 5 })
-            ])
+            // Usually dashboard stats call already populated this, 
+            // but if called directly we fetch from the same unified endpoint
+            const response = await api.get('/admin/dashboard-stats/')
+            const data = response.data
 
-            const safeArray = (result, extractor = (v) => v) => {
-                if (!result || result.status !== 'fulfilled') return []
-                return normalizeToArray(extractor(result.value))
-            }
+            const activities = (data.recent_activities || []).map(a => ({
+                ...a,
+                time: getTimeAgo(a.time_iso)
+            }))
 
-            const toDate = (value) => {
-                const date = value ? new Date(value) : null
-                return date && !Number.isNaN(date.getTime()) ? date : null
-            }
-
-            const getEntityTimestamp = (item) => {
-                return (
-                    toDate(item.updated_at) ||
-                    toDate(item.created_at) ||
-                    toDate(item.payment_date) ||
-                    null
-                )
-            }
-
-            const activityAction = (item) => {
-                const editCount = Number(item.edit_count || 0)
-                const createdAt = toDate(item.created_at)
-                const updatedAt = toDate(item.updated_at)
-                if (editCount > 0) return 'updated'
-                if (createdAt && updatedAt && updatedAt.getTime() - createdAt.getTime() > 1500) return 'updated'
-                return 'created'
-            }
-
-            const activities = []
-
-            const addEntityActivities = ({ items, type, label, nameFields, icon, color }) => {
-                items.forEach((item) => {
-                    const timestamp = getEntityTimestamp(item)
-                    if (!timestamp) return
-
-                    const action = activityAction(item)
-                    const displayName = nameFields
-                        .map((field) => item?.[field])
-                        .find((v) => typeof v === 'string' && v.trim().length > 0) || `#${item?.id || 'N/A'}`
-
-                    activities.push({
-                        id: `${type}-${item.id}-${action}`,
-                        message: `${label} ${action}: ${displayName}`,
-                        time: getTimeAgo(timestamp.toISOString()),
-                        timestamp,
-                        type,
-                        icon,
-                        color
-                    })
-                })
-            }
-
-            addEntityActivities({
-                items: safeArray(recentStudentsRes),
-                type: 'student',
-                label: 'Student',
-                nameFields: ['full_name', 'enrollment_number'],
-                icon: 'bi bi-person-plus',
-                color: 'text-success'
-            })
-
-            addEntityActivities({
-                items: safeArray(recentTeachersRes),
-                type: 'teacher',
-                label: 'Teacher',
-                nameFields: ['full_name', 'employee_id'],
-                icon: 'bi bi-person-badge',
-                color: 'text-primary'
-            })
-
-            addEntityActivities({
-                items: safeArray(recentDepartmentsRes),
-                type: 'department',
-                label: 'Department',
-                nameFields: ['name', 'code'],
-                icon: 'bi bi-building',
-                color: 'text-info'
-            })
-
-            addEntityActivities({
-                items: safeArray(recentProgramsRes),
-                type: 'program',
-                label: 'Program',
-                nameFields: ['name', 'code'],
-                icon: 'bi bi-mortarboard',
-                color: 'text-secondary'
-            })
-
-            addEntityActivities({
-                items: safeArray(recentSessionsRes),
-                type: 'session',
-                label: 'Session',
-                nameFields: ['session_name', 'session_code'],
-                icon: 'bi bi-calendar-event',
-                color: 'text-warning'
-            })
-
-            addEntityActivities({
-                items: safeArray(recentSubjectsRes),
-                type: 'subject',
-                label: 'Subject',
-                nameFields: ['name', 'code'],
-                icon: 'bi bi-book',
-                color: 'text-dark'
-            })
-
-            // Fee payments are useful admin actions; keep explicit status-based message.
-            const fees = safeArray(recentFeesRes, (v) => v?.data)
-            fees.filter(f => f.status === 'paid').forEach((f) => {
-                const timestamp = getEntityTimestamp(f)
-                if (!timestamp) return
-                activities.push({
-                    id: `fee-${f.id}-paid`,
-                    message: `Fee payment received: ${f.student_name || 'Student'}`,
-                    time: getTimeAgo(timestamp.toISOString()),
-                    timestamp,
-                    type: 'fee',
-                    icon: 'bi bi-cash-coin',
-                    color: 'text-success'
-                })
-            })
-
-            addEntityActivities({
-                items: safeArray(recentAssignmentsRes),
-                type: 'assignment',
-                label: 'Assignment',
-                nameFields: ['title'],
-                icon: 'bi bi-journal-check',
-                color: 'text-primary'
-            })
-
-            const sorted = activities.sort((a, b) => b.timestamp - a.timestamp).slice(0, 8)
-            cacheService.set(CACHE_KEYS.ACTIVITIES_RECENT, sorted)
-            return sorted
+            cacheService.set(CACHE_KEYS.ACTIVITIES_RECENT, activities)
+            return activities
         } catch (error) {
-            console.error('Error loading activities:', error)
+            console.error('Recent activities error:', error)
             return []
         }
     },

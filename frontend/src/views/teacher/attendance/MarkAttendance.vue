@@ -265,6 +265,11 @@ const saveAttendance = async () => {
 
     const response = await teacherPanelService.bulkMarkAttendance(attendanceData)
     
+    if (response?.warning) {
+      showAlert('warning', response.warning, 'Warning!')
+      return
+    }
+
     if (response.failed > 0) {
       // Create detailed error message from response.errors
       const errorDetails = response.errors.map(e => {
@@ -281,9 +286,17 @@ const saveAttendance = async () => {
       resetAttendance()
     }
   } catch (error) {
+    if (error.response?.status === 409) {
+      const msg = error.response?.data?.error || 'Attendance already marked for this subject and date.'
+      showAlert('warning', msg, 'Warning!')
+      return
+    }
+
     console.error(error)
-    const msg = error.response?.data ? JSON.stringify(error.response.data) : error.message
-    showAlert('error', `Failed: ${msg}`)
+    const msg = error.response?.data?.error ||
+      error.response?.data?.detail ||
+      (error.response?.data ? JSON.stringify(error.response.data) : error.message)
+    showAlert('error', msg)
   } finally {
     saving.value = false
   }

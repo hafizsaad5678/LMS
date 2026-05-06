@@ -81,6 +81,24 @@ class AttendanceViewSet(BaseViewSet):
         
         created_records = []
         errors = []
+
+        sample = next((item for item in attendance_list if isinstance(item, dict)), None)
+        if sample:
+            subject_id = sample.get('subject')
+            session_date = sample.get('session_date')
+            if subject_id and session_date:
+                already_marked = Attendance.objects.filter(
+                    subject_id=subject_id,
+                    session_date=session_date
+                ).exists()
+                if already_marked:
+                    return Response({
+                        'warning': 'Attendance already marked for this subject and date.',
+                        'created': 0,
+                        'failed': 0,
+                        'records': [],
+                        'errors': []
+                    }, status=status.HTTP_200_OK)
         
         for idx, attendance_data in enumerate(attendance_list):
             # Create a copy to avoid modifying the original
@@ -98,17 +116,11 @@ class AttendanceViewSet(BaseViewSet):
                 ).first()
                 
                 if existing:
-                    # Update existing record
-                    serializer = self.get_serializer(existing, data=data, partial=True)
-                    if serializer.is_valid():
-                        serializer.save()
-                        created_records.append(serializer.data)
-                    else:
-                        errors.append({
-                            'index': idx,
-                            'data': data,
-                            'errors': serializer.errors
-                        })
+                    errors.append({
+                        'index': idx,
+                        'data': data,
+                        'error': 'Attendance already marked for this student and date.'
+                    })
                 else:
                     # Create new record
                     serializer = self.get_serializer(data=data)

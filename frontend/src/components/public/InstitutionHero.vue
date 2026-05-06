@@ -21,7 +21,7 @@
               <h1 class="display-2 fw-bold mb-4 hero-title text-dark">
                 {{ institution.name }}
               </h1>
-              <p class="lead mb-5 text-secondary hero-description">
+              <p class="lead mb-5 fw-bold text-dark hero-description">
                 {{ institution.tagline || 'Shape your future with world-class academic programs and a vibrant campus community designed for success.' }}
               </p>
               <div class="d-flex flex-wrap gap-3">

@@ -58,7 +58,7 @@ export const institutionService = {
      */
     async updateInstitution(id, data) {
         try {
-            const response = await api.put(`/institutions/${id}/`, data)
+            const response = await api.patch(`/institutions/${id}/`, data)
             return response.data
         } catch (error) {
             console.error(`Error updating institution ${id}:`, error.response?.data || error.message)

@@ -36,46 +36,30 @@ export const studentPanelService = {
     /**
      * Get dashboard statistics with caching
      */
-    async getDashboardStats(studentId) {
-        if (!studentId) return this._getDefaultStats()
-
+    async getDashboardStats(studentId, options = {}) {
+        if (!studentId) return { stats: this._getDefaultStats(), activities: [] }
+        const { forceRefresh = false } = options
         const cacheKey = getCacheKey(studentId, 'dashboard:stats')
-        const cached = cacheService.get(cacheKey)
-        if (cached) return cached
+
+        if (!forceRefresh) {
+            const stats = cacheService.get(cacheKey)
+            if (stats) {
+                const activities = cacheService.get(getCacheKey(studentId, 'activities')) || []
+                return { stats, activities }
+            }
+        }
 
         try {
-            // Fetch all data once - studentService handles individual caching
-            const [subjects, gradeReport, attendance, assignments, announcements] = await Promise.all([
-                studentService.getEnrolledSubjects(studentId),
-                studentService.getGradeReport(studentId),
-                studentService.getAttendance(studentId),
-                studentService.getAssignments(studentId),
-                studentService.getAnnouncements(studentId)
-            ])
-
-            const summary = gradeReport?.summary || {}
-            const normalizedSubjects = normalizeToArray(subjects)
-            
-            // Filter pending logic: subjects that have assignments/components but aren't graded yet
-            const gradedCount = Number(summary.total_grades ?? 0)
-            const activeSubjects = normalizedSubjects.filter(s => 
-                (Number(s.total_components || 0) + Number(s.total_assignments || 0)) > 0
-            ).length
-
-            const stats = {
-                enrolledCourses: normalizedSubjects.length,
-                gpa: String(summary.overall_gpa ?? '0.00'),
-                gradingProgress: `${gradedCount}/${activeSubjects}`,
-                attendance: `${this._calculateAttendance(attendance)}%`,
-                pendingAssignments: this._calculatePendingAssignments(normalizeToArray(assignments)),
-                unreadAnnouncements: this._calculateUnreadAnnouncements(normalizeToArray(announcements))
-            }
+            const response = await api.get('/student/dashboard-stats/')
+            const { stats, activities } = response.data
 
             cacheService.set(cacheKey, stats)
-            return stats
+            cacheService.set(getCacheKey(studentId, 'activities'), activities)
+
+            return { stats, activities }
         } catch (error) {
             console.error('Dashboard stats error:', error)
-            return this._getDefaultStats()
+            return { stats: this._getDefaultStats(), activities: [] }
         }
     },
 
@@ -100,99 +84,14 @@ export const studentPanelService = {
         if (cached) return cached
 
         try {
-            // These will hit cache since getDashboardStats already fetched them
-            const [assignments, attendance, grades, subjects] = await Promise.all([
-                studentService.getAssignments(studentId),
-                studentService.getAttendance(studentId),
-                studentService.getGrades(studentId),
-                studentService.getEnrolledSubjects(studentId)
-            ])
+            // Usually dashboard stats call already populated this
+            const response = await api.get('/student/dashboard-stats/')
+            const activities = response.data.activities || []
 
-            const activities = []
-            const now = new Date()
-            const assignmentsList = normalizeToArray(assignments)
-            const gradesList = normalizeToArray(grades)
-            const subjectsList = normalizeToArray(subjects)
-
-            // Upcoming assignments
-            const upcomingAssignments = assignmentsList
-                .filter(a => {
-                    const dueDate = a.due_date ? new Date(a.due_date) : null
-                    return dueDate && dueDate > now && !a.is_submitted
-                })
-                .sort((a, b) => new Date(a.due_date) - new Date(b.due_date))
-                .slice(0, 2)
-
-            upcomingAssignments.forEach(a => {
-                const dueDate = new Date(a.due_date)
-                const daysUntil = Math.ceil((dueDate - now) / (1000 * 60 * 60 * 24))
-                const timeText = daysUntil === 0 ? 'Due today' : daysUntil === 1 ? 'Due tomorrow' : `Due in ${daysUntil} days`
-
-                activities.push({
-                    title: `Assignment: ${a.title || 'Untitled'}`,
-                    description: `${a.subject_name || a.subject?.name || 'Subject'} • ${timeText}`,
-                    time: timeText,
-                    icon: 'bi bi-clipboard-check',
-                    color: daysUntil <= 2 ? 'text-danger' : 'text-warning'
-                })
-            })
-
-            // Recent attendance
-            const attendanceList = normalizeToArray(attendance)
-            const recentAttendance = [...attendanceList]
-                .sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0))
-                .slice(0, 1)
-
-            recentAttendance.forEach(record => {
-                const statusIcon = record.status === 'present' ? 'bi bi-check-circle-fill' :
-                    record.status === 'absent' ? 'bi bi-x-circle-fill' : 'bi bi-dash-circle-fill'
-                const statusColor = record.status === 'present' ? 'text-success' :
-                    record.status === 'absent' ? 'text-danger' : 'text-warning'
-
-                activities.push({
-                    title: `Attendance: ${record.status?.charAt(0).toUpperCase() + record.status?.slice(1) || 'Marked'}`,
-                    description: record.subject_name || record.subject?.name || 'Subject',
-                    time: getTimeAgo(record.date),
-                    icon: statusIcon,
-                    color: statusColor
-                })
-            })
-
-            // Recent grades
-            if (gradesList.length > 0 && activities.length < 5) {
-                const recentGrades = [...gradesList]
-                    .sort((a, b) => new Date(b.created_at || b.graded_at || 0) - new Date(a.created_at || a.graded_at || 0))
-                    .slice(0, 2)
-
-                recentGrades.forEach(grade => {
-                    activities.push({
-                        title: `Grade posted: ${grade.subject_name || grade.submission?.assignment?.subject?.name || 'Subject'}`,
-                        description: `Score: ${grade.marks_obtained || grade.grade_value || grade.marks || grade.grade || 'N/A'}`,
-                        time: getTimeAgo(grade.created_at || grade.graded_at),
-                        icon: 'bi bi-star-fill',
-                        color: 'text-success'
-                    })
-                })
-            }
-
-            // Enrolled subjects as fallback
-            if (subjectsList.length > 0 && activities.length < 5) {
-                subjectsList.slice(0, 5 - activities.length).forEach(subject => {
-                    activities.push({
-                        title: `Enrolled: ${subject.subject_name || subject.subject?.name || subject.name}`,
-                        description: subject.subject_code || subject.subject?.code || '',
-                        time: 'This semester',
-                        icon: 'bi bi-book-fill',
-                        color: 'text-info'
-                    })
-                })
-            }
-
-            const result = activities.slice(0, 5)
-            cacheService.set(key, result)
-            return result
+            cacheService.set(key, activities)
+            return activities
         } catch (error) {
-            console.error('Error generating activities:', error)
+            console.error('Error fetching activities:', error)
             return []
         }
     },

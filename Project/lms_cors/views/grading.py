@@ -1,3 +1,5 @@
+import logging
+
 from rest_framework import viewsets, status, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -101,7 +103,7 @@ def _close_attempt(attempt, close_status):
                 }
             )
     except Exception as e:
-        print(f"Error auto-syncing quiz grade: {e}")
+        logging.getLogger(__name__).error("Error auto-syncing quiz grade: %s", e)
     # --------------------------------------
 
 
@@ -600,7 +602,7 @@ class GradeComponentViewSet(viewsets.ModelViewSet):
                             defaults={'marks_obtained': None}
                         )
             except Exception as e:
-                print(f"Error linking assignment marks: {e}")
+                logging.getLogger(__name__).error("Error linking assignment marks: %s", e)
 
     @action(detail=True, methods=['get'])
     def marks(self, request, pk=None):
@@ -659,6 +661,8 @@ class GradeComponentViewSet(viewsets.ModelViewSet):
                 component=component,
                 student_id=student_id
             )
+            if created:
+                created_count += 1
         return Response({
             'status': 'success', 
             'message': f'Initialized {created_count} new student records',

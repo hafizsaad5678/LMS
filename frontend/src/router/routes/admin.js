@@ -82,6 +82,8 @@ export const adminRoutes = {
         { path: 'accounts', name: 'Accounts', component: () => import('../../views/admin/management/Accounts.vue') },
         { path: 'fees-collection', name: 'FeesCollection', component: () => import('../../views/admin/management/FeesCollection.vue') },
         { path: 'expenses', name: 'Expenses', component: () => import('../../views/admin/management/Expenses.vue') },
+        { path: 'management/admissions', name: ADMIN_ROUTES.ADMISSIONS_MANAGEMENT.name, component: () => import('../../views/admin/management/AdmissionsManagement.vue') },
+        { path: 'management/institution-settings', name: ADMIN_ROUTES.INSTITUTION_SETTINGS.name, component: () => import('../../views/admin/management/InstitutionSettings.vue') },
 
         // Library routes
         { path: 'library', name: 'LibraryDashboard', component: () => import('../../views/admin/library/Library.vue') },

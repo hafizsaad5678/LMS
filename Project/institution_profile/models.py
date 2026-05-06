@@ -41,6 +41,9 @@ class Institution(models.Model):
     tagline = models.CharField(max_length=300, blank=True, null=True, help_text='Short slogan e.g. "Excellence in Education"')
     footer_text = models.TextField(blank=True, null=True, help_text='Custom footer text')
     
+    # Admissions Control
+    show_admissions = models.BooleanField(default=True, help_text="Toggle admissions section on public profile")
+    
     # Social Links
     facebook_url = models.URLField(max_length=300, blank=True, null=True)
     twitter_url = models.URLField(max_length=300, blank=True, null=True)
@@ -72,6 +75,7 @@ class InstitutionGallery(models.Model):
         related_name='gallery_images'
     )
     image = models.ImageField(upload_to='institution_gallery/')
+    category = models.CharField(max_length=100, blank=True, help_text="e.g. sports, events, campus")
     caption = models.CharField(max_length=200, blank=True)
     is_featured = models.BooleanField(default=False)
     order = models.IntegerField(default=0)
@@ -189,6 +193,33 @@ class InstitutionAdmissionInfo(models.Model):
 
     def __str__(self):
         return f"{self.institution.name} - {self.title}"
+
+
+class InstitutionAdmissionFeatured(models.Model):
+    """Featured programs or courses specifically for the admissions page promotional cards."""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    institution = models.ForeignKey(
+        Institution, on_delete=models.CASCADE, related_name='featured_admissions'
+    )
+    title = models.CharField(max_length=200, help_text="e.g. 'FSc Pre-Medical' or 'Computer Courses'")
+    description = models.TextField(blank=True)
+    image = models.ImageField(upload_to='institution_admissions_featured/', blank=True, null=True)
+    badge_text = models.CharField(max_length=50, blank=True, default='Admissions Open')
+    link_url = models.URLField(blank=True, null=True, help_text="Optional external link or internal path")
+    admission_start_date = models.DateField(blank=True, null=True, help_text="Optional start date for admissions")
+    admission_end_date = models.DateField(blank=True, null=True, help_text="Optional end date for admissions")
+    order = models.IntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['order', '-created_at']
+        db_table = 'institution_admissions_featured'
+        verbose_name = 'Featured Admission Card'
+        verbose_name_plural = 'Featured Admission Cards'
+
+    def __str__(self):
+        return f"{self.title} - {self.institution.name}"
 
 
 class InstitutionContact(models.Model):

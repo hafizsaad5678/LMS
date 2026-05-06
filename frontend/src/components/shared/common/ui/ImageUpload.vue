@@ -47,6 +47,7 @@
 
 <script setup>
 import { ref, watch, computed } from 'vue'
+import { getFileUrl } from '@/utils/constants/config'
 
 const props = defineProps({
   modelValue: { type: [String, File, Object], default: null },
@@ -73,11 +74,7 @@ const displayUrl = computed(() => {
   }
   
   if (typeof url === 'string' && url) {
-    if (url.startsWith('http')) return url
-    if (url.startsWith('/')) {
-      return `${import.meta.env.VITE_API_BASE_URL.replace('/api', '')}${url}`
-    }
-    return url
+    return getFileUrl(url)
   }
   
   return ''

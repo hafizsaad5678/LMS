@@ -3,13 +3,16 @@ from ..models import (
     Institution, InstitutionGallery, InstitutionFeature, InstitutionEvent,
     InstitutionAdmissionInfo, InstitutionContact, Department, Program,
     AcademicSession, Semester, Subject, Student, Teacher, TeacherSubject,
-    Timetable, Grade, StudentMark, InstitutionTestimonial
+    Timetable, Grade, StudentMark, InstitutionTestimonial, InstitutionAdmissionFeatured
 )
+from institution_profile.serializers import InstitutionAdmissionFeaturedSerializer, InstitutionGallerySerializer
 
 
 class InstitutionSerializer(serializers.ModelSerializer):
     """Serializer for Institution model"""
     department_count = serializers.SerializerMethodField()
+    featured_admissions = InstitutionAdmissionFeaturedSerializer(many=True, required=False)
+    gallery_images = InstitutionGallerySerializer(many=True, required=False)
     
     class Meta:
         model = Institution
@@ -18,6 +21,125 @@ class InstitutionSerializer(serializers.ModelSerializer):
     
     def get_department_count(self, obj):
         return obj.departments.count()
+
+    def update(self, instance, validated_data):
+        request = self.context.get('request')
+        featured_admissions_data = validated_data.pop('featured_admissions', None)
+        gallery_images_data = validated_data.pop('gallery_images', None)
+        
+        if request and any(key.startswith('featured_admissions[') for key in request.data.keys()):
+            featured_admissions_data = self._parse_nested_featured_admissions(request.data, request.FILES)
+
+        if request and any(key.startswith('gallery_images[') for key in request.data.keys()):
+            gallery_images_data = self._parse_nested_gallery_images(request.data, request.FILES)
+        
+        instance = super().update(instance, validated_data)
+        
+        if featured_admissions_data is not None:
+            # Keep track of IDs we've seen to delete the ones we haven't
+            provided_ids = [item.get('id') for item in featured_admissions_data if item.get('id')]
+            instance.featured_admissions.exclude(id__in=provided_ids).delete()
+            
+            for card_data in featured_admissions_data:
+                card_id = card_data.pop('id', None)
+                
+                if card_id:
+                    # Update existing
+                    try:
+                        card = InstitutionAdmissionFeatured.objects.get(id=card_id, institution=instance)
+                        # If image is not provided (or is null/string 'null'), keep the old one
+                        if 'image' not in card_data or not card_data['image'] or isinstance(card_data.get('image'), str):
+                            card_data.pop('image', None) 
+                        
+                        for attr, value in card_data.items():
+                            setattr(card, attr, value)
+                        card.save()
+                    except InstitutionAdmissionFeatured.DoesNotExist:
+                        # Fallback to create if ID is invalid for this institution
+                        InstitutionAdmissionFeatured.objects.create(institution=instance, **card_data)
+                else:
+                    # Create new
+                    InstitutionAdmissionFeatured.objects.create(institution=instance, **card_data)
+
+        if gallery_images_data is not None:
+            provided_ids = [item.get('id') for item in gallery_images_data if item.get('id')]
+            instance.gallery_images.exclude(id__in=provided_ids).delete()
+            
+            for img_data in gallery_images_data:
+                img_id = img_data.pop('id', None)
+                img_data.pop('previewUrl', None) # Remove frontend-only preview field
+                
+                if img_id:
+                    try:
+                        img_obj = InstitutionGallery.objects.get(id=img_id, institution=instance)
+                        if 'image' not in img_data or not img_data['image'] or isinstance(img_data.get('image'), str):
+                            img_data.pop('image', None) 
+                        
+                        for attr, value in img_data.items():
+                            setattr(img_obj, attr, value)
+                        img_obj.save()
+                    except InstitutionGallery.DoesNotExist:
+                        InstitutionGallery.objects.create(institution=instance, **img_data)
+                else:
+                    if not img_data.get('image') or isinstance(img_data.get('image'), str):
+                        img_data.pop('image', None)
+                    InstitutionGallery.objects.create(institution=instance, **img_data)
+                
+        return instance
+
+    def _parse_nested_featured_admissions(self, data, files):
+        """Helper to parse flattened featured_admissions[index][field] data."""
+        results = {}
+        import re
+        # Pattern to match featured_admissions[0][title], featured_admissions[0][image], etc.
+        pattern = re.compile(r'^featured_admissions\[(\d+)\]\[(\w+)\]$')
+        
+        for key in data.keys():
+            match = pattern.match(key)
+            if match:
+                index = int(match.group(1))
+                field = match.group(2)
+                if index not in results:
+                    results[index] = {}
+                results[index][field] = data[key]
+
+        # Also check files
+        for key in files.keys():
+            match = pattern.match(key)
+            if match:
+                index = int(match.group(1))
+                field = match.group(2)
+                if index not in results:
+                    results[index] = {}
+                results[index][field] = files[key]
+            
+        return [results[i] for i in sorted(results.keys())]
+
+    def _parse_nested_gallery_images(self, data, files):
+        """Helper to parse flattened gallery_images[index][field] data."""
+        results = {}
+        import re
+        pattern = re.compile(r'^gallery_images\[(\d+)\]\[(\w+)\]$')
+        
+        for key in data.keys():
+            match = pattern.match(key)
+            if match:
+                index = int(match.group(1))
+                field = match.group(2)
+                if index not in results:
+                    results[index] = {}
+                results[index][field] = data[key]
+
+        for key in files.keys():
+            match = pattern.match(key)
+            if match:
+                index = int(match.group(1))
+                field = match.group(2)
+                if index not in results:
+                    results[index] = {}
+                results[index][field] = files[key]
+            
+        return [results[i] for i in sorted(results.keys())]
 
 
 
@@ -81,6 +203,7 @@ class ProgramSerializer(serializers.ModelSerializer):
 class AcademicSessionSerializer(serializers.ModelSerializer):
     program_name = serializers.CharField(source='program.name', read_only=True)
     department_name = serializers.CharField(source='program.department.name', read_only=True)
+    institution_id = serializers.CharField(source='program.department.institution_id', read_only=True)
     program_level = serializers.CharField(source='program.program_level', read_only=True)
     program_level_display = serializers.SerializerMethodField()
     semester_count = serializers.SerializerMethodField()

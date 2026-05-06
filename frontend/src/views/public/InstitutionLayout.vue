@@ -126,7 +126,7 @@ const themeStyle = computed(() => {
 const coverStyle = computed(() => {
   if (coverUrl.value) {
     return {
-      backgroundImage: `linear-gradient(120deg, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0.45)), url('${coverUrl.value}')`
+      backgroundImage: `linear-gradient(120deg, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0.1)), url('${coverUrl.value}')`
     }
   }
 

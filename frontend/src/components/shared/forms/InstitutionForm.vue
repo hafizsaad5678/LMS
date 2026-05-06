@@ -51,46 +51,6 @@
             <div class="col-md-4">
               <BaseInput v-model.number="modelValue.established_year" label="Established Year" type="number" placeholder="e.g., 1990" />
             </div>
-            <div class="col-12">
-              <BaseInput v-model="modelValue.tagline" label="Tagline / Slogan" type="text" placeholder="e.g., Excellence in Education" />
-            </div>
-          </div>
-        </div>
-
-        <!-- Branding & Design -->
-        <div class="mb-5">
-          <h6 class="text-dark fw-semibold mb-3 pb-2 border-bottom">
-            <i class="bi bi-palette me-2 text-admin"></i>Branding & Design
-          </h6>
-          <div class="row g-4">
-            <div class="col-md-4">
-              <label class="form-label d-flex justify-content-between">
-                Theme Color
-                <span class="badge" :style="{ backgroundColor: modelValue.theme_color || '#3b82f6', color: '#fff' }">
-                  {{ modelValue.theme_color || '#3b82f6' }}
-                </span>
-              </label>
-              <input type="color" v-model="modelValue.theme_color" class="form-control form-control-color w-100" style="height: 45px;">
-              <div class="form-text mt-2">Main brand color used across the public profile.</div>
-            </div>
-            <div class="col-md-4">
-              <label class="form-label">Institution Logo</label>
-              <ImageUpload 
-                v-model="modelValue.logo" 
-                :existing-image-url="typeof modelValue.logo === 'string' ? modelValue.logo : ''"
-                aspect-ratio="1/1"
-                placeholder="Upload Logo"
-              />
-            </div>
-            <div class="col-md-4">
-              <label class="form-label">Hero Cover Image</label>
-              <ImageUpload 
-                v-model="modelValue.cover_image" 
-                :existing-image-url="typeof modelValue.cover_image === 'string' ? modelValue.cover_image : ''"
-                aspect-ratio="16/9"
-                placeholder="Upload Hero Banner"
-              />
-            </div>
           </div>
         </div>
 
@@ -140,34 +100,8 @@
           </div>
         </div>
 
-        <!-- Principal Information -->
-        <div class="mb-5">
-          <h6 class="text-dark fw-semibold mb-3 pb-2 border-bottom">
-            <i class="bi bi-person-badge me-2 text-admin"></i>Principal Information
-          </h6>
-          <div class="row g-4">
-            <div class="col-md-8">
-              <BaseInput v-model="modelValue.principal_name" label="Principal Name" type="text" placeholder="e.g., Dr. Ahmad Ali" />
-              <div class="mt-4">
-                <label class="form-label">Principal's Message</label>
-                <textarea v-model="modelValue.principal_message" class="form-control" rows="5" placeholder="Enter the message from the principal..."></textarea>
-              </div>
-            </div>
-            <div class="col-md-4">
-              <label class="form-label">Principal's Photo</label>
-              <ImageUpload 
-                v-model="modelValue.principal_image" 
-                :existing-image-url="typeof modelValue.principal_image === 'string' ? modelValue.principal_image : ''"
-                aspect-ratio="3/4"
-                placeholder="Upload Photo"
-              />
-              <div class="form-text mt-2 text-center">Formal portrait (e.g. 3x4 aspect ratio).</div>
-            </div>
-          </div>
-        </div>
-
         <!-- Description -->
-        <div class="mb-4">
+        <div class="mb-4 pt-3 border-top">
           <h6 class="text-dark fw-semibold mb-3 pb-2 border-bottom">
             <i class="bi bi-text-paragraph me-2"></i>Description
           </h6>

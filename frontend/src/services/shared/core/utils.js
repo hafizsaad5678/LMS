@@ -99,25 +99,30 @@ export const debounce = (func, wait = 300) => {
  * @param {Object} obj - Object to convert
  * @returns {FormData} - FormData object
  */
-export const toFormData = (obj) => {
-    const formData = new FormData()
+export const toFormData = (obj, formData = new FormData(), parentKey = '') => {
     Object.keys(obj).forEach(key => {
         const value = obj[key]
         if (value === null || value === undefined) return
         
-        if (Array.isArray(value)) {
-            value.forEach(item => formData.append(key, item))
-        } else if (value instanceof File) {
-            formData.append(key, value)
+        const propertyKey = parentKey ? `${parentKey}[${key}]` : key
+
+        if (value instanceof File) {
+            formData.append(propertyKey, value)
+        } else if (Array.isArray(value)) {
+            value.forEach((item, index) => {
+                const arrayKey = `${propertyKey}[${index}]`
+                if (typeof item === 'object' && !(item instanceof File)) {
+                    toFormData(item, formData, arrayKey)
+                } else {
+                    formData.append(arrayKey, item)
+                }
+            })
         } else if (typeof value === 'object' && !(value instanceof File)) {
-            // Only append if it's not a generic object we should ignore
-            // or handle specific sub-objects if needed
-            if (value.id) formData.append(key, value.id)
-            else formData.append(key, JSON.stringify(value))
+            toFormData(value, formData, propertyKey)
         } else if (typeof value === 'boolean') {
-            formData.append(key, value ? 'true' : 'false')
+            formData.append(propertyKey, value ? '1' : '0')
         } else {
-            formData.append(key, value)
+            formData.append(propertyKey, value)
         }
     })
     return formData
