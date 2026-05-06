@@ -1,6 +1,6 @@
 <template>
-  <div class="min-vh-100 bg-gradient-light d-flex align-items-center justify-content-center p-3">
-    <div class="w-100 max-w-900">
+  <div class="min-vh-100 bg-gradient-light d-flex align-items-center justify-content-center py-5">
+    <div class="w-100 max-w-900 mt-5">
       <div class="card shadow-lg border-0 overflow-hidden">
         <div class="row g-0">
           <!-- Left Side - Form -->

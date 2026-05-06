@@ -1,6 +1,6 @@
 <template>
-  <div class="forgot-password-page min-vh-100 d-flex align-items-center justify-content-center">
-    <div class="w-100 max-w-900">
+  <div class="forgot-password-page min-vh-100 d-flex align-items-center justify-content-center py-5">
+    <div class="w-100 max-w-900 mt-5">
       <div class="card shadow-lg border-0 overflow-hidden forgot-card">
         <div class="row g-0">
           <!-- Left Side - Form -->
