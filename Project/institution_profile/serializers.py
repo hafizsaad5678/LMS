@@ -209,7 +209,7 @@ class InstitutionPublicProfileSerializer(serializers.ModelSerializer):
         
         # 2. If no branding events, fallback to general academic events
         if not events:
-            from django.utils import timezone
+            
             # Fetch 6 upcoming academic events
             academic_events = Event.objects.filter(
                 is_active=True,
@@ -234,8 +234,8 @@ class InstitutionPublicProfileSerializer(serializers.ModelSerializer):
             return InstitutionAdmissionInfoSerializer(admissions).data
             
         # 2. Fallback: Check for active program admission sessions
-        from lms_cors.models import AcademicSession
-        from django.utils import timezone
+        
+        
         today = timezone.now().date()
         
         # Find any session with an open admission window for this institution

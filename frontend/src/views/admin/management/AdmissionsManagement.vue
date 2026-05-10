@@ -6,7 +6,9 @@
     :breadcrumbs="breadcrumbs"
   >
     <div class="row g-4">
-      <!-- Institution Selector -->
+      <!-- DISABLED: Single-college mode — institution selector hidden -->
+      <!-- To re-enable multi-institution: uncomment the block below -->
+      <!--
       <div v-if="institutions.length > 0" class="col-12">
         <div class="card border-0 shadow-sm mb-2">
           <div class="card-body p-3">
@@ -21,6 +23,7 @@
           </div>
         </div>
       </div>
+      -->
 
       <div class="col-12">
         <!-- Dashboard Tabs / Actions -->

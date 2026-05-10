@@ -22,14 +22,6 @@
       </div>
 
       <form @submit.prevent="$emit('submit')">
-        <!-- Profile Image -->
-        <div class="mb-4 text-center">
-          <ImageUpload 
-            v-model="formData.profile_image" 
-            label="Profile Picture" 
-            :existing-image-url="typeof formData.profile_image === 'string' ? getFileUrl(formData.profile_image) : ''"
-          />
-        </div>
 
         <!-- Personal Information -->
         <div class="mb-4">
@@ -105,16 +97,31 @@
           <h6 class="text-dark fw-semibold mb-3 pb-2 border-bottom">
             <i class="bi bi-book me-2"></i>Teaching Subjects
           </h6>
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+              <label class="form-label">Course/Program</label>
+              <select v-model="selectedProgramForSubjects" class="form-select" :disabled="loadingPrograms">
+                <option value="">{{ loadingPrograms ? 'Loading...' : 'Select Course to Add Subjects' }}</option>
+                <option v-for="prog in programs" :key="prog.id" :value="String(prog.id)">
+                  {{ prog.name }} ({{ prog.code }})
+                </option>
+              </select>
+              <small class="text-muted">Filter subjects by any course in the institution</small>
+            </div>
+          </div>
+          <div v-if="!selectedProgramForSubjects" class="alert alert-info">
+            <i class="bi bi-info-circle me-2"></i>Select a course to view subjects.
+          </div>
           <div v-if="loadingSubjects" class="text-muted">
             <span class="spinner-border spinner-border-sm me-2"></span>Loading subjects...
           </div>
-          <div v-else-if="subjects.length === 0" class="alert alert-info">
+          <div v-else-if="selectedProgramForSubjects && subjects.length === 0" class="alert alert-info">
             <i class="bi bi-info-circle me-2"></i>No subjects available.
           </div>
-          <div v-else class="subjects-grid">
+          <div v-else-if="selectedProgramForSubjects" class="subjects-grid p-3 border rounded mb-3 bg-light-subtle">
             <div v-for="subject in subjects" :key="subject.id" class="form-check subject-item">
               <input class="form-check-input" type="checkbox" :id="'teacher-subject-' + subject.id" :value="subject.id"
-                v-model="formData.teaching_subjects">
+                v-model="formData.teaching_subjects" @change="onSubjectToggle(subject)">
               <label class="form-check-label" :for="'teacher-subject-' + subject.id">
                 <span class="badge bg-dark me-2">{{ subject.code }}</span>
                 {{ subject.name }}
@@ -122,7 +129,17 @@
               </label>
             </div>
           </div>
-          <small class="text-muted mt-2 d-block">Selected: {{ formData.teaching_subjects.length }} subject(s)</small>
+
+          <!-- Selected Subjects Summary -->
+          <div v-if="formData.teaching_subjects.length > 0" class="selected-subjects-section mt-3">
+            <label class="form-label fw-semibold small text-muted text-uppercase mb-2">Currently Selected ({{ formData.teaching_subjects.length }})</label>
+            <div class="d-flex flex-wrap gap-2">
+              <div v-for="id in formData.teaching_subjects" :key="id" class="badge bg-dark text-white border border-secondary p-2 d-flex align-items-center gap-2">
+                <span>{{ getSubjectDisplayName(id) }}</span>
+                <i class="bi bi-x-circle cursor-pointer text-danger-emphasis ms-1" @click="removeSubject(id)"></i>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- Address Information -->
@@ -143,7 +160,14 @@
             </div>
           </div>
         </div>
-
+ <!-- Profile Image -->
+        <div class="mb-4 text-center">
+          <ImageUpload 
+            v-model="formData.profile_image" 
+            label="Profile Picture" 
+            :existing-image-url="typeof formData.profile_image === 'string' ? getFileUrl(formData.profile_image) : ''"
+          />
+        </div>
         <!-- Form Actions -->
         <div class="d-flex gap-3 justify-content-end pt-3 border-top">
           <button type="button" @click="$emit('cancel')" class="btn btn-admin-outline px-4" :disabled="submitting">
@@ -166,34 +190,22 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch, reactive } from 'vue'
 import { BaseInput, SelectInput, ImageUpload } from '@/components/shared/common'
 import { getFileUrl } from '@/utils/constants/config'
-import { useCascadingDropdowns } from '@/composables/shared'
+import { 
+  useCascadingDropdowns, 
+  useFormFormatting 
+} from '@/composables/shared'
 import { GENDER_OPTIONS, DESIGNATION_OPTIONS } from '@/utils/constants/options'
-import { api } from '@/services/shared'
+import { api, normalizeToArray } from '@/services/shared'
 
 const props = defineProps({
-  modelValue: {
-    type: Object,
-    required: true
-  },
-  isEditMode: {
-    type: Boolean,
-    default: false
-  },
-  submitting: {
-    type: Boolean,
-    default: false
-  },
-  employeeId: {
-    type: String,
-    default: ''
-  },
-  currentDepartmentName: {
-    type: String,
-    default: ''
-  }
+  modelValue: { type: Object, required: true },
+  isEditMode: { type: Boolean, default: false },
+  submitting: { type: Boolean, default: false },
+  employeeId: { type: String, default: '' },
+  currentDepartmentName: { type: String, default: '' }
 })
 
 const emit = defineEmits(['update:modelValue', 'submit', 'cancel'])
@@ -204,44 +216,106 @@ const formData = computed({
   set: (value) => emit('update:modelValue', value)
 })
 
-const formatCNIC = (value) => {
-  const digits = String(value || '').replace(/\D/g, '').slice(0, 13)
-  if (digits.length <= 5) return digits
-  if (digits.length <= 12) return `${digits.slice(0, 5)}-${digits.slice(5)}`
-  return `${digits.slice(0, 5)}-${digits.slice(5, 12)}-${digits.slice(12)}`
-}
-
-const cnicModel = computed({
-  get: () => formatCNIC(formData.value.cnic),
-  set: (value) => {
-    formData.value.cnic = formatCNIC(value)
-  }
-})
-
-// Use cascading dropdowns with caching
+// Use shared composables
+const { cnicModel } = useFormFormatting(formData)
 const {
   departments,
+  programs,
   loadingDepartments,
-  loadDepartments
+  loadingPrograms,
+  loadDepartments,
+  loadPrograms
 } = useCascadingDropdowns()
 
 // Load subjects separately (not part of cascading dropdowns)
 const subjects = ref([])
 const loadingSubjects = ref(false)
+const selectedProgramForSubjects = ref('')
 
-const loadSubjects = async () => {
+// Keep track of subject details for the selected list display
+const subjectDetailsMap = reactive({})
+
+const onSubjectToggle = (subject) => {
+  if (subject && subject.id) {
+    subjectDetailsMap[subject.id] = subject
+  }
+}
+
+const getSubjectDisplayName = (id) => {
+  const s = subjectDetailsMap[id]
+  return s ? `${s.code} - ${s.name}` : `Subject ${id}`
+}
+
+const removeSubject = (id) => {
+  formData.value.teaching_subjects = formData.value.teaching_subjects.filter(sid => sid !== id)
+}
+
+const loadSubjects = async (programId) => {
+  if (!programId) {
+    subjects.value = []
+    return
+  }
   loadingSubjects.value = true
   try {
-    const response = await api.get('/subjects/')
-    subjects.value = Array.isArray(response.data) ? response.data : (response.data?.results || [])
+    const response = await api.get('/subjects/', { 
+      params: { 
+        'semester__program': programId,
+        'semester__status': 'active'
+      } 
+    })
+    const data = normalizeToArray(response.data)
+    subjects.value = data
+    
+    // Cache subject details
+    data.forEach(s => {
+      subjectDetailsMap[s.id] = s
+    })
   } catch (error) {
     console.error('Error loading subjects:', error)
+    subjects.value = []
   } finally {
     loadingSubjects.value = false
   }
 }
 
+// Only clear if the department itself changes significantly, but user wants to KEEP subjects
+watch(() => formData.value.department, () => {
+  selectedProgramForSubjects.value = ''
+  subjects.value = []
+})
+
+watch(() => selectedProgramForSubjects.value, async (programId) => {
+  if (programId) {
+    await loadSubjects(programId)
+  }
+})
+
 onMounted(async () => {
-  await Promise.all([loadDepartments(), loadSubjects()])
+  await Promise.all([loadDepartments(), loadPrograms()])
+  
+  // If editing, pre-populate subjectDetailsMap for currently assigned subjects
+  if (props.isEditMode && formData.value.teaching_subjects?.length > 0) {
+    try {
+      // Fetch details for all currently selected subjects so names/codes show up immediately
+      const ids = formData.value.teaching_subjects
+        .map(s => typeof s === 'object' ? s.id : s)
+        .filter(id => !!id)
+      
+      if (ids.length > 0) {
+        // We can fetch them one by one or use a filter if supported
+        // For simplicity and correctness across legacy/new data, fetch in bulk if possible
+        const response = await api.get('/subjects/', { params: { id__in: ids.join(',') } })
+        const data = normalizeToArray(response.data)
+        data.forEach(s => {
+          subjectDetailsMap[s.id] = s
+        })
+      }
+      
+      // Ensure formData.teaching_subjects only contains IDs for the form logic
+      formData.value.teaching_subjects = formData.value.teaching_subjects.map(s => typeof s === 'object' ? s.id : s)
+    } catch (error) {
+      console.error('Error pre-loading subject details:', error)
+    }
+  }
 })
 </script>

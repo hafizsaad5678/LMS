@@ -117,6 +117,24 @@ const onSubmit = async () => {
 onMounted(async () => {
   await loadInstitutions()
 
+  // SINGLE-COLLEGE MODE: auto-select the only institution
+  // if (institutions.value.length > 0 && !form.value.institution) {
+  //   form.value.institution = String(institutions.value[0].id)
+  // }
+
+  // SINGLE-COLLEGE MODE: default to Govt Graduate College Aroop
+  const defaultInstitution = institutions.value.find((institution) => {
+    const name = (institution.name || '').toLowerCase()
+    return name.includes('graduate') && name.includes('college') && name.includes('aroop')
+  })
+  if (!form.value.institution) {
+    if (defaultInstitution) {
+      form.value.institution = String(defaultInstitution.id)
+    } else if (institutions.value.length > 0) {
+      form.value.institution = String(institutions.value[0].id)
+    }
+  }
+
   const institutionFromQuery = route.query.institution
   if (institutionFromQuery) {
     form.value.institution = String(institutionFromQuery)

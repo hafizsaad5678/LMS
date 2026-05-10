@@ -41,7 +41,7 @@
           <StatCard title="Completed" :value="stats.completed" icon="bi bi-check2-all" bg-color="bg-info-light" icon-color="text-info" />
         </div>
         <div class="col-6 col-xl-3">
-          <StatCard title="Programs" :value="stats.programs" icon="bi bi-mortarboard" bg-color="bg-warning-light" icon-color="text-warning" />
+          <StatCard title="Draft" :value="stats.draft" icon="bi bi-pencil-square" bg-color="bg-warning-light" icon-color="text-warning" />
         </div>
       </div>
     </template>
@@ -209,8 +209,8 @@ const {
   cacheKey: 'semesters_list',
   searchFields: ['name'],
   forceFreshOnMount: true,
-  defaultFilters: { program: '', status: 'active' },
-  resetToDefaults: { status: 'active' },
+  defaultFilters: { program: '', status: '' },
+  resetToDefaults: { status: '' },
   filterSchema: [
     {
       key: 'status',
@@ -235,13 +235,13 @@ const {
   ]
 })
 
-const listStats = useListStats(semesters)
+const listStats = useListStats(data)
 
 const stats = listStats.summary({
   total: list => list.length,
   active: list => list.filter((semester) => normalizeStatus(semester.status) === 'active').length,
   completed: list => list.filter((semester) => normalizeStatus(semester.status) === 'completed').length,
-  programs: list => new Set(list.map((semester) => extractProgramId(semester))).size
+  draft: list => list.filter((semester) => normalizeStatus(semester.status) === 'draft').length
 })
 
 const loadPrograms = async () => {

@@ -17,6 +17,9 @@ from ..models.chatbot import UploadedFile
 from ..serializers.chatbot import ChatSessionSerializer, ChatMessageSerializer
 from ..services.config import CHAT_HISTORY_LIMIT, SOURCE_LABEL_LLM_FALLBACK, SOURCE_LABEL_LLM_GENERAL, DOC_MODE_CACHE_TTL_SECONDS, UPLOAD_POLL_INTERVAL_PROCESSING_MS, UPLOAD_POLL_INTERVAL_PENDING_MS
 from ..services.utils import get_doc_mode_cache_key
+from ..services.chat.chatbot import orchestrate_response
+from ..services.rag.utils import process_and_index_document
+
 
 logger = logging.getLogger(__name__)
 
@@ -76,9 +79,10 @@ class StudentChatView(APIView):
             history.append({"role": role, "content": msg.content})
         
         try:
-            from ..services.chat.chatbot import orchestrate_response
+            
 
             # Get response from chatbot service (it handles streaming check internally)
+
             result = orchestrate_response(
                 request.user,
                 query,
@@ -284,7 +288,7 @@ class DocumentUploadView(APIView):
 
         def _run_indexing(user_id: int, session_id_value: str, uploaded_file_id: str, filename: str, data: bytes):
             try:
-                from ..services.rag.utils import process_and_index_document
+                
 
                 UploadedFile.objects.filter(id=uploaded_file_id).update(index_status=UploadedFile.IndexStatus.PROCESSING)
                 f = BytesIO(data)

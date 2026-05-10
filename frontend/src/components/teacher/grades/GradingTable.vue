@@ -19,8 +19,11 @@
                 <div class="fw-bold text-dark">{{ student.student_name }}</div>
                 <div class="d-flex align-items-center gap-2 mt-1">
                   <span class="small text-muted">{{ student.student_enrollment }}</span>
-                  <span v-if="student.marks_obtained != null" class="badge bg-light text-primary extra-small border-primary-subtle pt-1">
+                  <span v-if="student.marks_obtained != null && hasMaxMarks" class="badge bg-light text-primary extra-small border-primary-subtle pt-1">
                     Score: {{ student.marks_obtained }} / {{ maxMarks }}
+                  </span>
+                  <span v-else-if="student.marks_obtained != null" class="badge bg-light text-primary extra-small border-primary-subtle pt-1">
+                    Score: {{ student.marks_obtained }}
                   </span>
                 </div>
               </div>
@@ -32,20 +35,20 @@
                 type="number" 
                 class="form-control form-control-marks" 
                 v-model.number="student.marks_obtained"
-                :class="{ 'is-invalid-input': student.marks_obtained > maxMarks }"
-                :max="maxMarks"
+                :class="{ 'is-invalid-input': hasMaxMarks && student.marks_obtained > maxMarks }"
+                :max="hasMaxMarks ? maxMarks : null"
                 min="0"
                 step="0.5"
                 @input="handleInput(student)"
                 :disabled="student.is_locked"
               >
             </div>
-            <div v-if="student.marks_obtained > maxMarks" class="text-danger extra-small mt-1 fw-bold">
+            <div v-if="hasMaxMarks && student.marks_obtained > maxMarks" class="text-danger extra-small mt-1 fw-bold">
               Max is {{ maxMarks }}
             </div>
           </td>
           <td class="text-center">
-            <span v-if="student.marks_obtained != null" 
+            <span v-if="student.marks_obtained != null && hasMaxMarks" 
                   class="badge rounded-pill px-3" 
                   :class="`grade-badge-${getGradeColor(student.marks_obtained)}`">
               {{ Math.round((student.marks_obtained / maxMarks) * 100) }}%
@@ -82,7 +85,7 @@
 </template>
 
 <script setup>
-import { defineProps } from 'vue'
+import { computed, defineProps } from 'vue'
 
 const props = defineProps({
   marksData: {
@@ -95,15 +98,18 @@ const props = defineProps({
   }
 })
 
+const hasMaxMarks = computed(() => Number(props.maxMarks) > 0)
+
 const handleInput = (student) => {
   student.is_dirty = true
-  if (student.marks_obtained > props.maxMarks) {
+  if (hasMaxMarks.value && student.marks_obtained > props.maxMarks) {
     // Optional: Auto-correct to max or just leave for validation
     // student.marks_obtained = props.maxMarks
   }
 }
 
 const getGradeColor = (marks) => {
+  if (!hasMaxMarks.value) return 'danger'
   const percentage = (marks / props.maxMarks) * 100
   if (percentage > 100) return 'danger'
   if (percentage >= 80) return 'success'

@@ -34,7 +34,7 @@ export const navigateToSignup = (router) => {
  * Navigate to home page
  */
 export const navigateToHome = (router) => {
-    router.push({ name: 'Home' })
+    router.push('/')
 }
 
 /**
@@ -62,11 +62,11 @@ export const navigateToDashboard = (router, role) => {
  * @param {Object} router - Vue Router instance
  * @param {string} fallbackName - Fallback route name
  */
-export const navigateBack = (router, fallbackName = 'Home') => {
+export const navigateBack = (router, fallbackName = null) => {
     if (window.history.length > 1) {
         router.back()
     } else {
-        router.push({ name: fallbackName })
+        router.push(fallbackName ? { name: fallbackName } : '/')
     }
 }
 

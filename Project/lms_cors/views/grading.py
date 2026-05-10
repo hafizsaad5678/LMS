@@ -1,4 +1,5 @@
 import logging
+from django.db.models import OuterRef, Subquery
 
 from rest_framework import viewsets, status, permissions
 from rest_framework.decorators import action
@@ -24,6 +25,8 @@ from ..serializers.grading import (
     QuizReviewQuestionSerializer,
     QuizAnswerSerializer
 )
+from ..models.assignments import Assignment, SubmissionHistory, Grade
+from ..serializers.assignments import GradeSerializer
 from ..permissions import IsAdminOrTeacher, IsTeacherOrAdminForWrite
 
 
@@ -200,6 +203,23 @@ class QuizViewSet(viewsets.ModelViewSet):
                 }
             )
 
+            # If an attempt was pre-created but never started, reset timing so the quiz starts fresh.
+            if not created and not attempt.answers:
+                attempt.answer_entries.all().delete()
+                attempt.answers = {}
+                attempt.flagged_questions = []
+                attempt.status = 'in_progress'
+                attempt.is_completed = False
+                attempt.is_submitted = False
+                attempt.score = 0
+                attempt.completed_at = None
+                attempt.start_time = timezone.now()
+                attempt.end_time = timezone.now() + timedelta(minutes=quiz.time_limit_minutes or 30)
+                attempt.save(update_fields=[
+                    'answers', 'flagged_questions', 'status', 'is_completed', 'is_submitted',
+                    'score', 'completed_at', 'start_time', 'end_time'
+                ])
+
             # If an old in-progress attempt already expired, close it on the server
             # before returning state so the client doesn't auto-submit on first tick.
             if not created and not attempt.is_locked and attempt.is_expired:
@@ -345,7 +365,7 @@ class QuizAttemptViewSet(viewsets.ModelViewSet):
         # Handle duplicates: If multiple attempts by same student, only return the latest one
         # unless explicitly asked for all.
         if self.request.query_params.get('latest_only') == 'true':
-            from django.db.models import OuterRef, Subquery
+            
             latest_attempt = queryset.filter(
                 student_id=OuterRef('student_id')
             ).order_by('-started_at', '-id').values('id')[:1]
@@ -525,12 +545,16 @@ class QuizAttemptViewSet(viewsets.ModelViewSet):
             }
         )
 
+        total_marks = attempt.quiz.total_marks
+        if not total_marks:
+            total_marks = sum((q.marks or Decimal('0')) for q in questions)
+
         return Response({
             'attempt_id': str(attempt.id),
             'quiz_id': str(attempt.quiz_id),
             'quiz_title': attempt.quiz.title,
             'score': attempt.score,
-            'total_marks': attempt.quiz.total_marks,
+            'total_marks': total_marks,
             'status': attempt.status,
             'questions': serializer.data
         })
@@ -546,14 +570,14 @@ class GradeComponentViewSet(viewsets.ModelViewSet):
             return GradeComponent.objects.none()
 
         if user.is_staff or user.is_superuser or hasattr(user, 'admin_profile'):
-            queryset = GradeComponent.objects.all()
+            queryset = GradeComponent.objects.all().select_related('linked_quiz')
         elif hasattr(user, 'teacher_profile'):
-            queryset = GradeComponent.objects.filter(created_by=user.teacher_profile)
+            queryset = GradeComponent.objects.filter(created_by=user.teacher_profile).select_related('linked_quiz')
         elif hasattr(user, 'student_profile'):
             # Students can see published grade components for their enrolled subjects
             student = user.student_profile
             enrolled_subjects = StudentSubject.objects.filter(student=student).values_list('subject_id', flat=True)
-            queryset = GradeComponent.objects.filter(subject_id__in=enrolled_subjects, is_visible_to_students=True)
+            queryset = GradeComponent.objects.filter(subject_id__in=enrolled_subjects, is_visible_to_students=True).select_related('linked_quiz')
         else:
             return GradeComponent.objects.none()
         
@@ -574,8 +598,7 @@ class GradeComponentViewSet(viewsets.ModelViewSet):
 
         if assignment_id:
             try:
-                from ..models.assignments import Assignment, SubmissionHistory, Grade
-                from ..models.people import Student
+                
                 assignment = Assignment.objects.get(id=assignment_id)
                 
                 # Link all existing submissions/grades to this component
@@ -679,6 +702,7 @@ class StudentMarkViewSet(viewsets.ReadOnlyModelViewSet):
             return StudentMark.objects.none()
 
         queryset = StudentMark.objects.all()
+        queryset = queryset.select_related('component', 'component__linked_quiz')
         
         # Authorization filtering
         if user.is_staff or user.is_superuser or hasattr(user, 'admin_profile'):
@@ -710,3 +734,62 @@ class StudentMarkViewSet(viewsets.ReadOnlyModelViewSet):
             queryset = queryset.filter(student_id=student_id)
             
         return queryset.distinct()
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        
+        # 1. Serialize standard StudentMark objects
+        serializer = self.get_serializer(queryset, many=True)
+        marks_data = serializer.data
+        
+        # 2. Fetch and include legacy Grade objects (Assignments)
+        user = request.user
+        try:
+            
+            
+            legacy_grades_qs = Grade.objects.all().select_related(
+                'submission', 'submission__student', 'submission__assignment', 'submission__assignment__subject'
+            )
+            
+            # Apply same filters as StudentMark
+            if hasattr(user, 'teacher_profile'):
+                legacy_grades_qs = legacy_grades_qs.filter(submission__assignment__created_by=user.teacher_profile)
+            elif hasattr(user, 'student_profile'):
+                legacy_grades_qs = legacy_grades_qs.filter(submission__student=user.student_profile)
+            
+            subject_id = request.query_params.get('subject')
+            if subject_id:
+                legacy_grades_qs = legacy_grades_qs.filter(submission__assignment__subject_id=subject_id)
+            
+            student_id = request.query_params.get('student')
+            if student_id:
+                legacy_grades_qs = legacy_grades_qs.filter(submission__student_id=student_id)
+            
+            # Serialize legacy grades
+            for g in legacy_grades_qs:
+                assignment = g.submission.assignment
+                student = g.submission.student
+                
+                # Check if this assignment is already represented by a StudentMark to avoid duplicates
+                # We match by title and subject if they share the same name
+                if any(m.get('title') == assignment.title for m in marks_data):
+                    continue
+
+                marks_data.append({
+                    'id': str(g.id),
+                    'student_id': str(student.id),
+                    'student_name': student.full_name,
+                    'student_roll_no': student.enrollment_number,
+                    'component_name': assignment.title,
+                    'component_type': 'assignment',
+                    'marks_obtained': float(g.marks_obtained or 0),
+                    'max_marks': float(assignment.total_marks or 0),
+                    'percentage': round((float(g.marks_obtained or 0) / float(assignment.total_marks or 1)) * 100, 2) if assignment.total_marks else 0,
+                    'is_locked': True,
+                    'graded_at': g.graded_at.isoformat() if g.graded_at else None
+                })
+        except Exception as e:
+            # Fallback to just returning the standard marks if legacy lookup fails
+            logging.getLogger(__name__).error("Error including legacy grades in StudentMark list: %s", e)
+            
+        return Response(marks_data)

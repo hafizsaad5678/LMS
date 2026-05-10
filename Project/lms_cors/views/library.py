@@ -1,3 +1,4 @@
+from datetime import timedelta
 from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -55,7 +56,7 @@ class BookBorrowingViewSet(BaseViewSet):
     @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
     def request_borrow(self, request):
         """Allow students to request borrowing a book"""
-        from datetime import timedelta
+        
         
         book_id = request.data.get('book')
         if not book_id:

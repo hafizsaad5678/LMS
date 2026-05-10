@@ -20,12 +20,34 @@
             <div class="col-md-4">
               <BaseInput v-model="modelValue.code" label="Department Code" type="text" placeholder="e.g., CS" :required="true" />
             </div>
+            <!-- SINGLE-COLLEGE MODE: Institution auto-selected, dropdown hidden -->
+            <!-- To re-enable multi-institution: restore the <select> and remove the read-only display -->
             <div class="col-md-6">
               <label class="form-label">Institution <span class="text-danger">*</span></label>
-              <select v-model="modelValue.institution" class="form-select" required>
-                <option value="">Select Institution</option>
-                <option v-for="inst in institutions" :key="inst.id" :value="String(inst.id)">{{ inst.name }}</option>
-              </select>
+              <!-- <select v-model="modelValue.institution" class="form-select" required>
+                <option value="" disabled>Select Institution</option>
+                <option v-for="institution in institutions" :key="institution.id" :value="institution.id">
+                  {{ institution.name }}
+                </option>
+              </select> -->
+              <!-- <input type="text" class="form-control bg-light" :value="institutions.length ? institutions[1].name : 'Loading...'" disabled readonly /> -->
+              <input
+                type="text"
+                class="form-control bg-light"
+                :value="institutions.length
+                  ? (institutions.find((institution) => String(institution.id) === String(modelValue.institution))?.name
+                    || institutions.find((institution) =>
+                      (institution.name || '').toLowerCase().includes('graduate') &&
+                      (institution.name || '').toLowerCase().includes('college') &&
+                      (institution.name || '').toLowerCase().includes('aroop')
+                    )?.name
+                    || institutions[0].name)
+                  : 'Loading...'"
+                disabled
+                readonly
+              />
+              <!-- Hidden: keeps form value intact -->
+              <input type="hidden" :value="modelValue.institution" />
             </div>
             <div class="col-md-6">
               <BaseInput v-model="modelValue.head_of_department" label="Head of Department" type="text" placeholder="e.g., Dr. John Smith" />

@@ -196,7 +196,7 @@ import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { AdminPageTemplate } from '@/components/shared/panels'
 import { AlertMessage, ConfirmDialog, LoadingSpinner } from '@/components/shared/common'
-import { sessionService } from '@/services/shared'
+import { sessionService, normalizeToArray } from '@/services/shared'
 import { ADMIN_ROUTES } from '@/utils/constants/routes'
 import { formatDate as formatDateUtil } from '@/utils/formatters'
 
@@ -262,12 +262,6 @@ const showAlert = (type, title, message) => {
   alert.show = true
 }
 
-const normalizeListResponse = (payload) => {
-  if (Array.isArray(payload)) return payload
-  if (Array.isArray(payload?.results)) return payload.results
-  return []
-}
-
 const formatDate = (value) => {
   if (!value) return 'N/A'
   return formatDateUtil(value)
@@ -307,7 +301,7 @@ const loadSessions = async () => {
   loadingSessions.value = true
   try {
     const data = await sessionService.getActiveSessions()
-    sessions.value = normalizeListResponse(data)
+    sessions.value = normalizeToArray(data)
 
     const routeSessionId = route.query.session
     const hasRouteSession = sessions.value.some((session) => session.id === routeSessionId)
@@ -354,7 +348,7 @@ const loadHistory = async () => {
 
   try {
     const data = await sessionService.getPromotionHistory(selectedSessionId.value)
-    history.value = normalizeListResponse(data)
+    history.value = normalizeToArray(data)
   } catch (error) {
     console.error('Failed to load promotion history:', error)
     history.value = []

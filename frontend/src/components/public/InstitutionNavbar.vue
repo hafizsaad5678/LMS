@@ -40,7 +40,10 @@
             <router-link :to="`/i/${slug}/gallery`" class="nav-link fw-bold text-dark text-uppercase nav-hover-brand nav-link-custom" active-class="active">GALLERY</router-link>
           </li>
           <li class="nav-item ms-lg-2 mt-2 mt-lg-0">
-            <router-link to="/login" class="btn btn-sm rounded-pill px-3 py-1 fw-bold text-white shadow-sm btn-login">Login</router-link>
+            <router-link v-if="!isLoggedIn" to="/login" class="btn btn-sm rounded-pill px-3 py-1 fw-bold text-white shadow-sm btn-login">Login</router-link>
+            <button v-else type="button" class="d-inline-flex align-items-center gap-2 px-3 py-1 rounded-pill border border-secondary bg-light" @click="goToDashboard">
+              <span class="fw-semibold text-dark">{{ displayName }}</span>
+            </button>
           </li>
         </ul>
       </div>
@@ -50,10 +53,25 @@
 
 <script setup>
 import { computed } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
+import { useAuth } from '@/store/auth'
+import { navigateToDashboard, navigateToLogin } from '@/utils/navigation'
 
 const route = useRoute()
+const router = useRouter()
 const slug = computed(() => route.params.slug)
+const authStore = useAuth()
+const isLoggedIn = computed(() => authStore.isAuthenticated)
+const displayName = computed(() => authStore.displayName)
+const userRole = computed(() => authStore.userRole || authStore.user?.role || '')
+
+const goToDashboard = () => {
+  if (userRole.value) {
+    navigateToDashboard(router, userRole.value)
+    return
+  }
+  navigateToLogin(router)
+}
 defineProps({
   institution: {
     type: Object,

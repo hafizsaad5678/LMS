@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <AdminPageTemplate title="Accounts Management" subtitle="Manage financial accounts" icon="bi bi-bank" :breadcrumbs="breadcrumbs" :actions="actions" content-title="Account List">
     <AlertMessage v-if="alert.show" :type="alert.type" :message="alert.message" :title="alert.title" :auto-close="true" :auto-close-duration="3000" @close="alert.show = false" />
     
@@ -137,7 +137,7 @@ const accounts = computed(() => Array.isArray(rawAccounts.value) ? rawAccounts.v
 
 const loadAccounts = async () => {
   await fetchAccounts(async () => {
-    const response = await accountService.getAll()
+    const response = await accountService.getAll({}, { forceRefresh: true })
     return response.data?.results || response.data || []
   })
 }

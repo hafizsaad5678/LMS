@@ -17,10 +17,12 @@ export { useListStats } from './data/useListStats'
 // Form Logic & Validation
 export { useEntityForm } from './form/useEntityForm'
 export { useCascadingDropdowns } from './form/useCascadingDropdowns'
+export { useFormFormatting } from './form/useFormFormatting'
 export { useNavigateAfterDelay, useAlert, createForm, resetForm, FORM_DEFAULTS, useFormSubmit } from './form/useFormHelpers'
 
 // Domain Specific Logic
 export { useStudentId } from './domain/useStudentId'
+export { useAcademicSync } from './domain/useAcademicSync'
 export {
     enrollStudentInSubjects,
     assignSubjectsToTeacher,

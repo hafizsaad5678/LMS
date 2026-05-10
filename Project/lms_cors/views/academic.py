@@ -3,7 +3,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.db import transaction
 from django.db import IntegrityError
-from django.db.models import Q
+from django.db.models import Q, Count
 
 from .base import BaseViewSet
 from ..models import (
@@ -16,7 +16,8 @@ from ..serializers import (
     ProgramSerializer, ProgramDetailSerializer,
     AcademicSessionSerializer, AcademicSessionDetailSerializer,
     SemesterSerializer, SubjectSerializer, SubjectDetailSerializer,
-    StudentSerializer, TeacherSerializer, TeacherSubjectSerializer, StudentSubjectSerializer
+    StudentSerializer, TeacherSerializer, TeacherSubjectSerializer, StudentSubjectSerializer,
+    AssignmentSerializer, AttendanceSerializer
 )
 from ..services import SemesterFactory, EnrollmentService
 
@@ -43,7 +44,7 @@ class InstitutionViewSet(BaseViewSet):
     @action(detail=True)
     def statistics(self, request, pk=None):
         institution = self.get_object()
-        from django.db.models import Count
+        
         
         departments = institution.departments.all()
         dept_count = departments.count()
@@ -455,7 +456,7 @@ class SemesterViewSet(BaseViewSet):
     serializer_class = SemesterSerializer
     pagination_class = None  # Ensure all semesters load for frontend table
     search_fields = ['name', 'program__name', 'program__code']
-    filterset_fields = ['program', 'program__department', 'status']
+    filterset_fields = ['program', 'program__department', 'status', 'session', 'number']
     ordering_fields = ['number', 'name']
 
     @action(detail=False, methods=['post'])
@@ -475,14 +476,37 @@ class SemesterViewSet(BaseViewSet):
 
 
 class SubjectViewSet(BaseViewSet):
-    queryset = Subject.objects.select_related('semester', 'semester__program', 'semester__session', 'semester__program__department', 'semester__program__department__institution').filter(
-        semester__isnull=False,
-        semester__program__department__is_active=True,
-        semester__program__department__institution__is_active=True
-    ).filter(Q(semester__session__isnull=True) | Q(semester__session__is_active=True))
+    queryset = Subject.objects.select_related(
+        'semester', 'semester__program', 'semester__session', 
+        'semester__program__department', 'semester__program__department__institution'
+    )
+    
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        
+        # Filter by specific IDs if provided
+        ids = self.request.query_params.get('id__in')
+        if ids:
+            id_list = ids.split(',')
+            return queryset.filter(id__in=id_list)
+            
+        # Default filters for general listing
+        queryset = queryset.filter(
+            semester__isnull=False,
+            semester__program__department__is_active=True,
+            semester__program__department__institution__is_active=True
+        )
+        
+        # Only show subjects from active sessions (or legacy subjects without a session)
+        queryset = queryset.filter(
+            Q(semester__session__isnull=True) | Q(semester__session__is_active=True)
+        )
+        
+        return queryset
+
     serializer_class = SubjectSerializer
     search_fields = ['name', 'code', 'description']
-    filterset_fields = ['semester', 'semester__program', 'semester__program__department']
+    filterset_fields = ['semester', 'semester__program', 'semester__program__department', 'semester__status']
     ordering_fields = ['code', 'name', 'credit_hours']
     
     def get_serializer_class(self):
@@ -492,7 +516,7 @@ class SubjectViewSet(BaseViewSet):
     
     @action(detail=True)
     def assignments(self, request, pk=None):
-        from ..serializers import AssignmentSerializer
+        
         return Response(AssignmentSerializer(self.get_object().assignments.all(), many=True).data)
     
     @action(detail=True)
@@ -505,7 +529,7 @@ class SubjectViewSet(BaseViewSet):
     
     @action(detail=True)
     def attendance(self, request, pk=None):
-        from ..serializers import AttendanceSerializer
+        
         return Response(AttendanceSerializer(self.get_object().attendance_records.all(), many=True).data)
     
     @action(detail=False, methods=['get'])

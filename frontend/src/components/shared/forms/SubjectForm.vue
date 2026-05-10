@@ -33,31 +33,41 @@
           </h6>
           <div class="row g-3">
             <div class="col-md-6">
-              <label class="form-label">Department <span class="text-danger">*</span></label>
-              <select v-model="localDepartment" class="form-select" required @change="onDeptChange">
-                <option value="">Select Department</option>
-                <option v-for="dept in departments" :key="dept.id" :value="dept.id">{{ dept.name }} ({{ dept.code }})</option>
-              </select>
-              <small class="text-muted">Step 1: Select department</small>
+              <SelectInput 
+                v-model="localDepartment" 
+                label="Department" 
+                :options="deptOptions" 
+                :required="true" 
+                placeholder="Select Department"
+                hint="Step 1: Select department"
+                @change="onDeptChange" 
+              />
             </div>
             <div class="col-md-6">
-              <label class="form-label">Course/Program <span class="text-danger">*</span></label>
-              <select v-model="localProgram" class="form-select" required :disabled="!localDepartment" @change="onProgChange">
-                <option value="">{{ !localDepartment ? 'Select Department First' : 'Select Course' }}</option>
-                <option v-for="prog in filteredPrograms" :key="prog.id" :value="prog.id">{{ prog.name }} ({{ prog.code }})</option>
-              </select>
-              <small class="text-muted">Step 2: Select course</small>
+              <SelectInput 
+                v-model="localProgram" 
+                label="Course/Program" 
+                :options="progOptions" 
+                :required="true" 
+                :disabled="!localDepartment"
+                :placeholder="!localDepartment ? 'Select Department First' : 'Select Course'"
+                hint="Step 2: Select course"
+                @change="onProgChange" 
+              />
             </div>
             <div class="col-md-6">
-              <label class="form-label">Semester <span class="text-danger">*</span></label>
-              <select v-model="modelValue.semester" class="form-select" required :disabled="!localProgram || loadingSemesters">
-                <option value="">{{ loadingSemesters ? 'Loading...' : (!localProgram ? 'Select Course First' : 'Select Semester') }}</option>
-                <option v-for="sem in semesters" :key="sem.id" :value="sem.id">{{ sem.name }} (Semester {{ sem.number }})</option>
-              </select>
-              <small class="text-muted">Step 3: Assign to semester</small>
+              <SelectInput 
+                v-model="modelValue.semester" 
+                label="Semester" 
+                :options="semesterOptions" 
+                :required="true" 
+                :disabled="!localProgram || loadingSemesters"
+                :placeholder="!localProgram ? 'Select Course First' : 'Select Semester'"
+                hint="Step 3: Assign to semester"
+              />
             </div>
           </div>
-          <div v-if="localProgram && semesters.length === 0 && !loadingSemesters" class="alert alert-warning mt-3">
+          <div v-if="localProgram && displaySemesters.length === 0 && !loadingSemesters" class="alert alert-warning mt-3">
             <i class="bi bi-exclamation-triangle me-2"></i>No semesters found. Create semesters first.
           </div>
         </div>
@@ -67,7 +77,10 @@
           <h6 class="text-dark fw-semibold mb-3 pb-2 border-bottom">
             <i class="bi bi-text-paragraph me-2"></i>Description
           </h6>
-          <textarea v-model="modelValue.description" class="form-control" rows="4" placeholder="Enter subject description..."></textarea>
+          <RichTextEditor 
+            v-model="modelValue.description" 
+            placeholder="Enter subject description..." 
+          />
         </div>
 
         <!-- Form Actions -->
@@ -87,13 +100,14 @@
 
 <script setup>
 import { computed, ref, watch } from 'vue'
-import { BaseInput } from '@/components/shared/common'
+import { BaseInput, SelectInput, RichTextEditor } from '@/components/shared/common'
 
 const props = defineProps({
   modelValue: { type: Object, required: true },
   departments: { type: Array, default: () => [] },
   programs: { type: Array, default: () => [] },
   semesters: { type: Array, default: () => [] },
+  activeSemestersOnly: { type: Boolean, default: false },
   selectedDepartment: { type: [String, Number], default: '' },
   selectedProgram: { type: [String, Number], default: '' },
   loadingSemesters: { type: Boolean, default: false },
@@ -113,8 +127,30 @@ watch(() => props.selectedProgram, (val) => { localProgram.value = val })
 const onDeptChange = () => emit('department-change', localDepartment.value)
 const onProgChange = () => emit('program-change', localProgram.value)
 
+const displaySemesters = computed(() => {
+  if (!props.activeSemestersOnly) return props.semesters
+  return props.semesters.filter((semester) => String(semester?.status || '').trim().toLowerCase() === 'active')
+})
+
 const filteredPrograms = computed(() => {
   if (!localDepartment.value) return []
   return props.programs.filter(p => p.department === localDepartment.value || String(p.department) === String(localDepartment.value))
+})
+
+// Mapped options for SelectInput
+const deptOptions = computed(() => props.departments.map(d => ({ value: d.id, label: `${d.name} (${d.code})` })))
+const progOptions = computed(() => filteredPrograms.value.map(p => ({ value: p.id, label: `${p.name} (${p.code})` })))
+const semesterOptions = computed(() => displaySemesters.value.map(s => ({ value: s.id, label: `${s.name} (Semester ${s.number})` })))
+
+watch([
+  () => props.activeSemestersOnly,
+  () => localProgram.value,
+  () => displaySemesters.value.length
+], () => {
+  if (!props.activeSemestersOnly || !localProgram.value || props.modelValue?.semester) return
+  const firstActive = displaySemesters.value[0]
+  if (firstActive?.id) {
+    props.modelValue.semester = String(firstActive.id)
+  }
 })
 </script>

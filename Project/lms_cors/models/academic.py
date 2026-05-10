@@ -1,4 +1,5 @@
 from django.db import models
+from django.core.exceptions import ValidationError
 import uuid
 from institution_profile.models import Institution
 
@@ -118,6 +119,7 @@ class Program(models.Model):
     default_semesters = models.IntegerField(default=8)
     min_credit_hours = models.IntegerField(default=130)
     max_credit_hours = models.IntegerField(default=140)
+    requires_fyp = models.BooleanField(default=False)
     requires_thesis = models.BooleanField(default=False)
     requires_internship = models.BooleanField(default=True)
     description = models.TextField(blank=True)
@@ -230,6 +232,37 @@ class Semester(models.Model):
         if self.program:
             return f"{self.program.name} - Semester {self.number}"
         return f"Semester {self.number}: {self.name}"
+
+    def save(self, *args, **kwargs):
+        if self.status == 'active':
+            # 1. Check within session if it exists
+            if self.session:
+                active_exists = Semester.objects.filter(
+                    session=self.session,
+                    status='active'
+                ).exclude(id=self.id).exists()
+                
+                if active_exists:
+                    
+                    raise ValidationError(
+                        f"Another semester is already active for this session ({self.session.session_name})."
+                    )
+            
+            # 2. If no session, check within program (legacy data)
+            elif self.program:
+                active_exists = Semester.objects.filter(
+                    program=self.program,
+                    session__isnull=True,
+                    status='active'
+                ).exclude(id=self.id).exists()
+                
+                if active_exists:
+                    
+                    raise ValidationError(
+                        f"Another semester is already active for program '{self.program.name}'."
+                    )
+        
+        super().save(*args, **kwargs)
 
 
 class Subject(models.Model):

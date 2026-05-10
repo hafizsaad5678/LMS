@@ -130,18 +130,19 @@ const subjectOptions = computed(() => (subjects.value?.results || []).map(s => (
 
 const statsCards = computed(() => {
   const now = new Date()
+  const currentAssignments = filteredData.value || []
 
   return [
-    { title: 'Total Assignments', value: assignments.value.length, icon: 'bi bi-file-earmark-text', bgColor: 'bg-admin-light', iconColor: 'text-teacher' },
+    { title: 'Total Assignments', value: currentAssignments.length, icon: 'bi bi-file-earmark-text', bgColor: 'bg-admin-light', iconColor: 'text-teacher' },
     {
-      title: 'Due This Week', value: assignments.value.filter(a => {
+      title: 'Due This Week', value: currentAssignments.filter(a => {
         return isDateWithinNextDays(a.due_date, 7, now)
       }).length, icon: 'bi bi-calendar-week', bgColor: 'bg-warning-light', iconColor: 'text-warning'
     },
-    { title: 'Total Submissions', value: assignments.value.reduce((sum, a) => sum + (a.submission_count || 0), 0), icon: 'bi bi-upload', bgColor: 'bg-success-light', iconColor: 'text-success' },
+    { title: 'Total Submissions', value: currentAssignments.reduce((sum, a) => sum + (a.submission_count || 0), 0), icon: 'bi bi-upload', bgColor: 'bg-success-light', iconColor: 'text-success' },
     {
       title: 'Pending Review',
-      value: assignments.value.reduce((sum, a) => {
+      value: currentAssignments.reduce((sum, a) => {
         if (typeof a.pending_review_count === 'number') {
           return sum + a.pending_review_count
         }

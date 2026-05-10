@@ -27,12 +27,13 @@ export const adminRoutes = {
         { path: 'teachers/delete/:id?', name: 'DeleteTeacher', component: () => import('../../views/admin/teacher/DeleteTeacher.vue') },
         { path: 'teachers/:id', name: 'TeacherProfile', component: () => import('../../views/admin/teacher/TeacherProfile.vue') },
 
-        // Institution routes
-        { path: 'institution', name: 'ListInstitution', component: () => import('../../views/admin/institution/ListInstitution.vue') },
-        { path: 'institution/add', name: 'AddInstitution', component: () => import('../../views/admin/institution/AddInstitution.vue') },
-        { path: 'institution/edit/:id?', name: 'EditInstitution', component: () => import('../../views/admin/institution/EditInstitution.vue') },
-        { path: 'institution/delete/:id?', name: 'DeleteInstitution', component: () => import('../../views/admin/institution/DeleteInstitution.vue') },
-        { path: 'institution/:id', name: 'InstitutionProfile', component: () => import('../../views/admin/institution/InstitutionProfile.vue') },
+        // DISABLED: Single-college mode — Institution CRUD not needed
+        // To re-enable multi-institution: uncomment the routes below
+        // { path: 'institution', name: 'ListInstitution', component: () => import('../../views/admin/institution/ListInstitution.vue') },
+        // { path: 'institution/add', name: 'AddInstitution', component: () => import('../../views/admin/institution/AddInstitution.vue') },
+        // { path: 'institution/edit/:id?', name: 'EditInstitution', component: () => import('../../views/admin/institution/EditInstitution.vue') },
+        // { path: 'institution/delete/:id?', name: 'DeleteInstitution', component: () => import('../../views/admin/institution/DeleteInstitution.vue') },
+        // { path: 'institution/:id', name: 'InstitutionProfile', component: () => import('../../views/admin/institution/InstitutionProfile.vue') },
 
         // Department routes
         { path: 'departments', name: 'ListDepartment', component: () => import('../../views/admin/department/ListDepartment.vue') },

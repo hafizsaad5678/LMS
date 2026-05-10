@@ -12,6 +12,7 @@ from openai import OpenAI
 
 from ..config import AI_PROVIDER_ALIASES, AI_PROVIDER_DEFAULT_BASE_URLS, AI_PROVIDER_ENFORCE_PATH_SUFFIX
 from .prompts import JSON_ENFORCER
+from langchain_openai import ChatOpenAI
 
 logger = logging.getLogger(__name__)
 
@@ -164,7 +165,7 @@ class OpenAICompatibleProvider(LLMProvider):
 				yield text
 
 	def get_langchain_model(self, **kwargs) -> Any:
-		from langchain_openai import ChatOpenAI
+		
 
 		temperature = kwargs.pop("temperature", float(os.getenv("AI_TEMPERATURE", "0.7")))
 		max_retries = kwargs.pop("max_retries", 3)

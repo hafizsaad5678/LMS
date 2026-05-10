@@ -7,7 +7,7 @@
       <button @click="goBack" class="btn btn-primary me-2">
         <i class="bi bi-arrow-left me-2"></i>Go Back
       </button>
-      <router-link :to="{ name: 'Home' }" class="btn btn-outline-secondary">
+      <router-link to="/" class="btn btn-outline-secondary">
         <i class="bi bi-house me-2"></i>Home
       </router-link>
     </div>

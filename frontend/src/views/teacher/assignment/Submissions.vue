@@ -174,6 +174,7 @@ import { useFilterLogic } from '@/composables/teacher/useFilterLogic'
 import teacherPanelService from '@/services/teacher/teacherPanelService'
 import { api } from '@/services/shared'
 import { formatDateTime } from '@/utils/formatters'
+import { getFileUrl } from '@/utils/constants/config'
 import { calculateLetterGrade } from '@/utils/badgeHelpers'
 import { TEACHER_SUBMISSION_STATUS_OPTIONS } from '@/utils/constants/options'
 import { TEACHER_ROUTES } from '@/utils/constants/routes'
@@ -265,12 +266,13 @@ async function loadData() {
 
     submissions.value = students.map(student => {
       const submission = submissionsMap.get(String(student.id))
+      const submissionFile = submission?.submission_file || submission?.file_upload_url || submission?.file_upload || submission?.file_url || null
       return {
         student: student.id,
         student_name: student.full_name || student.name,
         roll_no: student.enrollment_number || student.roll_no,
         submitted_at: submission?.submitted_at || null,
-        submission_file: submission?.submission_file || null,
+        submission_file: submissionFile,
         comments: submission?.comments || submission?.submission_text || '',
         status: submission ? (submission.grade ? 'graded' : 'submitted') : 'pending',
         obtained_marks: submission?.grade?.marks_obtained || null,
@@ -336,8 +338,9 @@ function getFileName(fileUrl) {
 
 async function downloadSubmissionFile(fileUrl) {
   if (!fileUrl) return
+  const resolvedUrl = getFileUrl(fileUrl)
   try {
-    const response = await api.get(fileUrl, { responseType: 'blob' })
+    const response = await api.get(resolvedUrl, { responseType: 'blob' })
     const blob = response?.data
     if (!blob) throw new Error('No file data received')
 
@@ -351,7 +354,7 @@ async function downloadSubmissionFile(fileUrl) {
     window.URL.revokeObjectURL(objectUrl)
   } catch {
     // Fallback when direct blob download fails (e.g., browser/network restrictions).
-    window.open(fileUrl, '_blank', 'noopener')
+    window.open(resolvedUrl, '_blank', 'noopener')
     showAlert('warning', 'Direct download was blocked. File opened in a new tab instead.')
   }
 }

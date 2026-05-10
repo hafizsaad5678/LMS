@@ -3,7 +3,7 @@
  * Handles Department → Program → Semester cascading selection
  */
 import { ref, computed } from 'vue'
-import { api, cacheService } from '@/services/shared'
+import { api, cacheService, normalizeToArray } from '@/services/shared'
 
 
 export const useCascadingDropdowns = (options = {}) => {
@@ -36,8 +36,7 @@ export const useCascadingDropdowns = (options = {}) => {
     })
 
     // Helper to normalize API response
-    const normalize = (data) => Array.isArray(data) ? data : (data?.results || [])
-    const activeOnly = (items) => normalize(items).filter(item => item?.is_active !== false)
+    const activeOnly = (items) => normalizeToArray(items).filter(item => item?.is_active !== false)
 
     // Load Institutions
     const loadInstitutions = async () => {
@@ -109,18 +108,26 @@ export const useCascadingDropdowns = (options = {}) => {
     }
 
     // Load Semesters for a specific program
-    const loadSemesters = async (programId) => {
+    const loadSemesters = async (programId, options = {}) => {
         if (!programId) { semesters.value = []; return [] }
         loadingSemesters.value = true
+        const status = options?.status
         try {
+            if (status) {
+                const response = await api.get('/semesters/', { params: { program: programId, status } })
+                semesters.value = normalizeToArray(response.data)
+                return semesters.value
+            }
+
             const response = await api.get(`/programs/${programId}/semesters/`)
-            semesters.value = normalize(response.data)
+            semesters.value = normalizeToArray(response.data)
             return semesters.value
         } catch (error) {
             // Fallback to filtered query
             try {
-                const res = await api.get('/semesters/', { params: { program: programId } })
-                semesters.value = normalize(res.data)
+                const params = status ? { program: programId, status } : { program: programId }
+                const res = await api.get('/semesters/', { params })
+                semesters.value = normalizeToArray(res.data)
                 return semesters.value
             } catch (e) {
                 console.error('Error loading semesters:', e)
@@ -164,11 +171,11 @@ export const useCascadingDropdowns = (options = {}) => {
     }
 
     // Handle program change
-    const onProgramChange = async (progId) => {
+    const onProgramChange = async (progId, options = {}) => {
         selectedProgram.value = progId
         selectedSemester.value = ''
         if (progId) {
-            await loadSemesters(progId)
+            await loadSemesters(progId, options)
         } else {
             semesters.value = []
         }

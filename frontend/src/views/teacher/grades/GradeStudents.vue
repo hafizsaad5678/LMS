@@ -69,7 +69,7 @@
               <div>
                 <h5 class="fw-bold mb-1">{{ selectedComponent.name }}</h5>
                 <div class="d-flex align-items-center gap-3">
-                  <span class="small text-muted"><i class="bi bi-bullseye me-1"></i>Max Marks: <strong>{{ selectedComponent.max_marks }}</strong></span>
+                  <span class="small text-muted"><i class="bi bi-bullseye me-1"></i>Max Marks: <strong>{{ Number(selectedComponent.max_marks) > 0 ? selectedComponent.max_marks : 'Not set' }}</strong></span>
                   <span class="small text-muted"><i class="bi bi-people me-1"></i>Students: <strong>{{ marksData.length }}</strong></span>
                   <div class="vr mx-1"></div>
                   <div class="d-flex align-items-center small" :class="selectedComponent.is_visible_to_students ? 'text-success' : 'text-muted'">

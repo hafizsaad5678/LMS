@@ -472,12 +472,15 @@ const onStartTimeChange = () => {
 }
 
 const buildSchedulePayload = (item, overrides = {}) => {
+  const getSubjectId = (v) => v && typeof v === 'object' ? v.id : v;
+  const getTeacherId = (v) => v && typeof v === 'object' ? v.id : v;
+
   return {
     day: String(overrides.day ?? item.day ?? '').toLowerCase(),
     start_time: overrides.start_time ?? item.start_time,
     end_time: overrides.end_time ?? item.end_time,
-    subject: overrides.subject ?? item.subject,
-    teacher: overrides.teacher ?? item.teacher,
+    subject: overrides.subject ?? getSubjectId(item.subject) ?? item.subject_id,
+    teacher: overrides.teacher ?? getTeacherId(item.teacher) ?? item.teacher_id,
     room: overrides.room ?? item.room,
     program: overrides.program ?? (item.program || null),
     semester: overrides.semester ?? (item.semester || null),
@@ -539,7 +542,7 @@ const onSlotDrop = async (targetDay, targetHour) => {
     showSuccess(`Copied ${moved.subject_name || 'class'} to ${normalizedTarget.charAt(0).toUpperCase() + normalizedTarget.slice(1)}`)
     await loadSchedule()
   } catch (error) {
-    let msg = 'Unable to copy class. Please check for time conflicts.'
+    let msg = 'Unable to move class. Please check for time conflicts.'
     const d = error?.response?.data
     if (d) {
       if (typeof d === 'string') msg = d
@@ -575,7 +578,14 @@ const addSchedule = (day = '', hour = 8) => {
 
 const editSchedule = (item) => {
   editingSchedule.value = item
-  scheduleForm.value = { ...item, program: item.program || '', semester: item.semester || '', is_active: item.is_active !== false }
+  scheduleForm.value = {
+    ...item,
+    subject: item.subject?.id ?? item.subject_id ?? item.subject ?? '',
+    teacher: item.teacher?.id ?? item.teacher_id ?? item.teacher ?? '',
+    program: item.program ?? '',
+    semester: item.semester ?? '',
+    is_active: item.is_active !== false
+  }
   if (item.program) loadSemestersByProgram(item.program, 'form')
   showModal.value = true
 }
@@ -600,7 +610,7 @@ const loadSchedule = async () => {
     if (filterProgram.value) params.program = filterProgram.value
     if (filterSemester.value) params.semester = filterSemester.value
     if (filterTeacher.value) params.teacher = filterTeacher.value
-    const response = await timetableService.getAll(params)
+    const response = await timetableService.getAll(params, { forceRefresh: true })
     schedule.value = response.data.results || response.data
   } catch (error) {
     showError('Failed to load timetable')
@@ -676,8 +686,10 @@ const saveSchedule = async () => {
       return
     }
 
-    if (editingSchedule.value) await timetableService.update(editingSchedule.value.id, scheduleForm.value)
-    else await timetableService.create(scheduleForm.value)
+    const payload = buildSchedulePayload(scheduleForm.value)
+
+    if (editingSchedule.value) await timetableService.update(editingSchedule.value.id, payload)
+    else await timetableService.create(payload)
     invalidateTimetableCaches()
     showSuccess(editingSchedule.value ? 'Schedule updated' : 'Schedule added')
     closeModal()
@@ -709,7 +721,7 @@ const closeMultipleModal = () => { showAddMultipleModal.value = false; multipleS
 const saveMultipleSchedules = async () => {
   saving.value = true
   try {
-    await Promise.all(multipleScheduleForms.value.map(({ availableSemesters, ...data }) => timetableService.create(data)))
+    await Promise.all(multipleScheduleForms.value.map(({ availableSemesters, ...data }) => timetableService.create(buildSchedulePayload(data))))
     invalidateTimetableCaches()
     showSuccess(`${multipleScheduleForms.value.length} schedules added`)
     closeMultipleModal()

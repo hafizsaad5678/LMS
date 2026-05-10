@@ -1,5 +1,6 @@
 from collections import defaultdict
-from django.db.models import Q
+from django.db.models import Q, Count, Exists, OuterRef, Sum
+from django.db import IntegrityError
 
 from rest_framework import status
 from rest_framework.decorators import action, api_view, permission_classes
@@ -10,7 +11,8 @@ from django.utils import timezone
 from .base import BaseProfileViewSet, BaseViewSet
 from ..models import (
     Student, Teacher, Admin, TeacherSubject, StudentSubject, 
-    Grade, StudentMark, Assignment, SubmissionHistory, Subject, Timetable
+    Grade, StudentMark, Assignment, SubmissionHistory, Subject, Timetable,
+    Quiz, QuizAttempt, GradeComponent, Announcement, Exam
 )
 from ..serializers import (
     StudentSerializer, StudentDetailSerializer,
@@ -18,7 +20,8 @@ from ..serializers import (
     AdminSerializer,
     TeacherSubjectSerializer, StudentSubjectSerializer,
     SubmissionHistorySerializer, GradeSerializer, AttendanceSerializer,
-    AssignmentSerializer, EventSerializer, FeeSerializer, StudentMarkSerializer
+    AssignmentSerializer, EventSerializer, FeeSerializer, StudentMarkSerializer,
+    StudentAssignmentSerializer, AnnouncementSerializer, TimetableSerializer, ExamSerializer
 )
 from ..permissions import CanManageStudents, IsAdminUser, IsAdminOrTeacher, IsTeacherUser
 
@@ -162,8 +165,7 @@ def teacher_my_assignments(request):
     except Teacher.DoesNotExist:
         return Response({'detail': 'Teacher profile not found.'}, status=status.HTTP_404_NOT_FOUND)
     
-    from django.db.models import Count, Q, Exists, OuterRef
-    from ..models.grading import GradeComponent
+    
     
     # Get assignments with submission counts using annotation (avoids N+1 queries)
     # Filter out assignments that are already linked to a GradeComponent
@@ -373,6 +375,16 @@ class StudentViewSet(BaseProfileViewSet):
         if value == 'F':
             return 'F'
         return 'other'
+
+    @staticmethod
+    def _performance_label(percentage):
+        if percentage >= 90:
+            return 'Excellent'
+        if percentage >= 80:
+            return 'Good'
+        if percentage >= 60:
+            return 'Average'
+        return 'Below Average'
     
     @action(detail=True)
     def submissions(self, request, pk=None):
@@ -382,12 +394,8 @@ class StudentViewSet(BaseProfileViewSet):
     def assignments(self, request, pk=None):
         """Get all assignments for subjects the student is enrolled in"""
         student = self.get_object()
-        # Get all subjects the student is enrolled in
         enrolled_subject_ids = student.enrolled_subjects.values_list('subject_id', flat=True)
-        # Get assignments for those subjects
-        from ..models import Assignment
         assignments = Assignment.objects.filter(subject_id__in=enrolled_subject_ids).select_related('subject', 'created_by')
-        from ..serializers import StudentAssignmentSerializer
         return Response(
             StudentAssignmentSerializer(
                 assignments,
@@ -410,10 +418,8 @@ class StudentViewSet(BaseProfileViewSet):
             g['grade_type'] = 'assignment'
         
         # 2. Get Component Marks (Quizzes, Midterms, etc. from grading system)
-        # Only show if component is visible to students
         component_marks = StudentMark.objects.filter(
-            student=student,
-            component__is_visible_to_students=True
+            student=student
         ).select_related('component', 'component__subject')
         serialized_components = StudentMarkSerializer(component_marks, many=True).data
         # Add a type field to distinguish
@@ -435,124 +441,300 @@ class StudentViewSet(BaseProfileViewSet):
     def grade_report(self, request, pk=None):
         student = self.get_object()
 
+        # 1. Fetch Assignment Grades
         assignment_grades = Grade.objects.filter(submission__student=student).select_related(
             'submission', 'submission__assignment', 'submission__assignment__subject'
         )
+        
+        # 2. Fetch Quiz Attempts (for detailed quiz history)
+        quiz_attempts = QuizAttempt.objects.filter(student=student).select_related(
+            'quiz', 'quiz__subject'
+        )
+
+        # 3. Fetch ALL Component Marks for this student (including quizzes, midterms, etc.)
+        # NOTE: We intentionally do NOT filter by is_visible_to_students here.
+        # Students should always see their own graded marks in their grade report.
+        # The visibility flag controls the grading setup UI, not the student's own report.
         component_marks = StudentMark.objects.filter(
-            student=student,
-            component__is_visible_to_students=True
-        ).select_related('component', 'component__subject')
+            student=student
+        ).select_related('component', 'component__subject', 'component__linked_quiz')
 
+        # Use a dictionary to track unique assessment entries by their source ID or title+subject
+        # This helps in "calculating jointly" for each subject
         records = []
+        history = {
+            'assignments': [],
+            'quizzes': [],
+            'others': [],
+            'full_history': []
+        }
 
-        for grade in assignment_grades:
-            assignment = grade.submission.assignment if grade.submission else None
-            subject = assignment.subject if assignment else None
-            total_marks = float((assignment.total_marks if assignment else 0) or 0)
-            marks_obtained = float(grade.marks_obtained or 0)
-            percentage = round((marks_obtained / total_marks) * 100, 2) if total_marks > 0 else 0
-            records.append({
-                'subject_name': subject.name if subject else 'Unknown',
-                'subject_code': subject.code if subject else 'N/A',
-                'percentage': percentage,
-                'grade_value': grade.grade_value,
-            })
+        # Track results per subject for joint calculation
+        subject_buckets = defaultdict(lambda: {
+            'items': [],
+            'total_weightage': 0,
+            'weighted_sum': 0
+        })
 
+        # To avoid double counting when we have both StudentMark and QuizAttempt
+        processed_quiz_ids = set()
+        
+        # Helper to get grade value
+        def get_grade_val(pct):
+            return self._grade_value_from_percentage(pct)
+
+        all_history_records = []
+
+        # 1. Process Component Marks (Authoritative Grades)
+        # We process these FIRST because they represent the finalized marks
         for mark in component_marks:
-            subject = mark.component.subject if mark.component else None
+            comp = mark.component
+            subject = comp.subject
+            
+            marks_obtained = float(mark.marks_obtained or 0)
+            total_marks = float(comp.max_marks or 0)
+            
+            # Fallback chain for total_marks when component max_marks is 0:
+            # 1. Try linked quiz's total_marks
+            # 2. Try summing quiz question marks
+            if total_marks == 0 and hasattr(comp, 'linked_quiz') and comp.linked_quiz:
+                linked_quiz = comp.linked_quiz
+                total_marks = float(linked_quiz.total_marks or 0)
+                if total_marks == 0:
+                    # Sum question marks as final fallback
+                    # Sum question marks as final fallback
+                    q_total = linked_quiz.questions.aggregate(total=Sum('marks'))['total']
+                    total_marks = float(q_total or 0)
+            
+            # Calculate percentage: prefer the stored value, but recalculate if it's 0 and we have marks
             percentage = float(mark.percentage or 0)
-            records.append({
+            if percentage == 0 and marks_obtained > 0 and total_marks > 0:
+                percentage = round((marks_obtained / total_marks) * 100, 2)
+            
+            weight = float(comp.weightage or 0)
+            
+            # Try to resolve assignment_id for frontend linking
+            assignment_id = None
+            if comp.component_type == 'assignment':
+                
+                a_obj = Assignment.objects.filter(title=comp.name, subject=subject).first()
+                if a_obj:
+                    assignment_id = str(a_obj.id)
+
+            entry = {
+                'id': str(mark.id),
+                'assignment_id': assignment_id, # Added for frontend deduplication
+                'title': comp.name,
                 'subject_name': subject.name if subject else 'Unknown',
                 'subject_code': subject.code if subject else 'N/A',
                 'percentage': round(percentage, 2),
-                'grade_value': self._grade_value_from_percentage(percentage),
-            })
+                'marks_obtained': marks_obtained,
+                'total_marks': total_marks,
+                'grade_value': get_grade_val(percentage),
+                'date': mark.graded_at.isoformat() if mark.graded_at else mark.created_at.isoformat(),
+                'type': comp.component_type,
+                'category': comp.get_component_type_display() if hasattr(comp, 'get_component_type_display') else 'Assessment',
+                'weightage': weight,
+                'status': 'Graded'
+            }
 
+            if comp.component_type == 'quiz':
+                history['quizzes'].append(entry)
+                if hasattr(comp, 'linked_quiz') and comp.linked_quiz:
+                    processed_quiz_ids.add(comp.linked_quiz.id)
+            elif comp.component_type == 'assignment':
+                history['assignments'].append(entry)
+            else:
+                history['others'].append(entry)
+
+            records.append(entry)
+            all_history_records.append(entry)
+            if subject:
+                subject_key = f"{subject.name}::{subject.code}"
+                subject_buckets[subject_key]['items'].append(entry)
+                subject_buckets[subject_key]['total_weightage'] += weight
+                subject_buckets[subject_key]['weighted_sum'] += (percentage * weight / 100.0)
+
+        # 2. Process Assignments (Grade model)
+        # Only add if not already covered by a StudentMark
+        for grade in assignment_grades:
+            assignment = grade.submission.assignment if grade.submission else None
+            if not assignment: continue
+            
+            # Simple heuristic: if we already have an assignment with this title in history, skip
+            if any(h['title'] == assignment.title for h in history['assignments']):
+                continue
+
+            subject = assignment.subject
+            total_marks = float(assignment.total_marks or 0)
+            marks_obtained = float(grade.marks_obtained or 0)
+            percentage = round((marks_obtained / total_marks) * 100, 2) if total_marks > 0 else 0
+            
+            entry = {
+                'id': str(grade.id),
+                'assignment_id': str(assignment.id), # Added for frontend deduplication
+                'title': assignment.title,
+                'subject_name': subject.name if subject else 'Unknown',
+                'subject_code': subject.code if subject else 'N/A',
+                'percentage': percentage,
+                'marks_obtained': marks_obtained,
+                'total_marks': total_marks,
+                'grade_value': grade.grade_value,
+                'date': grade.graded_at.isoformat() if grade.graded_at else None,
+                'type': 'assignment',
+                'category': 'Assignment',
+                'status': 'Graded'
+            }
+            records.append(entry)
+            all_history_records.append(entry)
+            history['assignments'].append(entry)
+            
+            if subject:
+                subject_key = f"{subject.name}::{subject.code}"
+                subject_buckets[subject_key]['items'].append(entry)
+
+        # 3. Process Quiz Attempts
+        # Only add to 'records' (official stats) if the quiz is linked to a component (already handled).
+        # Otherwise, only add to history['quizzes'] and history['full_history'] for reference.
+        for attempt in quiz_attempts:
+            quiz = attempt.quiz
+            if not quiz:
+                continue
+                
+            # If already processed via StudentMark, we don't need to add it again anywhere
+            # as the StudentMark record is more authoritative.
+            if quiz.id in processed_quiz_ids:
+                continue
+            
+            subject = quiz.subject
+            total_marks = float(quiz.total_marks or 0)
+            marks_obtained = float(attempt.score or 0)
+            percentage = round((marks_obtained / total_marks) * 100, 2) if total_marks > 0 else 0
+            
+            entry = {
+                'id': str(attempt.id),
+                'title': quiz.title,
+                'subject_name': subject.name if subject else 'Unknown',
+                'subject_code': subject.code if subject else 'N/A',
+                'percentage': percentage,
+                'marks_obtained': marks_obtained,
+                'total_marks': total_marks,
+                'grade_value': get_grade_val(percentage),
+                'date': attempt.completed_at.isoformat() if attempt.completed_at else attempt.started_at.isoformat(),
+                'status': attempt.status.title() if attempt.status else 'Unknown',
+                'type': 'quiz',
+                'category': 'Quiz (Practice)'
+            }
+            
+            # They only appear in history tabs.
+            all_history_records.append(entry)
+            history['quizzes'].append(entry)
+            
+            # We still add it to full history for the "History" tab
+            # but we won't count it in the summary stats.
+            # (Wait, if the user wants 'full history' to include them, we keep them in history)
+
+        # Finalize Full History (sorted by date)
+        history['full_history'] = sorted(all_history_records, key=lambda x: x.get('date', '') or '', reverse=True)
+
+        # Process Subject Performance (Joint Calculation)
+        subject_performance = []
+        for subject_key, bucket in subject_buckets.items():
+            name, code = subject_key.split('::')
+            items = bucket['items']
+            total_items = len(items)
+            
+            # If weightage is available, use it for average, else simple average
+            if bucket['total_weightage'] > 0:
+                # Scale weighted sum to 100% if weightage isn't complete yet
+                avg_score = (bucket['weighted_sum'] / bucket['total_weightage']) * 100
+            else:
+                avg_score = sum(i['percentage'] for i in items) / total_items if total_items else 0
+            
+            best_score = max((i['percentage'] for i in items), default=0)
+            worst_score = min((i['percentage'] for i in items), default=0)
+
+            if avg_score >= 90: perf_label, color = 'Excellent', 'success'
+            elif avg_score >= 80: perf_label, color = 'Good', 'success'
+            elif avg_score >= 60: perf_label, color = 'Average', 'warning'
+            else: perf_label, color = 'Below Average', 'danger'
+
+            # Calculate category-specific averages for the "Detailed Grades" table
+            cat_avgs = {
+                'assignments': 0,
+                'quizzes': 0,
+                'midterm': 0,
+                'final': 0,
+                'lab': 0,
+                'project': 0
+            }
+            
+            # Map of component_type to these frontend-expected keys
+            type_map = {
+                'assignment': 'assignments',
+                'quiz': 'quizzes',
+                'midterm': 'midterm',
+                'final': 'final',
+                'lab': 'lab',
+                'project': 'project'
+            }
+            
+            # Count and sum percentages for each category
+            cat_counts = defaultdict(int)
+            cat_sums = defaultdict(float)
+            
+            for i in items:
+                cat_key = type_map.get(i.get('type'), 'others')
+                cat_counts[cat_key] += 1
+                cat_sums[cat_key] += i.get('percentage', 0)
+            
+            for key in cat_avgs:
+                if cat_counts[key] > 0:
+                    cat_avgs[key] = round(cat_sums[key] / cat_counts[key], 2)
+
+            subject_performance.append({
+                'name': name,
+                'code': code,
+                'count': total_items,
+                'average': round(avg_score, 2),
+                'best': round(best_score, 2),
+                'worst': round(worst_score, 2),
+                'performance': perf_label,
+                'color': color,
+                'rating': round(avg_score, 2),
+                'total_weightage_graded': bucket['total_weightage'],
+                'is_fully_graded': bucket['total_weightage'] >= 100,
+                # Include category averages
+                **cat_avgs
+            })
+        
+        subject_performance.sort(key=lambda s: (s['name'], s['code']))
+
+        # Overall Average (Joint Calculation across all records)
         total_grades = len(records)
         total_subjects = student.enrolled_subjects.count()
         average_score = round(sum(r['percentage'] for r in records) / total_grades, 2) if total_grades else 0
         gpa = round(sum(self._grade_point_from_percentage(r['percentage']) for r in records) / total_grades, 2) if total_grades else 0
 
+        # Recalculate Distribution & Performance Summary
         distribution = {'A': 0, 'B': 0, 'C': 0, 'D': 0, 'F': 0, 'other': 0}
-        performance = {'excellent': 0, 'good': 0, 'average': 0, 'below_average': 0}
-        subjects = defaultdict(lambda: {
-            'name': 'Unknown',
-            'code': 'N/A',
-            'count': 0,
-            'sum_score': 0.0,
-            'best': 0.0,
-            'worst': None,
-        })
+        perf_counts = {'excellent': 0, 'good': 0, 'average': 0, 'below_average': 0}
 
         for record in records:
-            percentage = float(record['percentage'])
-
+            pct = float(record['percentage'])
             distribution[self._distribution_bucket(record.get('grade_value'))] += 1
-
-            if percentage >= 90:
-                performance['excellent'] += 1
-            elif percentage >= 80:
-                performance['good'] += 1
-            elif percentage >= 60:
-                performance['average'] += 1
-            else:
-                performance['below_average'] += 1
-
-            subject_key = f"{record['subject_name']}::{record['subject_code']}"
-            summary = subjects[subject_key]
-            summary['name'] = record['subject_name']
-            summary['code'] = record['subject_code']
-            summary['count'] += 1
-            summary['sum_score'] += percentage
-            summary['best'] = max(summary['best'], percentage)
-            summary['worst'] = percentage if summary['worst'] is None else min(summary['worst'], percentage)
+            if pct >= 90: perf_counts['excellent'] += 1
+            elif pct >= 80: perf_counts['good'] += 1
+            elif pct >= 60: perf_counts['average'] += 1
+            else: perf_counts['below_average'] += 1
 
         total = total_grades or 1
         performance_summary = [
-            {
-                'label': 'Excellent',
-                'range': '90-100%',
-                'value': performance['excellent'],
-                'percent': round((performance['excellent'] / total) * 100, 2),
-                'color': 'success',
-            },
-            {
-                'label': 'Good',
-                'range': '80-89%',
-                'value': performance['good'],
-                'percent': round((performance['good'] / total) * 100, 2),
-                'color': 'success',
-                'opacity': 'bg-opacity-75',
-            },
-            {
-                'label': 'Average',
-                'range': '60-79%',
-                'value': performance['average'],
-                'percent': round((performance['average'] / total) * 100, 2),
-                'color': 'warning',
-            },
-            {
-                'label': 'Below Average',
-                'range': '<60%',
-                'value': performance['below_average'],
-                'percent': round((performance['below_average'] / total) * 100, 2),
-                'color': 'danger',
-            },
+            {'label': 'Excellent', 'range': '90-100%', 'value': perf_counts['excellent'], 'percent': round((perf_counts['excellent'] / total) * 100, 2), 'color': 'success'},
+            {'label': 'Good', 'range': '80-89%', 'value': perf_counts['good'], 'percent': round((perf_counts['good'] / total) * 100, 2), 'color': 'success', 'opacity': 'bg-opacity-75'},
+            {'label': 'Average', 'range': '60-79%', 'value': perf_counts['average'], 'percent': round((perf_counts['average'] / total) * 100, 2), 'color': 'warning'},
+            {'label': 'Below Average', 'range': '<60%', 'value': perf_counts['below_average'], 'percent': round((perf_counts['below_average'] / total) * 100, 2), 'color': 'danger'},
         ]
-
-        subject_performance = []
-        for subject in subjects.values():
-            count = subject['count'] or 1
-            subject_performance.append({
-                'name': subject['name'],
-                'code': subject['code'],
-                'count': subject['count'],
-                'average': round(subject['sum_score'] / count, 2),
-                'best': round(subject['best'], 2),
-                'worst': round(subject['worst'] if subject['worst'] is not None else 0, 2),
-            })
-
-        subject_performance.sort(key=lambda s: (s['name'], s['code']))
 
         return Response({
             'student': {
@@ -565,11 +747,15 @@ class StudentViewSet(BaseProfileViewSet):
                 'average_score': average_score,
                 'total_subjects': total_subjects,
                 'total_grades': total_grades,
+                'performance': self._performance_label(average_score),
             },
             'distribution': distribution,
             'performance_summary': performance_summary,
             'subject_performance': subject_performance,
+            'full_history': history['full_history'], # Flat list at top level
+            'history': history
         })
+
     
     @action(detail=True)
     def attendance(self, request, pk=None):
@@ -577,8 +763,7 @@ class StudentViewSet(BaseProfileViewSet):
     
     @action(detail=True)
     def enrolled_subjects(self, request, pk=None):
-        from django.db.models import Count, Q
-        from ..models import GradeComponent, Assignment
+        
         
         student = self.get_object()
         queryset = student.enrolled_subjects.all().select_related('subject', 'semester')
@@ -597,9 +782,7 @@ class StudentViewSet(BaseProfileViewSet):
     @action(detail=True)
     def announcements(self, request, pk=None):
         """Get all announcements for subjects the student is enrolled in"""
-        from django.db.models import Q
-        from ..models import Announcement
-        from ..serializers import AnnouncementSerializer
+        
         
         student = self.get_object()
         
@@ -622,18 +805,14 @@ class StudentViewSet(BaseProfileViewSet):
     def class_schedule(self, request, pk=None):
         student = self.get_object()
         enrolled_subject_ids = self._current_enrollments(student).values_list('subject_id', flat=True)
-        from ..models import Timetable
         timetable = Timetable.objects.filter(subject_id__in=enrolled_subject_ids, is_active=True).select_related('subject', 'teacher')
-        from ..serializers import TimetableSerializer
         return Response(TimetableSerializer(timetable, many=True).data)
 
     @action(detail=True)
     def exam_schedule(self, request, pk=None):
         student = self.get_object()
         enrolled_subject_ids = self._current_enrollments(student).values_list('subject_id', flat=True)
-        from ..models import Exam
         exams = Exam.objects.filter(subject_id__in=enrolled_subject_ids).select_related('subject')
-        from ..serializers import ExamSerializer
         return Response(ExamSerializer(exams, many=True).data)
 
 
@@ -733,7 +912,7 @@ class StudentSubjectViewSet(BaseViewSet):
     
     def perform_create(self, serializer):
         """Override create to automatically populate semester from subject if not provided"""
-        from django.db import IntegrityError
+        
         
         # Get the subject from the request data
         subject = serializer.validated_data.get('subject')

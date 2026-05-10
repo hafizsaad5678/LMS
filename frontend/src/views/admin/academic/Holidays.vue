@@ -235,7 +235,7 @@ const getMonthHolidays = (month) => {
 const loadHolidays = async () => {
   loading.value = true
   try {
-    const response = await holidayService.getAll()
+    const response = await holidayService.getAll({}, { forceRefresh: true })
     holidays.value = response.data.results || response.data
   } catch (error) {
     console.error('Error loading holidays:', error)

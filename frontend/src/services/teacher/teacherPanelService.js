@@ -196,6 +196,7 @@ export const teacherPanelService = {
     async createAssignment(data) {
         const response = await api.post('/assignments/', toAssignmentPayload(data))
         cacheService.clearPattern('teacher:myAssignments')
+        cacheService.clear('teacher_assignments_list')
         cacheService.clearPattern('teacher:dashboard')
         cacheService.clearPattern('teacher_materials')
         return response.data
@@ -204,6 +205,7 @@ export const teacherPanelService = {
     async updateAssignment(id, data) {
         const response = await api.patch(`/assignments/${id}/`, toAssignmentPayload(data))
         cacheService.clearPattern('teacher:myAssignments')
+        cacheService.clear('teacher_assignments_list')
         cacheService.clearPattern('teacher:dashboard')
         cacheService.clearPattern('teacher_materials')
         return response.data
@@ -212,6 +214,7 @@ export const teacherPanelService = {
     async deleteAssignment(id) {
         const response = await api.delete(`/assignments/${id}/`)
         cacheService.clearPattern('teacher:myAssignments')
+        cacheService.clear('teacher_assignments_list')
         cacheService.clearPattern('teacher:dashboard')
         cacheService.clearPattern('teacher_materials')
         return response.data

@@ -144,7 +144,7 @@ const breadcrumbs = [{ name: 'Dashboard', href: ADMIN_ROUTES.DASHBOARD.path }, {
 const defaultForm = { title: '', author: '', isbn: '', publisher: '', category: 'science', copies_total: 1, copies_available: 1 }
 
 const fetchBooks = async () => {
-  const res = await libraryBookService.getAll()
+  const res = await libraryBookService.getAll({}, { forceRefresh: true })
   return res.data?.results || res.data || []
 }
 

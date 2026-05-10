@@ -4,6 +4,8 @@ Includes SemesterFactory for auto-creating semesters and other utilities
 """
 from datetime import datetime
 from django.db import transaction
+from django.utils import timezone
+from ..models import Semester
 
 
 # Program Type Configuration Rules
@@ -91,7 +93,6 @@ class SemesterFactory:
         Create semesters for semester-based programs (BS, MS, PhD, Diploma, etc.)
         Unified method replacing duplicate _create_bachelor/master/phd/diploma_semesters
         """
-        from ..models import Semester
         semesters = []
         
         for i in range(count):
@@ -116,7 +117,7 @@ class SemesterFactory:
                 name=f"Semester {semester_num} ({semester_type} {display_year})",
                 start_date=sem_start,
                 end_date=sem_end,
-                status='draft'
+                status='active' if semester_num == 1 else 'draft'
             )
             semesters.append(semester)
         
@@ -125,7 +126,6 @@ class SemesterFactory:
     @staticmethod
     def _create_annual_parts(session, count=4):
         """Create parts for FSC/Intermediate (Annual System - 2 years, 4 parts)"""
-        from ..models import Semester
         semesters = []
         
         for i in range(count):
@@ -147,7 +147,7 @@ class SemesterFactory:
                 name=f"Part {part_num} (Year {year_offset + 1})",
                 start_date=sem_start,
                 end_date=sem_end,
-                status='draft'
+                status='active' if part_num == 1 else 'draft'
             )
             semesters.append(semester)
         
@@ -170,7 +170,7 @@ class EnrollmentService:
             return False, f"Student is already enrolled in {student.academic_session.session_name}"
         
         if academic_session.admission_end_date:
-            from django.utils import timezone
+            
             today = timezone.now().date()
             if today > academic_session.admission_end_date:
                 return False, f"Admission period for {academic_session.session_name} has ended"

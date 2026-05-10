@@ -11,6 +11,11 @@ from typing import Iterable
 from django.conf import settings
 from langchain_core.documents import Document
 from langchain_community.vectorstores import FAISS
+from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_community.document_loaders import PyPDFLoader, Docx2txtLoader, TextLoader
+import pypdf
+import docx
 
 from ..config import (
     CHAT_CHUNK_OVERLAP,
@@ -124,7 +129,7 @@ def _is_trusted_store_path(store_path: str) -> bool:
 @lru_cache(maxsize=1)
 def get_embeddings():
     """Singleton embeddings instance (avoids reloading the HF model each request)."""
-    from langchain_huggingface import HuggingFaceEmbeddings
+    
 
     model_name = CHAT_EMBEDDING_MODEL
     model_kwargs = {"device": CHAT_EMBEDDING_DEVICE}
@@ -133,7 +138,7 @@ def get_embeddings():
 
 
 def _get_splitter():
-    from langchain_text_splitters import RecursiveCharacterTextSplitter
+    
 
     return RecursiveCharacterTextSplitter(
         chunk_size=CHAT_CHUNK_SIZE,
@@ -163,18 +168,18 @@ def _extract_documents_with_langchain(file_obj, filename: str) -> list[Document]
 
     try:
         if lower_name.endswith(".pdf"):
-            from langchain_community.document_loaders import PyPDFLoader
+            
 
             return PyPDFLoader(tmp_path).load()
 
         if lower_name.endswith(".docx"):
             try:
-                from langchain_community.document_loaders import Docx2txtLoader
+                
 
                 return Docx2txtLoader(tmp_path).load()
             except Exception:
                 # Keep resilient fallback if docx2txt isn't available.
-                import docx
+                
 
                 doc = docx.Document(tmp_path)
                 text = "\n".join([p.text for p in doc.paragraphs if p.text]).strip()
@@ -183,7 +188,7 @@ def _extract_documents_with_langchain(file_obj, filename: str) -> list[Document]
                 return [Document(page_content=text, metadata={"page": None})]
 
         if lower_name.endswith(".txt"):
-            from langchain_community.document_loaders import TextLoader
+            
 
             return TextLoader(tmp_path, encoding="utf-8", autodetect_encoding=True).load()
 
@@ -302,7 +307,7 @@ def process_and_index_document(user_id, file_obj, filename):
 
         # Fallback extraction keeps previous behavior if a loader failed silently.
         if not page_texts and lower_name.endswith(".pdf"):
-            import pypdf
+            
 
             reader = pypdf.PdfReader(file_obj)
             for idx, page in enumerate(reader.pages):

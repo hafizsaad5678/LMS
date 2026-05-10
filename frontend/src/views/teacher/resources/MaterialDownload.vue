@@ -52,22 +52,16 @@
                 </div>
               </div>
               <div class="text-end">
-                <span :class="['badge rounded-pill px-2 py-1 fw-bold text-uppercase d-inline-block mb-1',
-                  getIcon(m.material_type).badge]">
-                  {{ formatType(m.material_type) }}</span>
                 <span :class="['badge rounded-pill px-2 py-1 fw-bold d-block text-uppercase',
                   getAccess(m.access_level).badge]"><i :class="getAccess(m.access_level).icon" class="me-1">
                   </i>{{ getAccess(m.access_level).label }}</span>
               </div>
             </div>
             <p v-if="m.description" class="text-muted small mb-2 text-truncate">{{ m.description }}</p>
-            <div class="d-flex justify-content-between align-items-center mb-2 text-sm material-meta-row">
+            <div class="d-flex align-items-center mb-2 text-sm material-meta-row">
               <span class="text-muted"><i class="bi bi-calendar me-1">
 
                 </i>{{ formatDate(m.uploaded_at) }}</span>
-              <span class="text-muted"><i class="bi bi-download me-1">
-
-                </i>{{ m.download_count || 0 }} downloads</span>
             </div>
             <div class="d-flex gap-2 material-action-row">
               <button @click="downloadFile(m)" class="btn btn-sm btn-teacher-primary flex-grow-1 material-action-btn">
@@ -93,7 +87,7 @@ import { SearchFilter, AlertMessage, ConfirmDialog, LoadingSpinner } from '@/com
 import teacherPanelService from '@/services/teacher/teacherPanelService'
 import { TEACHER_ROUTES } from '@/utils/constants/routes'
 import { formatDate } from '@/utils/formatters'
-import { MATERIAL_TYPE_OPTIONS, getOptionLabel } from '@/utils/constants/options'
+import { MATERIAL_TYPE_OPTIONS } from '@/utils/constants/options'
 import { getFileUrl } from '@/utils/constants/config'
 import { useEntityList, useAlert } from '@/composables/shared'
 
@@ -149,8 +143,6 @@ const getAccess = (level) => {
   }
   return map[level] || { badge: 'bg-secondary', icon: 'bi bi-eye', label: level }
 }
-
-const formatType = (type) => getOptionLabel(MATERIAL_TYPE_OPTIONS, type)
 
 const refreshMaterials = () => refresh(() => teacherPanelService.getMaterials())
 

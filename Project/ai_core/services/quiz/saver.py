@@ -1,5 +1,6 @@
 import json
 from datetime import timedelta
+from decimal import Decimal, InvalidOperation
 
 from django.core.serializers.json import DjangoJSONEncoder
 from django.utils import timezone
@@ -13,7 +14,6 @@ from lms_cors.models.academic import Subject
 from lms_cors.models.grading import (
     GradeComponent,
     Quiz,
-    QuizAttempt,
     QuizOption,
     QuizQuestion,
     StudentMark,
@@ -43,12 +43,26 @@ class QuizSaveService:
         teacher = Teacher.objects.get(user=user)
         quiz_json = validated_data["quiz_data"]
 
+        raw_total = quiz_json.get("total_marks")
+        if raw_total is not None:
+            try:
+                total_marks = Decimal(str(raw_total))
+            except (InvalidOperation, TypeError, ValueError):
+                total_marks = Decimal("0")
+        else:
+            total_marks = Decimal("0")
+            for q_data in quiz_json.get("questions", []):
+                try:
+                    total_marks += Decimal(str(q_data.get("marks") or 0))
+                except (InvalidOperation, TypeError, ValueError):
+                    continue
+
         grade_comp = GradeComponent.objects.create(
             subject=subject,
             created_by=teacher,
             name=validated_data["title"],
             component_type="quiz",
-            max_marks=quiz_json.get("total_marks", 0),
+            max_marks=total_marks,
             weightage=QUIZ_GRADE_COMPONENT_WEIGHTAGE,
             status=QUIZ_GRADE_COMPONENT_STATUS,
         )
@@ -59,6 +73,7 @@ class QuizSaveService:
             subject=subject,
             created_by=teacher,
             grade_component=grade_comp,
+            total_marks=total_marks,
             is_published=True,
         )
 
@@ -126,7 +141,6 @@ class QuizSaveService:
         quiz.save()
 
         for student in assigned_students:
-            QuizAttempt.objects.get_or_create(quiz=quiz, student=student)
             StudentMark.objects.get_or_create(component=grade_comp, student=student)
 
         return {

@@ -41,7 +41,7 @@
     <!-- Standard Input -->
     <div v-if="!['date', 'time', 'datetime-local'].includes(type)" :class="{ 'position-relative': type === 'password' }">
       <input :id="inputId" :type="inputType" :value="modelValue"
-        @input="$emit('update:modelValue', $event.target.value)" :placeholder="placeholder" :required="required"
+        @input="$emit('update:modelValue', $event.target.value)" @wheel="handleWheel" :placeholder="placeholder" :required="required"
         :disabled="disabled" :class="[
           'form-control',
           error ? 'is-invalid' : '',
@@ -109,6 +109,12 @@ const inputType = computed(() => {
   }
   return props.type
 })
+
+const handleWheel = (event) => {
+  if (props.type !== 'number') return
+  event.preventDefault()
+  event.target?.blur()
+}
 
 const proxyModel = computed({
   get() {

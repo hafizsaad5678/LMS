@@ -2200,3 +2200,22 @@ body {
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
   filter: brightness(0.95);
 }
+
+/* Drag and Drop Support */
+.admin-tt-view .admin-tt-hover-detail.show-persistent {
+    opacity: 1 !important;
+    visibility: visible !important;
+    transform: translate(-50%, 0);
+    z-index: 50;
+}
+
+.admin-tt-view .admin-tt-grid-slot:nth-child(6n + 1) .admin-tt-hover-detail.show-persistent,
+.admin-tt-view .admin-tt-grid-slot:nth-child(6n) .admin-tt-hover-detail.show-persistent {
+    transform: translate(0, 0);
+}
+
+.admin-tt-view .admin-tt-drag-source {
+    opacity: 0.6;
+    border-style: dashed !important;
+    transform: scale(0.98);
+}

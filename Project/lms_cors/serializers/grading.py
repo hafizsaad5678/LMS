@@ -1,12 +1,17 @@
 """
 Serializers for Professional Grading Management System
 """
+from decimal import Decimal, InvalidOperation
+from django.db.models import Count, Max, Avg
+from django.utils import timezone
 from rest_framework import serializers
 from ..models.grading import (
     GradeComponent, StudentMark, MarkEditHistory,
     GradingScheme, StudentGradeSummary,
     Quiz, QuizQuestion, QuizOption, QuizAttempt, QuizAnswer
 )
+from ..models.people import StudentSubject
+from ..models.assignments import Assignment
 
 
 class QuizOptionSerializer(serializers.ModelSerializer):
@@ -19,6 +24,16 @@ class QuizOptionPublicSerializer(serializers.ModelSerializer):
     class Meta:
         model = QuizOption
         fields = ['id', 'option_text']
+
+
+def _compute_total_marks_from_questions(questions):
+    total = Decimal('0')
+    for question in questions or []:
+        try:
+            total += Decimal(str(question.get('marks') or 0))
+        except (InvalidOperation, TypeError, ValueError):
+            continue
+    return total
 
 class QuizQuestionSerializer(serializers.ModelSerializer):
     options = QuizOptionSerializer(many=True, read_only=True)
@@ -89,7 +104,7 @@ class QuizSerializer(serializers.ModelSerializer):
 
     def get_attempt_stats(self, obj):
         """Get stats for teacher/admin to see total attempts and student performance"""
-        from django.db.models import Count, Max, Avg
+        
         stats = obj.attempts.filter(is_submitted=True).aggregate(
             total_students=Count('student', distinct=True),
             total_attempts=Count('id'),
@@ -159,6 +174,14 @@ class QuizSerializer(serializers.ModelSerializer):
             }
         return None
 
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        if not instance.total_marks:
+            computed = _compute_total_marks_from_questions(data.get('questions'))
+            if computed > 0:
+                data['total_marks'] = str(computed)
+        return data
+
 
 class QuizPublicSerializer(serializers.ModelSerializer):
     questions = QuizQuestionPublicSerializer(many=True, read_only=True)
@@ -174,6 +197,14 @@ class QuizPublicSerializer(serializers.ModelSerializer):
 
     def get_question_count(self, obj):
         return obj.questions.count()
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        if not instance.total_marks:
+            computed = _compute_total_marks_from_questions(data.get('questions'))
+            if computed > 0:
+                data['total_marks'] = str(computed)
+        return data
 
 class QuizAnswerSerializer(serializers.ModelSerializer):
     class Meta:
@@ -208,7 +239,7 @@ class QuizAttemptStateSerializer(serializers.ModelSerializer):
         ]
 
     def get_time_remaining_seconds(self, obj):
-        from django.utils import timezone
+        
         if not obj.end_time:
             return 0
         delta = int((obj.end_time - timezone.now()).total_seconds())
@@ -280,8 +311,62 @@ class GradeComponentSerializer(serializers.ModelSerializer):
     
     def get_total_students(self, obj):
         """Count total students enrolled in the subject"""
-        from ..models.people import StudentSubject
+        
         return StudentSubject.objects.filter(subject=obj.subject).count()
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        raw_max = data.get('max_marks')
+        try:
+            max_value = float(raw_max)
+        except (TypeError, ValueError):
+            max_value = 0
+
+        if max_value <= 0:
+            linked_quiz = getattr(instance, 'linked_quiz', None)
+            if not linked_quiz and instance.component_type in ['quiz', 'assignment']:
+                try:
+                    
+                    
+                    # 1. Try to find linked quiz
+                    linked_quiz = Quiz.objects.filter(grade_component=instance).first()
+                    if not linked_quiz:
+                        linked_quiz = Quiz.objects.filter(
+                            title=instance.name,
+                            subject=instance.subject,
+                            created_by=instance.created_by
+                        ).order_by('-created_at').first()
+                except Exception:
+                    pass
+            
+            # Now calculate marks if we have a linked_quiz (either from model or discovery)
+            if linked_quiz:
+                try:
+                    total_marks = linked_quiz.total_marks or Decimal('0')
+                    if total_marks <= 0:
+                        total_marks = sum((q.marks or Decimal('0')) for q in linked_quiz.questions.all())
+
+                    if total_marks > 0:
+                        data['max_marks'] = float(total_marks)
+                        max_value = float(total_marks)
+                except Exception:
+                    pass
+            
+            # If still 0, try to find matching assignment
+            if max_value <= 0:
+                try:
+        
+                    assignment = Assignment.objects.filter(
+                        title=instance.name,
+                        subject=instance.subject
+                    ).first()
+                    if assignment and assignment.total_marks:
+                        data['max_marks'] = float(assignment.total_marks)
+                        max_value = float(assignment.total_marks)
+                except Exception:
+                    pass
+
+        return data
 
 
 class StudentMarkSerializer(serializers.ModelSerializer):
@@ -306,6 +391,20 @@ class StudentMarkSerializer(serializers.ModelSerializer):
     subject_code = serializers.CharField(source='component.subject.code', read_only=True)
     total_marks = serializers.DecimalField(source='component.max_marks', max_digits=6, decimal_places=2, read_only=True)
     grade_value = serializers.SerializerMethodField()
+    assignment_id = serializers.SerializerMethodField()
+
+    def get_assignment_id(self, obj):
+        """Try to resolve corresponding assignment ID for frontend deduplication"""
+        try:
+            
+            assignment = Assignment.objects.filter(
+                title=obj.component.name,
+                subject=obj.component.subject
+            ).first()
+            return str(assignment.id) if assignment else None
+        except Exception:
+            return None
+
 
     def get_grade_value(self, obj):
         percentage = float(obj.percentage or 0)
@@ -330,6 +429,67 @@ class StudentMarkSerializer(serializers.ModelSerializer):
         if percentage >= 40:
             return 'D'
         return 'F'
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        raw_max = data.get('max_marks') or data.get('total_marks')
+        try:
+            max_value = float(raw_max)
+        except (TypeError, ValueError):
+            max_value = 0
+
+        if max_value <= 0:
+            component = getattr(instance, 'component', None)
+            linked_quiz = getattr(component, 'linked_quiz', None) if component else None
+            if not linked_quiz and component and component.component_type == 'quiz':
+                try:
+        
+                    linked_quiz = Quiz.objects.filter(grade_component=component).first()
+                    if not linked_quiz:
+                        linked_quiz = Quiz.objects.filter(
+                            title=component.name,
+                            subject=component.subject,
+                            created_by=component.created_by
+                        ).order_by('-created_at').first()
+                except Exception:
+                    linked_quiz = None
+
+            if linked_quiz:
+                total_marks = linked_quiz.total_marks or Decimal('0')
+                if total_marks <= 0:
+                    try:
+                        total_marks = sum((q.marks or Decimal('0')) for q in linked_quiz.questions.all())
+                    except Exception:
+                        total_marks = Decimal('0')
+
+                if total_marks > 0:
+                    value = float(total_marks)
+                    data['max_marks'] = value
+                    data['total_marks'] = value
+                    max_value = value
+
+        # Recalculate percentage and grade_value using the corrected max_marks
+        marks_obtained = float(instance.marks_obtained or 0)
+        if max_value > 0 and marks_obtained > 0:
+            pct = round((marks_obtained / max_value) * 100, 2)
+            data['percentage'] = pct
+            data['grade_value'] = self.get_grade_value_from_pct(pct)
+
+        return data
+
+    @staticmethod
+    def get_grade_value_from_pct(percentage):
+        if percentage >= 90: return 'A+'
+        if percentage >= 85: return 'A'
+        if percentage >= 80: return 'A-'
+        if percentage >= 75: return 'B+'
+        if percentage >= 70: return 'B'
+        if percentage >= 65: return 'B-'
+        if percentage >= 60: return 'C+'
+        if percentage >= 55: return 'C'
+        if percentage >= 50: return 'C-'
+        if percentage >= 40: return 'D'
+        return 'F'
     
     class Meta:
         model = StudentMark
@@ -339,7 +499,7 @@ class StudentMarkSerializer(serializers.ModelSerializer):
             'assignment_title', 'subject_name', 'subject_code',
             'marks_obtained', 'total_marks', 'max_marks', 
             'percentage', 'weighted_marks', 'remarks', 
-            'grade_value',
+            'grade_value', 'assignment_id',
             'is_absent', 'is_locked', 'graded_by', 'graded_by_name',
             'graded_at', 'created_at'
         ]

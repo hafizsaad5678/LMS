@@ -165,7 +165,8 @@ const teachers = computed(() => Array.isArray(entity.value.teachers) ? entity.va
 
 const profileBadges = computed(() => {
   const badges = []
-  if (entity.value.institution_name) badges.push({ text: entity.value.institution_name, class: 'bg-info' })
+  // DISABLED: Single-college mode — institution badge hidden
+  // if (entity.value.institution_name) badges.push({ text: entity.value.institution_name, class: 'bg-info' })
   return badges
 })
 
@@ -173,7 +174,8 @@ const deptInfoItems = computed(() => [
   { label: 'Name', value: entity.value.name },
   { label: 'Code', value: entity.value.code },
   { label: 'Head of Department', value: entity.value.head_of_department || 'Not Assigned' },
-  { label: 'Institution', value: entity.value.institution_name || 'N/A' },
+  // DISABLED: Single-college mode — institution row hidden
+  // { label: 'Institution', value: entity.value.institution_name || 'N/A' },
   { label: 'Email', value: entity.value.email, href: entity.value.email ? `mailto:${entity.value.email}` : null },
   { label: 'Phone', value: entity.value.phone }
 ])

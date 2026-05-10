@@ -13,25 +13,19 @@
       <div class="card border-0 shadow-sm mb-4">
         <div class="card-body">
           <div class="row g-3 align-items-center">
-            <div class="col-md-3">
+            <div class="col-md-5">
               <SelectInput v-model="filters.subject" :options="subjectOptions" placeholder="All Subjects"
                 :no-margin="true" />
             </div>
-            <div class="col-md-3">
-              <SelectInput v-model="filters.session" :options="sessionOptions" placeholder="All Sessions"
-                :no-margin="true" />
-            </div>
-            <div class="col-md-3">
+            <div class="col-md-4">
               <SelectInput v-model="filters.program" :options="programOptions" placeholder="All Programs"
                 :no-margin="true" />
             </div>
-            <div class="col-md-3">
-              <div class="d-flex gap-2 justify-content-md-end">
-                <button @click="loadStudents(true)" class="btn btn-teacher-outline flex-fill flex-md-grow-0"><i
-                    class="bi bi-arrow-clockwise me-1"></i>Refresh</button>
-                <button @click="resetFilters" class="btn btn-outline-secondary flex-fill flex-md-grow-0"><i
-                    class="bi bi-x-circle me-1"></i>Reset</button>
-              </div>
+            <div class="col-md-3 text-end d-flex justify-content-md-end gap-2">
+              <button @click="loadStudents(true)" class="btn btn-teacher-outline flex-fill flex-md-grow-0"><i
+                  class="bi bi-arrow-clockwise me-1"></i>Refresh</button>
+              <button @click="resetFilters" class="btn btn-outline-secondary flex-fill flex-md-grow-0"><i
+                  class="bi bi-x-circle me-1"></i>Reset</button>
             </div>
           </div>
         </div>
@@ -71,8 +65,6 @@
                   class="text-muted">{{ student.program_name }}</small></div>
               <div class="d-flex align-items-center gap-2 mb-1"><i class="bi bi-book text-muted small"></i><small
                   class="text-muted">{{ getSubjectSummary(student) }}</small></div>
-              <div class="d-flex align-items-center gap-2"><i class="bi bi-calendar-event text-muted small"></i><small
-                  class="text-muted">{{ getSessionSummary(student) }}</small></div>
             </div>
             <div class="d-flex gap-2">
               <button @click="router.push({ name: TEACHER_ROUTES.STUDENT_PROFILE.name, params: { id: student.id } })"
@@ -94,6 +86,7 @@ import { smartSearch } from '@/utils'
 import { useRouter, useRoute } from 'vue-router'
 import { TeacherPageTemplate } from '@/components/shared/panels'
 import { StatCard, AlertMessage, SelectInput, LoadingSpinner, EmptyState } from '@/components/shared/common'
+import { useTeacherSubjectOptions } from '@/composables/teacher/useTeacherSubjectOptions'
 import teacherPanelService from '@/services/teacher/teacherPanelService'
 import { cacheService } from '@/services/shared'
 import { TEACHER_ROUTES } from '@/utils/constants/routes'
@@ -106,112 +99,21 @@ const breadcrumbs = [{ name: 'Dashboard', href: TEACHER_ROUTES.DASHBOARD.path },
 const actions = [{ label: 'Back to Classes', icon: 'bi bi-arrow-left', variant: 'btn-teacher-outline', onClick: () => router.push({ name: TEACHER_ROUTES.CLASS_LIST.name }) }]
 
 const loading = ref(false)
-const filters = ref({ subject: '', session: '', program: '', search: '' })
+const filters = ref({ subject: '', program: '', search: '' })
 const students = ref([])
-const subjects = ref([])
 const error = ref(null)
-const MAX_FILTER_OPTIONS = 100
 
-const loadSubjects = async () => {
-  try {
-    const response = await teacherPanelService.getMyClasses()
-    subjects.value = response.results || response || []
-  } catch (err) {
-    console.error('Error loading subjects:', err)
-  }
-}
+const { subjectOptions, programOptions, loadSubjects } = useTeacherSubjectOptions({
+  programFilter: computed(() => filters.value.program)
+})
 
 onMounted(() => {
   if (route.query.subject) filters.value.subject = route.query.subject
-  if (route.query.session) filters.value.session = route.query.session
   if (route.query.search) filters.value.search = String(route.query.search)
   loadSubjects()
 })
 
-const uniqueSubjects = computed(() => {
-  const seen = new Set()
-  return subjects.value
-    .filter(s => {
-      const key = `${s.subject_id || s.id}-${s.subject_code}`
-      if (seen.has(key)) return false
-      seen.add(key)
-      return true
-    })
-    .map(s => ({ id: s.subject_id || s.id, name: s.subject_name, code: s.subject_code }))
-})
-
-const uniqueSessions = computed(() => {
-  const sessionMap = new Map()
-  subjects.value.forEach(cls => {
-    if (!cls.session_id) return
-    if (!sessionMap.has(cls.session_id)) {
-      sessionMap.set(cls.session_id, {
-        value: cls.session_id,
-        label: cls.session_name && cls.session_name !== 'N/A'
-          ? `${cls.session_name}${cls.session_code && cls.session_code !== 'N/A' ? ` (${cls.session_code})` : ''}`
-          : 'Unknown Session'
-      })
-    }
-  })
-  return Array.from(sessionMap.values())
-})
-
-const getUniqueValues = (items, key) => [...new Set(items.map(item => item[key]).filter(Boolean))]
-
-const getStudentsForOption = (excludeKey) => {
-  return students.value.filter(student => {
-    if (excludeKey !== 'subject' && filters.value.subject) {
-      const subjectIds = Array.isArray(student.subject_ids) ? student.subject_ids : [student.subject_id]
-      if (!subjectIds.filter(Boolean).some(id => `${id}` === `${filters.value.subject}`)) return false
-    }
-    if (excludeKey !== 'session' && filters.value.session) {
-      const sessionIds = Array.isArray(student.session_ids) ? student.session_ids : [student.session_id]
-      if (!sessionIds.filter(Boolean).some(id => `${id}` === `${filters.value.session}`)) return false
-    }
-    if (excludeKey !== 'program' && filters.value.program && student.program_name !== filters.value.program) return false
-    return true
-  })
-}
-
-const subjectOptions = computed(() => {
-  const allowedSubjectIds = new Set(
-    getStudentsForOption('subject').flatMap(student => {
-      const subjectIds = Array.isArray(student.subject_ids) ? student.subject_ids : [student.subject_id]
-      return subjectIds.filter(Boolean).map(id => `${id}`)
-    })
-  )
-
-  const seen = new Set()
-  return subjects.value
-    .map(s => ({ value: `${s.subject_id || s.id}`, label: `${s.subject_name} (${s.subject_code})` }))
-    .filter(option => {
-      if (!allowedSubjectIds.has(option.value) || seen.has(option.value)) return false
-      seen.add(option.value)
-      return true
-    })
-    .slice(0, MAX_FILTER_OPTIONS)
-})
-
-const sessionOptions = computed(() => {
-  const allowedSessionIds = new Set(
-    getStudentsForOption('session').flatMap(student => {
-      const sessionIds = Array.isArray(student.session_ids) ? student.session_ids : [student.session_id]
-      return sessionIds.filter(Boolean).map(id => `${id}`)
-    })
-  )
-
-  return uniqueSessions.value
-    .filter(option => allowedSessionIds.has(`${option.value}`))
-    .slice(0, MAX_FILTER_OPTIONS)
-})
-
-const programOptions = computed(() => {
-  return getUniqueValues(getStudentsForOption('program'), 'program_name')
-    .map(p => ({ value: p, label: p }))
-    .slice(0, MAX_FILTER_OPTIONS)
-})
-
-const hasActiveFilters = computed(() => filters.value.subject || filters.value.session || filters.value.program || filters.value.search)
+const hasActiveFilters = computed(() => filters.value.subject || filters.value.program || filters.value.search)
 
 const noStudentsMessage = computed(() => {
   return hasActiveFilters.value
@@ -230,10 +132,6 @@ const filteredStudents = computed(() => {
     if (filters.value.subject) {
       const subjectIds = Array.isArray(s.subject_ids) ? s.subject_ids : [s.subject_id]
       if (!subjectIds.filter(Boolean).some(id => `${id}` === `${filters.value.subject}`)) return false
-    }
-    if (filters.value.session) {
-      const sessionIds = Array.isArray(s.session_ids) ? s.session_ids : [s.session_id]
-      if (!sessionIds.filter(Boolean).some(id => `${id}` === `${filters.value.session}`)) return false
     }
     if (filters.value.program && s.program_name !== filters.value.program) return false
     return true
@@ -271,8 +169,7 @@ const statsCards = computed(() => [
 
 function getStudentsCacheKey() {
   const subject = filters.value.subject || 'all'
-  const session = filters.value.session || 'all'
-  return `${CACHE_KEY_PREFIX}:${subject}:${session}`
+  return `${CACHE_KEY_PREFIX}:${subject}`
 }
 
 function getSubjectSummary(student) {
@@ -291,21 +188,6 @@ function getSubjectSummary(student) {
   return `${labels.slice(0, 2).join(', ')} +${labels.length - 2} more`
 }
 
-function getSessionSummary(student) {
-  const sessionsList = Array.isArray(student.sessions) ? student.sessions : []
-  if (!sessionsList.length) {
-    return student.session_name || 'No session'
-  }
-
-  const labels = sessionsList
-    .filter(s => s?.name)
-    .map(s => s.code ? `${s.name} (${s.code})` : s.name)
-
-  if (!labels.length) return 'No session'
-  if (labels.length <= 2) return labels.join(', ')
-  return `${labels.slice(0, 2).join(', ')} +${labels.length - 2} more`
-}
-
 async function loadStudents(forceRefresh = false) {
   loading.value = true
   error.value = null
@@ -318,8 +200,7 @@ async function loadStudents(forceRefresh = false) {
     }
     const allStudents = await teacherPanelService.getAllStudentsFromClasses({
       dedupe: true,
-      subject: filters.value.subject || null,
-      session: filters.value.session || null
+      subject: filters.value.subject || null
     })
     students.value = allStudents.map(student => ({
       ...student,
@@ -342,14 +223,14 @@ async function loadStudents(forceRefresh = false) {
 }
 
 function resetFilters() {
-  filters.value = { subject: '', session: '', program: '', search: '' }
+  filters.value = { subject: '', program: '', search: '' }
   router.replace({ query: {} })
 }
 
 onMounted(() => loadStudents())
 
 watch(
-  () => [filters.value.subject, filters.value.session],
+  () => filters.value.subject,
   () => {
     loadStudents(false)
   }
@@ -366,12 +247,6 @@ watch(subjectOptions, (options) => {
   if (!filters.value.subject) return
   const allowed = options.some(option => `${option.value}` === `${filters.value.subject}`)
   if (!allowed) filters.value.subject = ''
-})
-
-watch(sessionOptions, (options) => {
-  if (!filters.value.session) return
-  const allowed = options.some(option => `${option.value}` === `${filters.value.session}`)
-  if (!allowed) filters.value.session = ''
 })
 
 watch(programOptions, (options) => {

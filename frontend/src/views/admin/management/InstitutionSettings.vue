@@ -15,7 +15,9 @@
     />
 
     <div class="row g-4">
-      <!-- Institution Selector (If multiple) -->
+      <!-- DISABLED: Single-college mode — institution selector hidden -->
+      <!-- To re-enable multi-institution: uncomment the block below -->
+      <!--
       <div v-if="institutions.length > 1" class="col-12">
         <div class="card border-0 shadow-sm">
           <div class="card-body p-3">
@@ -30,6 +32,7 @@
           </div>
         </div>
       </div>
+      -->
 
       <!-- Main Settings Form -->
       <div class="col-lg-12">

@@ -112,6 +112,7 @@ import { ref, computed, onMounted } from 'vue'
 import { TeacherPageTemplate } from '@/components/shared/panels'
 import { DataTable, BaseModal, StatCard, SearchFilter, SelectInput, AlertMessage, LoadingSpinner } from '@/components/shared/common'
 import { AnnouncementFormModal } from '@/components/teacher/shared'
+import { useTeacherSubjectOptions } from '@/composables/teacher/useTeacherSubjectOptions'
 import { useCrudModal } from '@/composables/shared'
 import teacherPanelService from '@/services/teacher/teacherPanelService'
 import { ANNOUNCEMENT_PRIORITY_OPTIONS } from '@/utils/constants/options'
@@ -128,19 +129,19 @@ const breadcrumbs = [
 
 const loading = ref(true)
 const announcements = ref([])
-const subjects = ref([])
 const filters = ref({ search: '', subject: '', priority: '' })
+
+const { subjects, subjectOptions, loadSubjects } = useTeacherSubjectOptions({ includeOther: true })
 
 const loadData = async () => {
   loading.value = true
   try {
-    const [announcementsData, subjectsData] = await Promise.all([
+    const [announcementsData] = await Promise.all([
       teacherPanelService.getAnnouncements(),
-      teacherPanelService.getMyClasses()
+      loadSubjects()
     ])
 
     const allAnnouncements = announcementsData.results || announcementsData || []
-    subjects.value = subjectsData.results || subjectsData || []
 
     const teacherSubjectIds = subjects.value.map(s => s.subject_id || s.id)
     announcements.value = allAnnouncements.filter(a => {
@@ -211,17 +212,6 @@ const stats = computed(() => {
     highPriority: announcements.value.filter(a => a.priority === 'high').length,
     urgent: announcements.value.filter(a => a.priority === 'urgent').length
   }
-})
-
-// Subject options with "Other" option
-const subjectOptions = computed(() => {
-  const opts = subjects.value.map(s => ({
-    value: s.subject_id || s.id,
-    label: `${s.subject_name} (${s.subject_code})`
-  }))
-  // Add "Other" option
-  opts.push({ value: 'other', label: 'Other' })
-  return opts
 })
 
 const filteredAnnouncements = computed(() => {

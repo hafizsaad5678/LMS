@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <AdminPageTemplate title="Expenses Management" subtitle="Track and manage institutional expenses" icon="bi bi-cash-stack" :breadcrumbs="breadcrumbs" :actions="actions" content-title="Expense Records">
     <AlertMessage v-if="alert.show" :type="alert.type" :message="alert.message" :title="alert.title" :auto-close="true" :auto-close-duration="3000" @close="alert.show = false" />
     
@@ -165,7 +165,7 @@ const tableColumns = [
 // Data fetching
 const { data: expensesData, loading: loadingExpenses, execute: loadExpensesApi } = useAsyncState({ initialLoading: true })
 const loadExpenses = () => loadExpensesApi(async () => {
-    const response = await expenseService.getAll()
+    const response = await expenseService.getAll({}, { forceRefresh: true })
     return response.data.results || response.data
 })
 

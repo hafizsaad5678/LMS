@@ -1,6 +1,13 @@
 from rest_framework import serializers
 import secrets
-from ..models import Student, Teacher, Admin, TeacherSubject, StudentSubject, Semester
+from django.utils import timezone
+from ..models import (
+    Student, Teacher, Admin, TeacherSubject, StudentSubject, Semester,
+    SubmissionHistory, Assignment, Attendance, Timetable
+)
+from .assignments import SubmissionHistorySerializer, AssignmentSerializer
+from .attendance import AttendanceSerializer
+from .management import FeeSerializer
 
 
 class BaseProfileSerializer(serializers.ModelSerializer):
@@ -113,13 +120,12 @@ class StudentSerializer(BaseProfileSerializer):
     
     def get_completed_assignments(self, obj):
         """Count completed/submitted assignments"""
-        from ..models import SubmissionHistory
+        
         return SubmissionHistory.objects.filter(student=obj).count()
     
     def get_pending_assignments(self, obj):
         """Count pending assignments (assigned but not submitted)"""
-        from ..models import Assignment, SubmissionHistory
-        from django.utils import timezone
+        
         
         # Get all subjects the student is enrolled in
         enrolled_subject_ids = obj.enrolled_subjects.values_list('subject_id', flat=True)
@@ -140,7 +146,7 @@ class StudentSerializer(BaseProfileSerializer):
     
     def get_attendance_rate(self, obj):
         """Calculate attendance percentage"""
-        from ..models import Attendance
+        
         
         total_classes = Attendance.objects.filter(student=obj).count()
         if total_classes == 0:
@@ -204,10 +210,6 @@ class TeacherSubjectSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError({'teacher': 'Teacher is required for subject assignment.'})
             if not subject:
                 raise serializers.ValidationError({'subject': 'Subject is required for teacher assignment.'})
-
-        if teacher and subject and subject.semester and subject.semester.program and subject.semester.program.department and teacher.department:
-            if teacher.department_id != subject.semester.program.department_id:
-                raise serializers.ValidationError({'teacher': 'Teacher department must match subject program department.'})
 
         return attrs
 
@@ -282,9 +284,7 @@ class StudentSubjectSerializer(serializers.ModelSerializer):
 # Detail Serializers
 class StudentDetailSerializer(StudentSerializer):
     """Student with enrolled subjects and submissions"""
-    from .assignments import SubmissionHistorySerializer
-    from .attendance import AttendanceSerializer
-    from .management import FeeSerializer
+    
     
     enrolled_subjects = StudentSubjectSerializer(many=True, read_only=True)
     submissions = SubmissionHistorySerializer(many=True, read_only=True)
@@ -294,8 +294,7 @@ class StudentDetailSerializer(StudentSerializer):
 
 class TeacherDetailSerializer(TeacherSerializer):
     """Teacher with teaching subjects and created assignments"""
-    from .assignments import AssignmentSerializer
-    from .attendance import AttendanceSerializer
+    
     
     teaching_subjects = TeacherSubjectSerializer(many=True, read_only=True)
     created_assignments = AssignmentSerializer(many=True, read_only=True)
@@ -308,7 +307,7 @@ class TeacherDetailSerializer(TeacherSerializer):
         return obj.created_assignments.count()
 
     def get_classes_this_week(self, obj):
-        from ..models import Timetable
+        
         return Timetable.objects.filter(
             teacher=obj,
             is_active=True

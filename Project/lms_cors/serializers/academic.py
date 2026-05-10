@@ -1,11 +1,13 @@
+import re
 from rest_framework import serializers
 from ..models import (
     Institution, InstitutionGallery, InstitutionFeature, InstitutionEvent,
     InstitutionAdmissionInfo, InstitutionContact, Department, Program,
-    AcademicSession, Semester, Subject, Student, Teacher, TeacherSubject,
-    Timetable, Grade, StudentMark, InstitutionTestimonial, InstitutionAdmissionFeatured
+    Timetable, Grade, StudentMark, InstitutionTestimonial, InstitutionAdmissionFeatured,
+    Attendance, AcademicSession, Semester, Subject, Student
 )
 from institution_profile.serializers import InstitutionAdmissionFeaturedSerializer, InstitutionGallerySerializer
+from .people import TeacherSerializer
 
 
 class InstitutionSerializer(serializers.ModelSerializer):
@@ -90,7 +92,6 @@ class InstitutionSerializer(serializers.ModelSerializer):
     def _parse_nested_featured_admissions(self, data, files):
         """Helper to parse flattened featured_admissions[index][field] data."""
         results = {}
-        import re
         # Pattern to match featured_admissions[0][title], featured_admissions[0][image], etc.
         pattern = re.compile(r'^featured_admissions\[(\d+)\]\[(\w+)\]$')
         
@@ -118,7 +119,6 @@ class InstitutionSerializer(serializers.ModelSerializer):
     def _parse_nested_gallery_images(self, data, files):
         """Helper to parse flattened gallery_images[index][field] data."""
         results = {}
-        import re
         pattern = re.compile(r'^gallery_images\[(\d+)\]\[(\w+)\]$')
         
         for key in data.keys():
@@ -240,6 +240,7 @@ class AcademicSessionSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({'program': 'Selected program belongs to an inactive department.'})
         if program and program.department and program.department.institution and program.department.institution.is_active is False:
             raise serializers.ValidationError({'program': 'Selected program belongs to an inactive institution.'})
+
         return attrs
 
 
@@ -280,6 +281,28 @@ class SemesterSerializer(serializers.ModelSerializer):
 
         if session and getattr(session, 'is_active', True) is False:
             raise serializers.ValidationError({'session': 'Selected session is inactive.'})
+
+        # Validate active status uniqueness
+        status = attrs.get('status', getattr(self.instance, 'status', None))
+        if status == 'active':
+            # Check within session if it exists
+            if session:
+                qs = Semester.objects.filter(session=session, status='active')
+                if self.instance:
+                    qs = qs.exclude(id=self.instance.id)
+                if qs.exists():
+                    raise serializers.ValidationError({
+                        'status': f"Another semester is already active for session '{session.session_name}'."
+                    })
+            # If no session, check within program (legacy data)
+            elif program:
+                qs = Semester.objects.filter(program=program, session__isnull=True, status='active')
+                if self.instance:
+                    qs = qs.exclude(id=self.instance.id)
+                if qs.exists():
+                    raise serializers.ValidationError({
+                        'status': f"Another semester is already active for program '{program.name}'."
+                    })
 
         return attrs
 
@@ -354,7 +377,7 @@ class SubjectDetailSerializer(SubjectSerializer):
         request = self.context.get('request')
         if request and hasattr(request.user, 'student_profile'):
             student = request.user.student_profile
-            from ..models import Attendance
+            
             records = Attendance.objects.filter(subject=obj, student=student)
             total = records.count()
             if total > 0:
@@ -443,7 +466,7 @@ class DepartmentDetailSerializer(DepartmentSerializer):
     teachers = serializers.SerializerMethodField()
 
     def get_teachers(self, obj):
-        from .people import TeacherSerializer
+        
         return TeacherSerializer(obj.teachers.all(), many=True).data
 
 

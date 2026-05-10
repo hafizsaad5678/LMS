@@ -3,6 +3,7 @@ Professional Grading Management System Models
 Supports custom assessment components with full teacher control
 """
 from django.db import models
+from django.db.models import Sum
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.conf import settings
 from django.utils import timezone
@@ -125,18 +126,36 @@ class StudentMark(models.Model):
         return f"{self.student.enrollment_number} - {self.component.name}: {marks}"
     
     @property
+    def _effective_max_marks(self):
+        """Resolve max marks with fallback to linked quiz data."""
+        max_marks = float(self.component.max_marks or 0)
+        if max_marks == 0:
+            linked_quiz = getattr(self.component, 'linked_quiz', None)
+            if linked_quiz:
+                max_marks = float(linked_quiz.total_marks or 0)
+                if max_marks == 0:
+                    
+                    q_total = linked_quiz.questions.aggregate(total=Sum('marks'))['total']
+                    max_marks = float(q_total or 0)
+        return max_marks
+
+    @property
     def percentage(self):
-        if self.marks_obtained and self.component.max_marks:
-            return round((float(self.marks_obtained) / float(self.component.max_marks)) * 100, 2)
+        if self.marks_obtained:
+            max_marks = self._effective_max_marks
+            if max_marks > 0:
+                return round((float(self.marks_obtained) / max_marks) * 100, 2)
         return 0
     
     @property
     def weighted_marks(self):
-        if self.marks_obtained and self.component.max_marks and self.component.weightage:
-            return round(
-                (float(self.marks_obtained) / float(self.component.max_marks)) * float(self.component.weightage),
-                2
-            )
+        if self.marks_obtained and self.component.weightage:
+            max_marks = self._effective_max_marks
+            if max_marks > 0:
+                return round(
+                    (float(self.marks_obtained) / max_marks) * float(self.component.weightage),
+                    2
+                )
         return 0
 
 

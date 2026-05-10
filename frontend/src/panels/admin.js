@@ -168,17 +168,19 @@ export const sidebarSections = [
       }
     ]
   },
-   {
-    title: 'Institution',
-    items: [
-      {
-        name: 'Institution',
-        href: `${BASE_PATH}/institution`,
-        icon: '🏢',
-        submenu: createCrudSubmenu('institution', 'Institution')
-      }
-    ]
-  },
+  // DISABLED: Single-college mode — no need for multi-institution CRUD
+  // To re-enable: uncomment the block below
+  // {
+  //   title: 'Institution',
+  //   items: [
+  //     {
+  //       name: 'Institution',
+  //       href: `${BASE_PATH}/institution`,
+  //       icon: '🏢',
+  //       submenu: createCrudSubmenu('institution', 'Institution')
+  //     }
+  //   ]
+  // },
   {
     title: 'Academic Sessions',
     items: [

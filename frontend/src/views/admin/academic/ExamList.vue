@@ -218,7 +218,7 @@ const getStatus = (date) => new Date(date).toDateString() === new Date().toDateS
 const getStatusBadge = (date) => getStatus(date) === 'Today' ? 'bg-info' : getStatus(date) === 'Upcoming' ? 'bg-success' : 'bg-secondary'
 
 const fetchExams = async () => {
-  const response = await examService.getAll()
+  const response = await examService.getAll({}, { forceRefresh: true })
   return response.data?.results || response.data || []
 }
 

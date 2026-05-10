@@ -186,7 +186,24 @@ const submitForm = async () => {
     setTimeout(() => router.push({ name: ADMIN_ROUTES.SEMESTER_LIST.name }), 1500)
   } catch (e) {
     console.error('Error updating semester:', e.response?.data || e.message)
-    const msg = e.response?.data?.detail || e.response?.data?.non_field_errors?.[0] || 'Failed to update semester'
+    
+    // Extract the most relevant error message
+    const data = e.response?.data
+    let msg = 'Failed to update semester'
+    
+    if (data) {
+      if (typeof data === 'string') msg = data
+      else if (data.detail) msg = data.detail
+      else if (data.non_field_errors) msg = data.non_field_errors[0]
+      else {
+        // Get the first field-specific error
+        const firstField = Object.keys(data)[0]
+        if (firstField && data[firstField]) {
+          msg = Array.isArray(data[firstField]) ? data[firstField][0] : data[firstField]
+        }
+      }
+    }
+    
     showAlert('error', msg, 'Error!')
   } finally {
     submitting.value = false

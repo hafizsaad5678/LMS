@@ -1,7 +1,10 @@
 import os
+from django.utils import timezone
 
 from rest_framework import serializers
-from ..models import Assignment, SubmissionHistory, Grade
+from ..models import Assignment, SubmissionHistory, Grade, Material, StudentSubject
+from ..models.grading import GradeComponent, StudentMark
+from .grading import StudentMarkSerializer, GradeComponentSerializer
 
 
 ALLOWED_SUBMISSION_EXTENSIONS = {'.pdf', '.doc', '.docx', '.zip', '.rar'}
@@ -88,7 +91,7 @@ class AssignmentSerializer(serializers.ModelSerializer):
         if not assignment.material_file:
             return
             
-        from ..models import Material
+        
         
         # Determine size safely
         file_size = 0
@@ -111,7 +114,7 @@ class AssignmentSerializer(serializers.ModelSerializer):
     def get_total_students(self, obj):
         if not obj.subject:
             return 0
-        from ..models import StudentSubject
+        
         return StudentSubject.objects.filter(subject=obj.subject).count()
 
 
@@ -159,6 +162,29 @@ class SubmissionHistorySerializer(serializers.ModelSerializer):
         model = SubmissionHistory
         fields = '__all__'
         read_only_fields = ['id', 'submitted_at', 'student']
+
+    def create(self, validated_data):
+        assignment = validated_data.get('assignment')
+        student = validated_data.get('student')
+        if assignment and student:
+            defaults = {}
+            for key in ('submission_text', 'file_upload', 'file_url'):
+                if key in validated_data:
+                    defaults[key] = validated_data[key]
+
+            submission, created = SubmissionHistory.objects.update_or_create(
+                assignment=assignment,
+                student=student,
+                defaults=defaults
+            )
+
+            if not created:
+                submission.submitted_at = timezone.now()
+                submission.save(update_fields=['submitted_at'])
+
+            return submission
+
+        return super().create(validated_data)
 
     def validate(self, attrs):
         if self.instance is None:
@@ -225,6 +251,12 @@ class GradeSerializer(serializers.ModelSerializer):
     total_marks = serializers.DecimalField(source='submission.assignment.total_marks', max_digits=6, decimal_places=2, read_only=True)
     graded_by_name = serializers.CharField(source='graded_by.full_name', read_only=True)
     percentage = serializers.SerializerMethodField()
+    assignment_id = serializers.SerializerMethodField()
+
+    def get_assignment_id(self, obj):
+        if obj.submission and obj.submission.assignment_id:
+            return str(obj.submission.assignment_id)
+        return None
 
     def get_percentage(self, obj):
         total = float((obj.submission.assignment.total_marks if obj.submission and obj.submission.assignment else 0) or 0)

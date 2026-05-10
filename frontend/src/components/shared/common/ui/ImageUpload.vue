@@ -1,6 +1,15 @@
 <template>
   <div class="image-upload-container">
     <label v-if="label" class="form-label">{{ label }} <span v-if="required" class="text-danger">*</span></label>
+
+    <AlertMessage
+      v-if="alert.show"
+      :type="alert.type"
+      :message="alert.message"
+      :title="alert.title"
+      :auto-close="false"
+      @close="clearAlert"
+    />
     
     <div 
       class="upload-area rounded-4 d-flex flex-column align-items-center justify-content-center p-4"
@@ -47,6 +56,8 @@
 
 <script setup>
 import { ref, watch, computed } from 'vue'
+import { AlertMessage } from '@/components/shared/common'
+import { useAlert } from '@/composables/shared'
 import { getFileUrl } from '@/utils/constants/config'
 
 const props = defineProps({
@@ -61,6 +72,7 @@ const emit = defineEmits(['update:modelValue', 'change'])
 const fileInput = ref(null)
 const localPreviewUrl = ref('')
 const isDragging = ref(false)
+const { alert, showAlert, clearAlert } = useAlert()
 
 // Determine what to show
 const displayUrl = computed(() => {
@@ -98,9 +110,11 @@ const handleDrop = (e) => {
 const processFile = (file) => {
   // Validate size (5MB)
   if (file.size > 5 * 1024 * 1024) {
-    alert('File size exceeds 5MB limit.')
+    showAlert('error', 'File size exceeds 5MB limit.', 'Error!')
     return
   }
+
+  clearAlert()
 
   const reader = new FileReader()
   reader.onload = (e) => {

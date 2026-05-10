@@ -16,7 +16,7 @@ from .scheduling import Event, Holiday, Exam, Timetable
 from .management import Fee, Expense, Account
 from .library import LibraryBook, LibraryBorrowPolicy, BookBorrowing
 from .materials import Material, Announcement, ActivityLog
-from .grading import GradeComponent, StudentMark, StudentGradeSummary
+from .grading import GradeComponent, StudentMark, StudentGradeSummary, Quiz, QuizAttempt
 
 __all__ = [
     # Base
@@ -40,5 +40,5 @@ __all__ = [
     # Materials
     'Material', 'Announcement', 'ActivityLog',
     # Grading
-    'GradeComponent', 'StudentMark', 'StudentGradeSummary',
+    'GradeComponent', 'StudentMark', 'StudentGradeSummary', 'Quiz', 'QuizAttempt',
 ]

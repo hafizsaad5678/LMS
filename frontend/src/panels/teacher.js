@@ -22,10 +22,9 @@ const createMenuWithSubmenu = (name, path, icon, submenuItems) => ({
 })
 
 export const mainNav = [
-  { name: 'Dashboard', href: BASE_PATH, icon: 'bi bi-speedometer2' },
-  { name: 'My Classes', href: `${BASE_PATH}/classes`, icon: 'bi bi-book-half' },
+  { name: 'Time Table', href: `${BASE_PATH}/schedule/class`, icon: 'bi bi-speedometer2' },
+  { name: 'My Materials', href: `${BASE_PATH}/resources/download`, icon: 'bi bi-book-half' },
   { name: 'Assignments', href: `${BASE_PATH}/assignments`, icon: 'bi bi-file-text' },
-  { name: 'Grades', href: `${BASE_PATH}/grades`, icon: 'bi bi-award' },
   { name: 'Quizzes', href: `${BASE_PATH}/quizzes`, icon: 'bi bi-question-square' },
   { name: 'Attendance', href: `${BASE_PATH}/attendance/mark`, icon: 'bi bi-calendar-check' }
 ]

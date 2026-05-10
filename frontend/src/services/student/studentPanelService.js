@@ -461,9 +461,8 @@ export const studentPanelService = {
 
     async submitAssignment(formData) {
         try {
-            const response = await api.post('/submissions/', formData, {
-                headers: { 'Content-Type': 'multipart/form-data' }
-            })
+            // Let the browser set the multipart boundary so files upload correctly.
+            const response = await api.post('/submissions/', formData)
             // Clear stats cache as pending assignments count may change
             const studentId = formData.get('student')
             if (studentId) cacheService.clear(getCacheKey(studentId, 'dashboard:stats'))

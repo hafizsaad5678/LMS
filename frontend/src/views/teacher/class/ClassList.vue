@@ -8,45 +8,8 @@
   >
     <template #stats>
       <div class="row g-3 g-lg-4 mb-4">
-        <div class="col-6 col-md-3">
-          <StatCard 
-            title="Total Classes" 
-            :value="classes?.length || 0" 
-            icon="bi bi-book-half" 
-            bg-color="bg-teacher-light" 
-            icon-color="text-teacher"
-            @click="viewAllClasses"
-          />
-        </div>
-        <div class="col-6 col-md-3">
-          <StatCard 
-            title="Total Students" 
-            :value="totalStudents" 
-            icon="bi bi-people" 
-            bg-color="bg-success-light" 
-            icon-color="text-success"
-            @click="viewAllStudents"
-          />
-        </div>
-        <div class="col-6 col-md-3">
-          <StatCard 
-            title="Classes Today" 
-            :value="todayClasses" 
-            icon="bi bi-calendar-event" 
-            bg-color="bg-warning-light" 
-            icon-color="text-warning"
-            @click="viewTodaySchedule"
-          />
-        </div>
-        <div class="col-6 col-md-3">
-          <StatCard 
-            title="Pending Reviews" 
-            :value="pendingAssignments" 
-            icon="bi bi-clipboard-check" 
-            bg-color="bg-info-light" 
-            icon-color="text-info"
-            @click="viewPendingReviews"
-          />
+        <div v-for="stat in statsCards" :key="stat.title" class="col-6 col-md-3">
+          <StatCard v-bind="stat" @click="stat.onClick" />
         </div>
       </div>
     </template>
@@ -55,7 +18,7 @@
       <div class="card border-0 shadow-sm mb-4">
         <div class="card-body">
           <div class="row g-3 align-items-center">
-            <div class="col-md-3">
+            <div class="col-md-5">
               <input 
                 v-model="searchQuery" 
                 type="text" 
@@ -63,32 +26,18 @@
                 placeholder="Search classes, subjects, codes..."
               >
             </div>
-            <div class="col-md-2">
-              <SelectInput
-                v-model="filters.department"
-                :options="(departments || []).map(d => ({ value: d, label: d }))"
-                placeholder="All Departments"
-                :no-margin="true"
-              />
-            </div>
-            <div class="col-md-2">
+           
+            <div class="col-md-4">
               <SelectInput
                 v-model="filters.program"
-                :options="(programs || []).map(p => ({ value: p, label: p }))"
+                :options="programOptions"
                 placeholder="All Programs"
                 :no-margin="true"
               />
             </div>
-            <div class="col-md-2">
-              <SelectInput
-                v-model="filters.semester"
-                :options="(semesters || []).map(s => ({ value: s, label: s }))"
-                placeholder="All Semesters"
-                :no-margin="true"
-              />
-            </div>
-            <div class="col-md-3 text-end">
-              <button @click="refresh" class="btn btn-teacher-outline me-2">
+           
+            <div class="col-md-3 text-end d-flex justify-content-md-end gap-2">
+              <button @click="refresh" class="btn btn-teacher-outline">
                 <i class="bi bi-arrow-clockwise me-1"></i>Refresh
               </button>
               <button @click="resetFilters" class="btn btn-outline-secondary">
@@ -178,11 +127,10 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { TeacherPageTemplate } from '@/components/shared/panels'
 import { StatCard, AlertMessage, SelectInput, LoadingSpinner, EmptyState } from '@/components/shared/common'
-import { useCachedData } from '@/composables/shared'
+import { useCachedData, useFilterOptions } from '@/composables/shared'
 import { useFilterLogic } from '@/composables/teacher/useFilterLogic'
 import teacherPanelService from '@/services/teacher/teacherPanelService'
 import { TEACHER_ROUTES } from '@/utils/constants/routes'
-import { smartSearch } from '@/utils'
 
 const router = useRouter()
 
@@ -227,29 +175,12 @@ const { data: classes, loading, error, load, refresh } = useCachedData(
   }
 )
 
-// Dynamic filter options
-const departments = computed(() => {
-  if (!classes.value) return []
-  return [...new Set(classes.value.map(c => c.department_name).filter(Boolean))]
+const { createObjectOptions: createProgramOptions } = useFilterOptions(computed(() => classes.value || []))
+const programOptions = createProgramOptions({
+  value: 'program_name',
+  label: 'program_name',
+  uniqueBy: 'program_name'
 })
-const programs = computed(() => {
-  if (!classes.value) return []
-  return [...new Set(classes.value.map(c => c.program_name).filter(Boolean))]
-})
-const semesters = computed(() => {
-  if (!classes.value) return []
-  return [...new Set(classes.value.map(c => c.semester).filter(Boolean))]
-})
-
-const totalStudents = computed(() => {
-  if (!classes.value) return 0
-  return classes.value.reduce((sum, cls) => sum + (cls.student_count || 0), 0)
-})
-const todayClasses = computed(() => {
-  if (!classes.value || classes.value.length === 0) return 0
-  return Math.min(3, classes.value.length)
-})
-const pendingAssignments = computed(() => 0)
 
 const filteredClasses = computed(() => {
   let result = searchFilteredClasses.value || []
@@ -272,6 +203,21 @@ const viewAllClasses = () => document.querySelector('.row.g-4')?.scrollIntoView(
 const viewTodaySchedule = () => router.push({ name: TEACHER_ROUTES.CLASS_SCHEDULE.name })
 const viewPendingReviews = () => router.push({ name: TEACHER_ROUTES.SUBMISSIONS.name })
 const viewSubjectStudents = (cls) => router.push({ name: TEACHER_ROUTES.STUDENT_LIST.name, query: { subject: cls.subject_id, subject_name: cls.subject_name } })
+
+const statsCards = computed(() => {
+  const currentClasses = filteredClasses.value
+  
+  const totalStudents = currentClasses.reduce((sum, cls) => sum + (cls.student_count || 0), 0)
+  const classesToday = Math.min(3, currentClasses.length)
+  const pendingReviews = 0
+
+  return [
+    { title: 'Total Classes', value: currentClasses.length, icon: 'bi bi-book-half', bgColor: 'bg-teacher-light', iconColor: 'text-teacher', onClick: viewAllClasses },
+    { title: 'Total Students', value: totalStudents, icon: 'bi bi-people', bgColor: 'bg-success-light', iconColor: 'text-success', onClick: viewAllStudents },
+    { title: 'Classes Today', value: classesToday, icon: 'bi bi-calendar-event', bgColor: 'bg-warning-light', iconColor: 'text-warning', onClick: viewTodaySchedule },
+    { title: 'Pending Reviews', value: pendingReviews, icon: 'bi bi-clipboard-check', bgColor: 'bg-info-light', iconColor: 'text-info', onClick: viewPendingReviews }
+  ]
+})
 
 onMounted(() => load(true))
 </script>

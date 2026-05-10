@@ -6,7 +6,7 @@
     @confirm="handleSubmit"
     :loading="loading"
     :confirm-text="isEditing ? 'Update' : 'Create'"
-    size="lg"
+    size="md"
   >
     <div class="p-2">
       <div class="mb-3">
@@ -19,8 +19,8 @@
       </div>
 
       <div class="mb-3">
-        <label class="form-label fw-bold text-dark small">Subject/Class</label>
-        <select v-model="localForm.subject" class="form-select rounded-4 bg-light border-0 p-3" required>
+        <label class="form-label text-dark small">Subject/Class</label>
+        <select v-model="localForm.subject" class="form-select" required>
           <option value="">Select Subject</option>
           <option v-for="subj in subjects" :key="subj.id" :value="subj.subject_id">
             {{ subj.subject_name }} ({{ subj.subject_code }})
@@ -30,8 +30,8 @@
       </div>
 
       <div class="mb-3">
-        <label class="form-label fw-bold text-dark small">Priority Level</label>
-        <select v-model="localForm.priority" class="form-select rounded-4 bg-light border-0 p-3">
+        <label class="form-label text-dark small">Priority Level</label>
+        <select v-model="localForm.priority" class="form-select">
           <option v-for="opt in priorityOptions" :key="opt.value" :value="opt.value">
             {{ opt.label }}
           </option>

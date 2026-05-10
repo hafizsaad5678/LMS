@@ -108,7 +108,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useAlert } from '@/composables/shared'
-import { studentService } from '@/services/shared'
+import { studentService, normalizeToArray } from '@/services/shared'
 import { StudentPageTemplate } from '@/components/shared/panels'
 import { AlertMessage, StatCard, StudentSectionHeader } from '@/components/shared/common'
 import { STUDENT_ROUTES } from '@/utils/constants/routes'
@@ -162,10 +162,11 @@ const loadData = async () => {
   if (!studentId.value) return
   loading.value = true
   try {
-    const [profile, gradeReport, subjectsRes, gradesRes] = await Promise.all([
+    const [profile, gradeReport, subjectsRes, assignmentsRes, gradesRes] = await Promise.all([
       studentService.getStudent(studentId.value),
       studentService.getGradeReport(studentId.value),
       studentService.getEnrolledSubjects(studentId.value),
+      studentService.getAssignments(studentId.value),
       studentService.getGrades(studentId.value)
     ])
     studentName.value = profile.full_name
@@ -177,16 +178,28 @@ const loadData = async () => {
       subject_performance: Array.isArray(gradeReport?.subject_performance) ? gradeReport.subject_performance : []
     }
 
-    // Calculate Pending Count
-    const subjects = subjectsRes?.results || subjectsRes || []
-    const gradedEntries = gradesRes?.results || gradesRes || []
-    const gradedKeys = new Set(gradedEntries.map(g => `${g.subject_name || g.assignment?.subject?.name || ''}|${g.subject_code || g.assignment?.subject?.code || ''}`))
+    // Calculate Pending Count based on individual assignments
+    const assignments = normalizeToArray(assignmentsRes)
+    const gradedEntries = normalizeToArray(gradesRes)
+    const gradedAssignmentIds = new Set(gradedEntries.map(g => g.assignment?.id || g.assignment_id).filter(Boolean))
     
-    pendingCount.value = subjects.filter(s => {
-      const hasAssessments = (Number(s.total_components || 0) + Number(s.total_assignments || 0)) > 0
-      const key = `${s.subject_name || s.subject?.name || ''}|${s.subject_code || s.subject?.code || ''}`
-      return hasAssessments && !gradedKeys.has(key)
+    pendingCount.value = assignments.filter(a => {
+      const submitted = a.is_submitted || !!a.submitted_at
+      const alreadyGraded = gradedAssignmentIds.has(a.id)
+      return submitted && !alreadyGraded
     }).length
+
+    // FALLBACK: If no assignments are pending but there are subjects with NO grades at all
+    if (pendingCount.value === 0) {
+      const subjects = normalizeToArray(subjectsRes)
+      const gradedSubjectKeys = new Set(gradedEntries.map(g => `${g.subject_name || g.assignment?.subject?.name || g.subject?.name || ''}|${g.subject_code || g.assignment?.subject?.code || g.subject?.code || ''}`))
+      
+      pendingCount.value = subjects.filter(s => {
+        const hasAssessments = (Number(s.total_components || 0) + Number(s.total_assignments || 0)) > 0
+        const key = `${s.subject_name || s.subject?.name || ''}|${s.subject_code || s.subject?.code || ''}`
+        return hasAssessments && !gradedSubjectKeys.has(key)
+      }).length
+    }
 
   } catch (err) { console.error(err) } finally { loading.value = false }
 }

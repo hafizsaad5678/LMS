@@ -207,7 +207,7 @@ const getStatus = (date) => new Date(date).toDateString() === new Date().toDateS
 const getStatusBadge = (date) => getStatus(date) === 'Today' ? 'bg-info' : getStatus(date) === 'Upcoming' ? 'bg-success' : 'bg-secondary'
 
 const fetchEvents = async () => {
-  const response = await eventService.getAll()
+  const response = await eventService.getAll({}, { forceRefresh: true })
   return response.data?.results || response.data || []
 }
 

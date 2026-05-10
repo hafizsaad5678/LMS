@@ -100,15 +100,26 @@
                 placeholder="Auto from session" :required="true" :disabled="!formData.session || loadingSessionSemester" />
             </div>
             <div class="col-md-3">
-              <BaseInput v-model.number="formData.current_semester" label="Current Semester" type="number"
-                placeholder="Auto from session" :required="true" :disabled="!formData.session || loadingSessionSemester" />
+              <div class="mb-3">
+                <label class="form-label">Current Semester <span class="text-danger">*</span></label>
+                <select v-model="activeSemesterId" class="form-select"
+                  :disabled="!formData.session || loadingSessionSemester || !sessionSemesters.length"
+                  required>
+                  <option value="">{{ loadingSessionSemester ? 'Loading...' : 'Select Semester' }}</option>
+                  <option v-for="sem in sessionSemesters" :key="sem.id" :value="String(sem.id)">
+                    {{ sem.name }} {{ sem.status === 'active' ? '✓ Active' : '' }}
+                  </option>
+                </select>
+                <small class="text-muted">Step 4: Auto-selects active semester</small>
+              </div>
             </div>
 
             <!-- Session/Batch Selection -->
             <div class="col-md-6">
               <div class="mb-3">
                 <label class="form-label">Session/Batch <span class="text-danger">*</span></label>
-                <select v-model="formData.session" class="form-select" :disabled="!formData.program" required>
+                <select v-model="formData.session" class="form-select" :disabled="!formData.program" required
+                  @change="onSessionChange">
                   <option value="">Select Session</option>
                   <option v-for="sess in filteredSessions" :key="sess.id" :value="String(sess.id)">
                     {{ sess.session_name }} ({{ sess.start_year }}-{{ sess.end_year }})
@@ -125,13 +136,17 @@
           <h6 class="text-dark fw-semibold mb-3 pb-2 border-bottom">
             <i class="bi bi-book me-2"></i>Subject Enrollment
           </h6>
-          <div v-if="loadingSubjects" class="text-muted">
+          <div v-if="loadingSubjects || loadingSessionSemester" class="text-muted">
             <span class="spinner-border spinner-border-sm me-2"></span>Loading subjects...
           </div>
-          <div v-else-if="availableSubjects.length === 0" class="alert alert-info">
+          <div v-else-if="!formData.program || !formData.session" class="alert alert-secondary">
             <i class="bi bi-info-circle me-2"></i>
-            <span v-if="formData.program">No subjects found for this course.</span>
-            <span v-else>Select a department and course to see subjects.</span>
+            <span v-if="!formData.program">Select a department and course first.</span>
+            <span v-else>Select a session/batch to load subjects.</span>
+          </div>
+          <div v-else-if="availableSubjects.length === 0" class="alert alert-warning">
+            <i class="bi bi-exclamation-triangle me-2"></i>
+            No subjects found for Semester {{ formData.current_semester || '?' }} of this session.
           </div>
           <div v-else class="subjects-grid">
             <div v-for="subject in availableSubjects" :key="subject.id" class="form-check subject-item">
@@ -192,43 +207,25 @@
     </div>
   </div>
 </template>
-
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
 import { BaseInput, SelectInput } from '@/components/shared/common'
-import { useCascadingDropdowns } from '@/composables/shared'
+import { 
+  useCascadingDropdowns, 
+  useFormFormatting, 
+  useAcademicSync 
+} from '@/composables/shared'
 import { GENDER_OPTIONS, BLOOD_GROUP_OPTIONS } from '@/utils/constants/options'
-import { api } from '@/services/shared'
+import { api, normalizeToArray } from '@/services/shared'
 
 const props = defineProps({
-  modelValue: {
-    type: Object,
-    required: true
-  },
-  isEditMode: {
-    type: Boolean,
-    default: false
-  },
-  submitting: {
-    type: Boolean,
-    default: false
-  },
-  enrollmentNumber: {
-    type: String,
-    default: ''
-  },
-  currentDepartmentName: {
-    type: String,
-    default: ''
-  },
-  currentProgramName: {
-    type: String,
-    default: ''
-  },
-  initialDepartment: {
-    type: [String, Number],
-    default: ''
-  }
+  modelValue: { type: Object, required: true },
+  isEditMode: { type: Boolean, default: false },
+  submitting: { type: Boolean, default: false },
+  enrollmentNumber: { type: String, default: '' },
+  currentDepartmentName: { type: String, default: '' },
+  currentProgramName: { type: String, default: '' },
+  initialDepartment: { type: [String, Number], default: '' }
 })
 
 const emit = defineEmits(['update:modelValue', 'submit', 'cancel'])
@@ -239,21 +236,8 @@ const formData = computed({
   set: (value) => emit('update:modelValue', value)
 })
 
-const formatCNIC = (value) => {
-  const digits = String(value || '').replace(/\D/g, '').slice(0, 13)
-  if (digits.length <= 5) return digits
-  if (digits.length <= 12) return `${digits.slice(0, 5)}-${digits.slice(5)}`
-  return `${digits.slice(0, 5)}-${digits.slice(5, 12)}-${digits.slice(12)}`
-}
-
-const cnicModel = computed({
-  get: () => formatCNIC(formData.value.cnic),
-  set: (value) => {
-    formData.value.cnic = formatCNIC(value)
-  }
-})
-
-// Use cascading dropdowns with caching
+// Use shared composables for formatting and dropdowns
+const { cnicModel } = useFormFormatting(formData)
 const {
   departments,
   programs,
@@ -267,30 +251,6 @@ const {
   onProgramChange: handleProgramChange
 } = useCascadingDropdowns()
 
-// Subjects state (loaded separately based on program)
-const availableSubjects = ref([])
-const loadingSubjects = ref(false)
-const loadingSessionSemester = ref(false)
-const activeSemesterId = ref('')
-
-// Load subjects only for the active semester of selected session.
-const loadSubjectsBySemester = async (semesterId) => {
-  if (!semesterId) {
-    availableSubjects.value = []
-    return
-  }
-  loadingSubjects.value = true
-  try {
-    const response = await api.get(`/subjects/?semester=${encodeURIComponent(semesterId)}`)
-    availableSubjects.value = Array.isArray(response.data) ? response.data : (response.data?.results || [])
-  } catch (error) {
-    console.error('Error loading subjects:', error)
-    availableSubjects.value = []
-  } finally {
-    loadingSubjects.value = false
-  }
-}
-
 // Filter sessions by selected program
 const filteredSessions = computed(() => {
   if (!formData.value.program) return []
@@ -299,115 +259,125 @@ const filteredSessions = computed(() => {
   )
 })
 
-const normalizeList = (payload) => {
-  if (Array.isArray(payload)) return payload
-  if (Array.isArray(payload?.results)) return payload.results
-  if (Array.isArray(payload?.data)) return payload.data
-  return []
-}
+// Subjects state
+const availableSubjects = ref([])
+const loadingSubjects = ref(false)
 
-const syncAcademicFieldsFromSession = async (sessionId) => {
-  if (!sessionId) return
+// Use shared composable for academic sync
+const {
+  activeSemesterId,
+  sessionSemesters,
+  loadingSessionSemester,
+  syncAcademicFieldsFromSession
+} = useAcademicSync(formData, sessions)
 
-  const selectedSession = sessions.value.find((sess) => String(sess.id) === String(sessionId))
-  if (selectedSession?.start_year != null) {
-    formData.value.enrollment_year = Number(selectedSession.start_year)
+// Fetch subjects for a given semester ID
+const loadSubjectsBySemester = async (semesterId) => {
+  if (!semesterId) {
+    availableSubjects.value = []
+    return
   }
-
-  loadingSessionSemester.value = true
+  loadingSubjects.value = true
   try {
-    const response = await api.get(`/academic-sessions/${encodeURIComponent(sessionId)}/semesters/`)
-    const semesters = normalizeList(response.data)
-
-    const activeSemester = semesters.find((sem) => String(sem?.status || '').trim().toLowerCase() === 'active')
-    if (activeSemester && activeSemester.number != null) {
-      activeSemesterId.value = String(activeSemester.id || '')
-      formData.value.current_semester = Number(activeSemester.number)
-      await loadSubjectsBySemester(activeSemesterId.value)
-      return
-    }
-
-    activeSemesterId.value = ''
-    availableSubjects.value = []
-    formData.value.current_semester = ''
+    const response = await api.get(`/semesters/${semesterId}/subjects/`)
+    availableSubjects.value = normalizeToArray(response)
   } catch (error) {
-    console.error('Error loading session semesters:', error)
-    activeSemesterId.value = ''
+    console.error('Error loading subjects:', error)
     availableSubjects.value = []
-    formData.value.current_semester = ''
   } finally {
-    loadingSessionSemester.value = false
+    loadingSubjects.value = false
   }
 }
 
-// When department changes, reset program and subjects
+// Wrap academic sync with subject loading
+const handleSessionSync = async (sessionId) => {
+  const currentIdBefore = activeSemesterId.value
+  const target = await syncAcademicFieldsFromSession(sessionId)
+  
+  if (target) {
+    // Force reload if ID hasn't changed (to ensure subjects list refreshes)
+    if (activeSemesterId.value === currentIdBefore) {
+      await loadSubjectsBySemester(activeSemesterId.value)
+    }
+  }
+}
+
+// Watch semester selection — fetch subjects whenever it changes
+watch(activeSemesterId, async (newId) => {
+  if (!newId) {
+    availableSubjects.value = []
+    return
+  }
+  const sem = sessionSemesters.value.find(s => String(s.id) === newId)
+  if (sem) {
+    formData.value.current_semester = parseInt(sem.number) || 1
+    if (!props.isEditMode) {
+      formData.value.enrolled_subjects = []
+    }
+    await loadSubjectsBySemester(sem.id)
+  }
+})
+
+// Cascading event handlers
 const onDepartmentChange = () => {
   handleDepartmentChange(selectedDepartment.value)
   formData.value.program = ''
   formData.value.session = ''
-  formData.value.current_semester = 1
+  formData.value.current_semester = ''
   formData.value.enrollment_year = new Date().getFullYear()
   formData.value.enrolled_subjects = []
   activeSemesterId.value = ''
   availableSubjects.value = []
+  sessionSemesters.value = []
 }
 
-// When program/course changes, load subjects for that program
 const onProgramChange = async () => {
   formData.value.session = ''
-  formData.value.current_semester = 1
+  formData.value.current_semester = ''
   formData.value.enrollment_year = new Date().getFullYear()
   formData.value.enrolled_subjects = []
   activeSemesterId.value = ''
+  sessionSemesters.value = []
+  availableSubjects.value = []
   if (formData.value.program) {
     await handleProgramChange(formData.value.program)
-    availableSubjects.value = []
-  } else {
-    availableSubjects.value = []
   }
 }
 
-// Watch for initial department changes (for edit mode)
-watch(() => props.initialDepartment, (newVal) => {
-  if (newVal) {
-    selectedDepartment.value = newVal
-  }
-})
-
-// Watch for program changes to load subjects (for edit mode)
-watch(() => formData.value.program, async (newVal) => {
-  if (newVal && props.isEditMode && formData.value.session) {
-    await syncAcademicFieldsFromSession(formData.value.session)
-  }
-})
-
-watch(() => formData.value.session, async (newSession, oldSession) => {
-  if (!newSession) {
+const onSessionChange = async () => {
+  formData.value.enrolled_subjects = []
+  if (formData.value.session) {
+    await handleSessionSync(formData.value.session)
+  } else {
     formData.value.enrollment_year = new Date().getFullYear()
-    formData.value.current_semester = 1
+    formData.value.current_semester = ''
     activeSemesterId.value = ''
     availableSubjects.value = []
-    return
+    sessionSemesters.value = []
   }
+}
 
-  if (String(newSession) === String(oldSession)) return
-  formData.value.enrolled_subjects = []
-  await syncAcademicFieldsFromSession(newSession)
-})
-
+// Initialize and handles edit mode state
 onMounted(async () => {
   await Promise.all([loadDepartments(), loadPrograms(), loadSessions()])
 
-  // If edit mode and program is set, find department and load subjects
   if (props.isEditMode && formData.value.program) {
     const prog = programs.value.find(p => String(p.id) === String(formData.value.program))
-    if (prog && prog.department) {
+    if (prog?.department) {
       selectedDepartment.value = String(prog.department)
     }
   }
 
   if (formData.value.session) {
-    await syncAcademicFieldsFromSession(formData.value.session)
+    await handleSessionSync(formData.value.session)
+  }
+})
+
+// Watchers for edit mode synchronization
+watch(() => props.initialDepartment, (newVal) => { if (newVal) selectedDepartment.value = newVal })
+watch(() => formData.value.program, async (newVal) => {
+  if (newVal && props.isEditMode && formData.value.session) {
+    await handleSessionSync(formData.value.session)
   }
 })
 </script>

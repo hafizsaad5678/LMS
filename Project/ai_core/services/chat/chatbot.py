@@ -19,7 +19,9 @@ from ..config import (
     SOURCE_LABEL_DOC_PREFIX,
     SOURCE_LABEL_LLM_FALLBACK,
     SOURCE_LABEL_LLM_GENERAL,
+    FAISS_INDEX_DIR,
 )
+from ...models.chatbot import UploadedFile
 from ..llm.provider import call_llm, get_chat_model, stream_llm
 from ..llm.prompts import CHATBOT_SYSTEM_PROMPT, RAG_DOC_ANSWER_PROMPT
 from ..tools.docs import query_documents
@@ -120,8 +122,8 @@ def _stream_rag_answer(context: str, question: str):
 
 
 def _has_user_document_index(user_id: int, session_id: str | None = None) -> bool:
-    from ..config import FAISS_INDEX_DIR
-    from ...models.chatbot import UploadedFile
+    
+    
 
     # Require explicit doc-mode activation in this runtime to avoid unexpectedly
     # loading embedding models from old historical uploads.
@@ -188,7 +190,7 @@ def _get_cache_key(user, intent, query, history):
     docs_ver = 0
     if intent == "rag":
         try:
-            from ..config import FAISS_INDEX_DIR
+            
             idx_file = os.path.join(str(FAISS_INDEX_DIR), f"user_docs_lc_{user.id}", "index.faiss")
             docs_ver = int(os.path.getmtime(idx_file)) if os.path.exists(idx_file) else 0
         except Exception:
@@ -210,6 +212,7 @@ def orchestrate_response(user, query, history=None, **kwargs):
             "latency": round(time.time() - start, 2),
         }
 
+    t_start = time.time()
     has_user_docs = _has_user_document_index(user.id, kwargs.get("session_id"))
     conf = 1.0 if has_user_docs else 0.5
     intent = "rag" if has_user_docs else "general"
@@ -222,7 +225,10 @@ def orchestrate_response(user, query, history=None, **kwargs):
     
     if use_doc_retrieval:
         try:
+            rag_start = time.time()
             res.update(doc_rag_tool(user, query, history=history))
+            print(f"⏱️ RAG Retrieval took: {time.time() - rag_start:.2f}s")
+            
             if kwargs.get("streaming") and res.get("stream_generator") and res.get("prefix_text"):
                 base_gen = res["stream_generator"]
 
@@ -232,9 +238,11 @@ def orchestrate_response(user, query, history=None, **kwargs):
 
                 res["stream_generator"] = _with_prefix
             if not kwargs.get("streaming") and not res.get("text") and res.get("stream_generator"):
+                gen_start = time.time()
                 generated = "".join(list(res["stream_generator"]()))
                 res["text"] = f"{res.get('prefix_text', '')}{generated}"
                 res.pop("stream_generator", None)
+                print(f"⏱️ LLM Generation took: {time.time() - gen_start:.2f}s")
         except Exception as e:
             logger.error(f"RAG fail: {e}")
             if kwargs.get("streaming"):
@@ -244,10 +252,12 @@ def orchestrate_response(user, query, history=None, **kwargs):
                 res["text"] = call_llm(query, history=history, system_prompt=CHATBOT_SYSTEM_PROMPT)
                 res["source"] = SOURCE_LABEL_LLM_FALLBACK
     else:
+        llm_start = time.time()
         if kwargs.get("streaming"):
             res["stream_generator"] = lambda: stream_llm(query, system_prompt=CHATBOT_SYSTEM_PROMPT, history=history)
         else:
             res["text"] = call_llm(query, history=history, system_prompt=CHATBOT_SYSTEM_PROMPT)
+            print(f"⏱️ LLM Call took: {time.time() - llm_start:.2f}s")
 
     res["latency"] = round(time.time() - start, 2)
     if not kwargs.get("streaming") and res.get("text"):

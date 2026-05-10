@@ -43,6 +43,24 @@ export function formatDateTime(dateString) {
 }
 
 /**
+ * Format a date range duration as months or days.
+ * @param {string|Date} startDate - Range start
+ * @param {string|Date} endDate - Range end
+ * @returns {string} Duration label
+ */
+export function formatDateRangeDuration(startDate, endDate) {
+    if (!startDate || !endDate) return '-'
+    const start = new Date(startDate)
+    const end = new Date(endDate)
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) return '-'
+
+    const diff = end - start
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24))
+    const months = Math.floor(days / 30)
+    return months > 0 ? `${months} Months` : `${days} Days`
+}
+
+/**
  * Format time only
  * @param {string} timeString - Time string (HH:mm or HH:mm:ss)
  * @returns {string} Formatted time string
@@ -178,6 +196,7 @@ export function getInitials(name) {
 export default {
     formatDate,
     formatDateTime,
+    formatDateRangeDuration,
     formatTime,
     formatRelativeDate,
     isDateWithinNextDays,

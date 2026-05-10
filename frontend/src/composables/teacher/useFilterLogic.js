@@ -29,6 +29,36 @@ export function useFilterLogic(items, options = {}) {
         return smartSearch(item, searchQuery.value, activeFields)
     }
 
+    const parseDate = (value) => {
+        if (!value) return null
+        const str = String(value)
+        const match = str.match(/^(\d{4})-(\d{2})-(\d{2})/)
+        if (match) {
+            const [, y, m, d] = match
+            return new Date(Number(y), Number(m) - 1, Number(d))
+        }
+        const parsed = new Date(value)
+        return Number.isNaN(parsed.getTime()) ? null : parsed
+    }
+
+    const startOfDay = (date) => new Date(date.getFullYear(), date.getMonth(), date.getDate())
+    const endOfDay = (date) => new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59, 999)
+    const startOfWeek = (date) => {
+        const start = startOfDay(date)
+        const day = start.getDay()
+        const diff = (day + 6) % 7
+        start.setDate(start.getDate() - diff)
+        return start
+    }
+    const endOfWeek = (date) => {
+        const end = startOfWeek(date)
+        end.setDate(end.getDate() + 6)
+        end.setHours(23, 59, 59, 999)
+        return end
+    }
+    const startOfMonth = (date) => new Date(date.getFullYear(), date.getMonth(), 1)
+    const endOfMonth = (date) => new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59, 999)
+
     /**
      * Filter by date range
      */
@@ -36,27 +66,40 @@ export function useFilterLogic(items, options = {}) {
         if (!dateField || filters.value.dateRange === 'all') return true
 
         const now = new Date()
-        const filterDate = new Date()
-        const itemDate = new Date(item[dateField])
+        const itemDate = parseDate(item[dateField])
+        if (!itemDate) return false
+
+        let start = null
+        let end = null
 
         switch (filters.value.dateRange) {
             case 'thisWeek':
-                filterDate.setDate(now.getDate() - 7)
+                start = startOfWeek(now)
+                end = endOfWeek(now)
                 break
-            case 'lastWeek':
-                filterDate.setDate(now.getDate() - 14)
+            case 'lastWeek': {
+                const lastWeek = new Date(now)
+                lastWeek.setDate(now.getDate() - 7)
+                start = startOfWeek(lastWeek)
+                end = endOfWeek(lastWeek)
                 break
+            }
             case 'thisMonth':
-                filterDate.setMonth(now.getMonth() - 1)
+                start = startOfMonth(now)
+                end = endOfMonth(now)
                 break
-            case 'lastMonth':
-                filterDate.setMonth(now.getMonth() - 2)
+            case 'lastMonth': {
+                const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+                start = startOfMonth(lastMonth)
+                end = endOfMonth(lastMonth)
                 break
+            }
             default:
                 return true
         }
 
-        return itemDate >= filterDate
+        const normalized = startOfDay(itemDate)
+        return normalized >= start && normalized <= end
     }
 
     /**

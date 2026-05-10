@@ -121,7 +121,7 @@ const tableColumns = [
 const { alert, showSuccess, showError } = useAlert()
 
 const fetchFees = async () => {
-  const res = await feeService.getAll()
+  const res = await feeService.getAll({}, { forceRefresh: true })
   return res.data?.results || res.data || []
 }
 

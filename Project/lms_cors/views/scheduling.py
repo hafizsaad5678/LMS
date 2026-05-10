@@ -87,6 +87,7 @@ class ExamViewSet(BaseViewSet):
 class TimetableViewSet(BaseViewSet):
     queryset = Timetable.objects.all()
     serializer_class = TimetableSerializer
+    pagination_class = None
     permission_classes = [IsAuthenticated, ReadOnlyForStudents]
     search_fields = ['subject__name', 'subject__code', 'teacher__full_name', 'room']
     filterset_fields = ['day', 'subject', 'teacher', 'program', 'semester', 'room', 'is_active']

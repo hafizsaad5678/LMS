@@ -117,7 +117,7 @@
 
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
-import { studentService } from '@/services/shared'
+import { studentService, normalizeToArray } from '@/services/shared'
 import { StudentPageTemplate } from '@/components/shared/panels'
 import { AlertMessage, StatCard, LoadingSpinner, EmptyState, Pagination, SearchFilter, SelectInput } from '@/components/shared/common'
 import { useEntityList, usePagination } from '@/composables/shared'
@@ -133,6 +133,7 @@ const gradeSummary = ref({
   total_subjects: 0,
   total_grades: 0
 })
+const enrolledSubjects = ref([])
 const pendingGradeItems = ref([])
 const loadingPending = ref(false)
 
@@ -156,7 +157,7 @@ const {
   customFilter: (items, f) => {
     let res = items
     if (f.subject) {
-      res = res.filter(g => (g.subject_name || g.assignment?.subject?.name) === f.subject)
+      res = res.filter(g => (g.subject_name || g.assignment?.subject?.name || g.subject?.name) === f.subject)
     }
     return res
   }
@@ -173,8 +174,14 @@ watch(filteredGrades, (newData) => {
 const paginatedGrades = computed(() => paginate(filteredGrades.value || []))
 
 const subjectOptions = computed(() => {
-  const subs = [...new Set(grades.value.map(g => g.subject_name || g.assignment?.subject?.name).filter(Boolean))]
-  return subs.sort().map(s => ({ value: s, label: s }))
+  // Use enrolled subjects for options so filter isn't empty even if no grades exist yet
+  const subs = enrolledSubjects.value.map(s => s.subject_name || s.subject?.name).filter(Boolean)
+  
+  // Also include any subjects from existing grades just in case
+  const gradeSubs = grades.value.map(g => g.subject_name || g.assignment?.subject?.name || g.subject?.name).filter(Boolean)
+  
+  const allSubs = [...new Set([...subs, ...gradeSubs])]
+  return allSubs.sort().map(s => ({ value: s, label: s }))
 })
 
 const statsCards = computed(() => [
@@ -184,7 +191,7 @@ const statsCards = computed(() => [
     icon: 'bi bi-hourglass-split',
     type: 'finance'
   },
-  { title: 'Total Subjects', value: Number(gradeSummary.value.total_subjects || 0), icon: 'bi bi-book-fill', type: 'department' },
+  { title: 'Total Subjects', value: Number(gradeSummary.value.total_subjects || enrolledSubjects.value.length || 0), icon: 'bi bi-book-fill', type: 'department' },
   { title: 'Average Score', value: `${Math.round(Number(gradeSummary.value.average_score || 0))}%`, icon: 'bi bi-star-fill', type: 'teacher' }
 ])
 
@@ -230,36 +237,64 @@ const loadPendingGrades = async () => {
 
   try {
     loadingPending.value = true
-    const [subjectsRes, gradesRes] = await Promise.all([
+    const [subjectsRes, assignmentsRes, gradesRes] = await Promise.all([
       studentService.getEnrolledSubjects(studentId),
+      studentService.getAssignments(studentId),
       studentService.getGrades(studentId)
     ])
 
-    const subjects = subjectsRes?.results || subjectsRes || []
-    const gradedEntries = gradesRes?.results || gradesRes || []
+    const subjects = normalizeToArray(subjectsRes)
+    const assignments = normalizeToArray(assignmentsRes)
+    const gradedEntries = normalizeToArray(gradesRes)
+    
+    enrolledSubjects.value = subjects
 
-    const gradedSubjectKeys = new Set(
-      gradedEntries.map(g => `${g.subject_name || g.assignment?.subject?.name || ''}|${g.subject_code || g.assignment?.subject?.code || ''}`)
+    // Create a set of IDs for assignments that already have grades
+    const gradedAssignmentIds = new Set(
+      gradedEntries.map(g => g.assignment?.id || g.assignment_id).filter(Boolean)
     )
 
-    pendingGradeItems.value = subjects
-      .filter(s => {
-        const name = s.subject_name || s.subject?.name || ''
-        const code = s.subject_code || s.subject?.code || ''
-        
-        // Only count as pending if teacher has actually created assignments or grade components
-        const hasAssessments = (Number(s.total_components || 0) + Number(s.total_assignments || 0)) > 0
-        
-        return hasAssessments && !gradedSubjectKeys.has(`${name}|${code}`)
+    // A grade is pending if an assignment is submitted but not yet graded
+    pendingGradeItems.value = assignments
+      .filter(a => {
+        const submitted = a.is_submitted || !!a.submitted_at
+        const alreadyGraded = gradedAssignmentIds.has(a.id)
+        return submitted && !alreadyGraded
       })
-      .map(s => ({
-        id: s.id || `${s.subject_name || s.subject?.name}-${s.subject_code || s.subject?.code}`,
-        title: 'No grade published yet for this subject',
-        subject_name: s.subject_name || s.subject?.name,
-        subject_code: s.subject_code || s.subject?.code,
-        updated_at: s.updated_at || s.created_at,
-        created_at: s.created_at
+      .map(a => ({
+        id: a.id,
+        title: a.title,
+        subject_name: a.subject_name || a.subject?.name,
+        subject_code: a.subject_code || a.subject?.code,
+        updated_at: a.submitted_at || a.updated_at || a.created_at,
+        created_at: a.created_at
       }))
+
+    // FALLBACK: If no assignments are pending but there are subjects with NO grades at all,
+    // and those subjects HAVE assessment components, we can list them as potentially pending.
+    if (pendingGradeItems.value.length === 0) {
+      const gradedSubjectKeys = new Set(
+        gradedEntries.map(g => `${g.subject_name || g.assignment?.subject?.name || g.subject?.name || ''}|${g.subject_code || g.assignment?.subject?.code || g.subject?.code || ''}`)
+      )
+
+      const additionalPending = subjects
+        .filter(s => {
+          const name = s.subject_name || s.subject?.name || ''
+          const code = s.subject_code || s.subject?.code || ''
+          const hasAssessments = (Number(s.total_components || 0) + Number(s.total_assignments || 0)) > 0
+          return hasAssessments && !gradedSubjectKeys.has(`${name}|${code}`)
+        })
+        .map(s => ({
+          id: s.id || `${s.subject_name || s.subject?.name}-${s.subject_code || s.subject?.code}`,
+          title: 'No grade published yet for this subject',
+          subject_name: s.subject_name || s.subject?.name,
+          subject_code: s.subject_code || s.subject?.code,
+          updated_at: s.updated_at || s.created_at,
+          created_at: s.created_at
+        }))
+      
+      pendingGradeItems.value = [...pendingGradeItems.value, ...additionalPending]
+    }
   } catch (err) {
     console.error('Error loading pending grades:', err)
     pendingGradeItems.value = []

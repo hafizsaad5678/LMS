@@ -142,7 +142,6 @@ const statsCards = computed(() => [
   { title: 'Class Average', value: averageGrade.value, icon: 'bi bi-award', type: 'student' },
   { title: 'Total Students', value: detailedGrades.value.length, icon: 'bi bi-people', type: 'teacher' },
   { title: 'Pending', value: detailedGrades.value.filter(s => s.is_pending).length, icon: 'bi bi-hourglass-split', type: 'finance' },
-  { title: 'Excellent (A)', value: detailedGrades.value.filter(s => s.overall >= 85).length, icon: 'bi bi-star', type: 'department' },
   { title: 'Below 50%', value: detailedGrades.value.filter(s => !s.is_pending && s.overall < 50).length, icon: 'bi bi-exclamation-triangle', type: 'finance' }
 ])
 
@@ -204,12 +203,18 @@ async function loadGradeReport() {
       }
       const student = studentMap.get(studentId)
       const componentType = mark.component_type || 'assignment'
-      const isGraded = mark.marks_obtained !== null && mark.marks_obtained !== undefined
-      const percentage = typeof mark.percentage === 'number'
-        ? mark.percentage
-        : (isGraded && mark.max_marks)
-          ? (parseFloat(mark.marks_obtained) / parseFloat(mark.max_marks)) * 100
-          : 0
+      const rawMaxMarks = mark.max_marks ?? mark.total_marks
+      const maxMarks = Number(rawMaxMarks)
+      const hasValidMax = Number.isFinite(maxMarks) && maxMarks > 0
+      const rawMarks = mark.marks_obtained
+      const hasMarks = rawMarks !== null && rawMarks !== undefined
+      const isGraded = hasMarks && hasValidMax
+      const computedPercent = isGraded ? (parseFloat(rawMarks) / maxMarks) * 100 : null
+      const apiPercent = Number.isFinite(mark.percentage) ? Number(mark.percentage) : null
+      const useComputed = apiPercent === null || (apiPercent === 0 && Number(rawMarks) > 0)
+      const percentage = isGraded
+        ? (useComputed ? computedPercent : apiPercent)
+        : null
       const typeMap = { assignment: 'assignments', quiz: 'quizzes', midterm: 'midterm', final: 'final' }
       const key = typeMap[componentType] || 'assignments'
       if (isGraded) {
@@ -220,8 +225,8 @@ async function loadGradeReport() {
     })
     
     detailedGrades.value = Array.from(studentMap.values()).map(student => {
-      const avg = (key) => student.componentCount[key] > 0 ? Math.round(student[key] / student.componentCount[key]) : 0
-      const components = [avg('assignments'), avg('quizzes'), avg('midterm'), avg('final')].filter(v => v > 0)
+      const avg = (key) => student.componentCount[key] > 0 ? Math.round(student[key] / student.componentCount[key]) : null
+      const components = [avg('assignments'), avg('quizzes'), avg('midterm'), avg('final')].filter(v => v !== null)
       const gradedComponents = ['assignments', 'quizzes', 'midterm', 'final'].reduce((sum, key) => sum + (student.gradedCount[key] || 0), 0)
       const overall = components.length > 0 ? Math.round(components.reduce((sum, v) => sum + v, 0) / components.length) : 0
       const isPending = gradedComponents === 0

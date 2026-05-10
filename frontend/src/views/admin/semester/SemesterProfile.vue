@@ -92,15 +92,15 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { AdminPageTemplate } from '@/components/shared/panels'
 import { ProfileHeader, InfoCard, StatsGrid } from '@/components/shared/profile'
 import { LoadingSpinner, EmptyState } from '@/components/shared/common'
 import { useProfileLoader } from '@/composables/shared'
-import { semesterService } from '@/services/shared'
+import { semesterService, sessionService, normalizeToArray } from '@/services/shared'
 import { ADMIN_ROUTES } from '@/utils/constants/routes'
-import { formatDate as formatDateUtil } from '@/utils/formatters'
+import { formatDate as formatDateUtil, formatDateRangeDuration } from '@/utils/formatters'
 
 const router = useRouter()
 
@@ -122,22 +122,42 @@ const { entityId, loading, entity, subData } = useProfileLoader({
   idParam: 'id'
 })
 
+const resolvedSessionName = ref('')
+
+const fetchActiveSessionName = async () => {
+  if (!entity.value?.id) return
+  if (entity.value.session_name) {
+    resolvedSessionName.value = ''
+    return
+  }
+
+  const programId = entity.value.program?.id || entity.value.program_id || entity.value.program
+  if (!programId) {
+    resolvedSessionName.value = 'N/A'
+    return
+  }
+
+  try {
+    const response = await sessionService.getSessions({ program: programId, status: 'active', is_active: true, page_size: 1 })
+    const list = normalizeToArray(response)
+    const activeSession = list[0]
+    resolvedSessionName.value = activeSession?.session_name || activeSession?.name || 'N/A'
+  } catch (error) {
+    console.error('Error loading active session:', error)
+    resolvedSessionName.value = 'N/A'
+  }
+}
+
 const subjects = computed(() => subData.value.subjects || [])
 
 const formatDate = (d) => formatDateUtil(d, { year: 'numeric', month: 'long', day: 'numeric' })
 
-const getDuration = (start, end) => {
-  if (!start || !end) return '-'
-  const diff = new Date(end) - new Date(start)
-  const days = Math.floor(diff / (1000 * 60 * 60 * 24))
-  const months = Math.floor(days / 30)
-  return months > 0 ? `${months} Months` : `${days} Days`
-}
+const sessionLabel = computed(() => entity.value.session_name || resolvedSessionName.value || 'N/A')
 
 const profileBadges = computed(() => {
   const badges = []
   if (entity.value.program_name) badges.push({ text: entity.value.program_name, class: 'bg-info' })
-  if (entity.value.session_name) badges.push({ text: entity.value.session_name, class: 'bg-secondary' })
+  if (sessionLabel.value && sessionLabel.value !== 'N/A') badges.push({ text: sessionLabel.value, class: 'bg-secondary' })
   return badges
 })
 
@@ -147,22 +167,26 @@ const basicInfoItems = computed(() => [
   { label: 'Name', value: entity.value.name },
   { label: 'Semester Number', value: entity.value.number?.toString() },
   { label: 'Program', value: entity.value.program_name },
-  { label: 'Session', value: entity.value.session_name },
+  { label: 'Session', value: sessionLabel.value },
   { label: 'Status', value: entity.value.status || 'Active', capitalize: true }
 ])
 
 const timelineItems = computed(() => [
   { label: 'Start Date', value: formatDate(entity.value.start_date) },
   { label: 'End Date', value: formatDate(entity.value.end_date) },
-  { label: 'Duration', value: getDuration(entity.value.start_date, entity.value.end_date) },
+  { label: 'Duration', value: formatDateRangeDuration(entity.value.start_date, entity.value.end_date) },
   { label: 'Is Active', value: semesterIsActive.value ? 'Yes' : 'No' }
 ])
 
 const statsData = computed(() => [
   { value: subjects.value.length, label: 'Total Subjects', icon: 'bi bi-book', bgClass: 'bg-admin-light', iconColor: 'text-admin' },
   { value: entity.value.number, label: 'Semester Rank', icon: 'bi bi-hash', bgClass: 'bg-info-light', iconColor: 'text-info' },
-  { value: getDuration(entity.value.start_date, entity.value.end_date), label: 'Total Duration', icon: 'bi bi-clock', bgClass: 'bg-success-light', iconColor: 'text-success' }
+  { value: formatDateRangeDuration(entity.value.start_date, entity.value.end_date), label: 'Total Duration', icon: 'bi bi-clock', bgClass: 'bg-success-light', iconColor: 'text-success' }
 ])
+
+watch(() => entity.value?.id, () => {
+  void fetchActiveSessionName()
+}, { immediate: true })
 </script>
 
 

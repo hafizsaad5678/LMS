@@ -69,9 +69,11 @@
         </div>
       </template>
 
+      <!-- DISABLED: Single-college mode — institution column hidden
       <template #cell-institution_name="{ value }">
         <span class="badge bg-light text-dark border">{{ value || 'N/A' }}</span>
       </template>
+      -->
 
       <template #cell-program_count="{ value }">
         <span class="badge bg-info">{{ value || 0 }}</span>
@@ -132,7 +134,8 @@ const actions = [
 const tableColumns = [
   { key: 'name', label: 'Department' },
   { key: 'head_of_department', label: 'HOD', hideOnMobile: true, default: 'Not Assigned' },
-  { key: 'institution_name', label: 'Institution', hideOnMobile: true },
+  // DISABLED: Single-college mode — institution column hidden
+  // { key: 'institution_name', label: 'Institution', hideOnMobile: true },
   { key: 'program_count', label: 'Programs', hideOnMobile: true, center: true },
   { key: 'teacher_count', label: 'Teachers', hideOnMobile: true, center: true },
   { key: 'is_active', label: 'Status' },
