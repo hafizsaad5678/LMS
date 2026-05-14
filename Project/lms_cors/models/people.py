@@ -8,7 +8,7 @@ class Student(BaseProfile):
     """Student model extending BaseProfile"""
     enrollment_number = models.CharField(max_length=20, unique=True, blank=True)
     program = models.ForeignKey(
-        'lms_cors.Program', on_delete=models.CASCADE, 
+        'lms_cors.Program', on_delete=models.SET_NULL, 
         related_name='students_legacy', null=True, blank=True
     )
     session = models.ForeignKey(

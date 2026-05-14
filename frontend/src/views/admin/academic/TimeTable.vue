@@ -242,9 +242,9 @@ const multipleScheduleForms = ref([{ day: '', start_time: '', end_time: '', subj
 
 const isSemesterActive = (semester) => {
   if (!semester || typeof semester !== 'object') return false
-  if (typeof semester.is_active === 'boolean') return semester.is_active
+  if (typeof semester.is_active === 'boolean' && semester.is_active === false) return false
   const statusValue = String(semester.status || '').trim().toLowerCase()
-  if (statusValue) return statusValue === 'active'
+  if (statusValue === 'completed') return false
   return true
 }
 
@@ -733,5 +733,6 @@ const saveMultipleSchedules = async () => {
 
 onMounted(() => { loadSchedule(); loadDropdowns() })
 </script>
+
 
 

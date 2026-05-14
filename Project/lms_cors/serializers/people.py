@@ -47,7 +47,7 @@ class BaseProfileSerializer(serializers.ModelSerializer):
 
 
 class StudentSerializer(BaseProfileSerializer):
-    program_name = serializers.CharField(source='program.name', read_only=True)
+    program_name = serializers.SerializerMethodField()
     department_name = serializers.CharField(source='program.department.name', read_only=True)
     session_name = serializers.CharField(source='session.session_name', read_only=True)
     current_semester_name = serializers.SerializerMethodField()
@@ -59,6 +59,13 @@ class StudentSerializer(BaseProfileSerializer):
         model = Student
         fields = '__all__'
         read_only_fields = BaseProfileSerializer.Meta.read_only_fields + ['enrollment_number']
+
+    def get_program_name(self, obj):
+        if obj.program and obj.session:
+            return f"{obj.program.name} ({obj.session.session_name})"
+        elif obj.program:
+            return obj.program.name
+        return "N/A"
 
     def validate(self, attrs):
         program = attrs.get('program', getattr(self.instance, 'program', None))
@@ -286,10 +293,22 @@ class StudentDetailSerializer(StudentSerializer):
     """Student with enrolled subjects and submissions"""
     
     
-    enrolled_subjects = StudentSubjectSerializer(many=True, read_only=True)
-    submissions = SubmissionHistorySerializer(many=True, read_only=True)
+    enrolled_subjects = serializers.SerializerMethodField()
+    submissions = serializers.SerializerMethodField()
     attendance_records = AttendanceSerializer(many=True, read_only=True)
     fees = FeeSerializer(many=True, read_only=True)
+
+    def get_enrolled_subjects(self, obj):
+        qs = obj.enrolled_subjects.filter(
+            subject__semester__number=obj.current_semester
+        )
+        return StudentSubjectSerializer(qs, many=True, context=self.context).data
+
+    def get_submissions(self, obj):
+        qs = obj.submissions.filter(
+            assignment__subject__semester__number=obj.current_semester
+        )
+        return SubmissionHistorySerializer(qs, many=True, context=self.context).data
 
 
 class TeacherDetailSerializer(TeacherSerializer):

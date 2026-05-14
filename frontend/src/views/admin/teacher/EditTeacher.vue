@@ -198,11 +198,24 @@ const handleSubmit = async () => {
       experience_years: form.value.experience_years || 0,
       address: form.value.address || null,
       city: form.value.city || null,
-      profile_image: form.value.profile_image || null,
       is_active: form.value.is_active
     }
 
-    const payload = teacherData.profile_image instanceof File ? toFormData(teacherData) : teacherData
+    // Handle profile_image specially
+    // 1. If it's a File, we must use FormData
+    // 2. If it's null, we want to clear the image (send null)
+    // 3. If it's a string (existing URL), we don't send it at all to avoid validation errors
+    let payload = teacherData
+
+    if (form.value.profile_image instanceof File) {
+      teacherData.profile_image = form.value.profile_image
+      payload = toFormData(teacherData)
+    } else if (form.value.profile_image === null) {
+      teacherData.profile_image = null
+      payload = teacherData
+    }
+    // Else: it's a string (URL), so we leave it out of teacherData/payload entirely
+
     await teacherService.patchTeacher(teacherId.value, payload)
     
     // Sync subject assignments using composable

@@ -69,17 +69,8 @@ class SemesterFactory:
         """Create semesters based on program type and academic system"""
         program = academic_session.program
         
-        if program.duration_years:
-            target_count = program.duration_years * 2
-        elif program.default_semesters:
-            target_count = program.default_semesters
-        else:
-            if program.program_level == 'master':
-                target_count = 4
-            elif program.program_level == 'diploma':
-                target_count = 2
-            else:
-                target_count = 8
+        # Use simple reliable default from Program model
+        target_count = program.default_semesters
         
         # Use annual system for intermediate, semester system for others
         if program.program_level == 'intermediate':

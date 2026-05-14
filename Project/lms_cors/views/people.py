@@ -45,7 +45,8 @@ def teacher_my_classes(request):
     # Primary source: direct teacher-subject assignments
     teacher_subjects = TeacherSubject.objects.filter(
         teacher=teacher,
-        subject__isnull=False
+        subject__isnull=False,
+        subject__semester__status='active'
     ).select_related(
         'subject',
         'subject__semester',
@@ -58,7 +59,8 @@ def teacher_my_classes(request):
     timetable_subject_ids = Timetable.objects.filter(
         teacher=teacher,
         subject__isnull=False,
-        is_active=True
+        is_active=True,
+        subject__semester__status='active'
     ).values_list('subject_id', flat=True).distinct()
 
     # Map subject_id -> assignment row (when available)
@@ -170,7 +172,8 @@ def teacher_my_assignments(request):
     # Get assignments with submission counts using annotation (avoids N+1 queries)
     # Filter out assignments that are already linked to a GradeComponent
     assignments = Assignment.objects.filter(
-        created_by=teacher
+        created_by=teacher,
+        subject__semester__status='active'
     ).exclude(
         Exists(GradeComponent.objects.filter(name=OuterRef('title'), subject=OuterRef('subject')))
     ).select_related(
@@ -387,15 +390,14 @@ class StudentViewSet(BaseProfileViewSet):
         return 'Below Average'
     
     @action(detail=True)
-    def submissions(self, request, pk=None):
-        return Response(SubmissionHistorySerializer(self.get_object().submissions.all(), many=True).data)
-    
-    @action(detail=True)
     def assignments(self, request, pk=None):
         """Get all assignments for subjects the student is enrolled in"""
         student = self.get_object()
         enrolled_subject_ids = student.enrolled_subjects.values_list('subject_id', flat=True)
-        assignments = Assignment.objects.filter(subject_id__in=enrolled_subject_ids).select_related('subject', 'created_by')
+        assignments = Assignment.objects.filter(
+            subject_id__in=enrolled_subject_ids,
+            subject__semester__number=student.current_semester
+        ).select_related('subject', 'created_by')
         return Response(
             StudentAssignmentSerializer(
                 assignments,
@@ -408,8 +410,11 @@ class StudentViewSet(BaseProfileViewSet):
     def grades(self, request, pk=None):
         student = self.get_object()
         
-        # 1. Get Assignment Grades (linked via submission)
-        assignment_grades = Grade.objects.filter(submission__student=student).select_related(
+        # 1. Get Assignment Grades
+        assignment_grades = Grade.objects.filter(
+            submission__student=student,
+            submission__assignment__subject__semester__number=student.current_semester
+        ).select_related(
             'submission', 'submission__assignment', 'submission__assignment__subject'
         )
         serialized_assignments = GradeSerializer(assignment_grades, many=True).data
@@ -419,7 +424,8 @@ class StudentViewSet(BaseProfileViewSet):
         
         # 2. Get Component Marks (Quizzes, Midterms, etc. from grading system)
         component_marks = StudentMark.objects.filter(
-            student=student
+            student=student,
+            component__subject__semester__number=student.current_semester
         ).select_related('component', 'component__subject')
         serialized_components = StudentMarkSerializer(component_marks, many=True).data
         # Add a type field to distinguish
@@ -437,26 +443,31 @@ class StudentViewSet(BaseProfileViewSet):
         
         return Response(combined_grades)
 
-    @action(detail=True, url_path='grade-report')
-    def grade_report(self, request, pk=None):
+    @action(detail=True, url_path='academic-history')
+    def academic_history(self, request, pk=None):
+        """Provides a detailed academic breakdown including assignments, quizzes, and component marks."""
         student = self.get_object()
-
-        # 1. Fetch Assignment Grades
-        assignment_grades = Grade.objects.filter(submission__student=student).select_related(
+        
+        # 1. Fetch Assignment Grades for current semester
+        assignment_grades = Grade.objects.filter(
+            submission__student=student,
+            submission__assignment__subject__semester__number=student.current_semester
+        ).select_related(
             'submission', 'submission__assignment', 'submission__assignment__subject'
         )
         
         # 2. Fetch Quiz Attempts (for detailed quiz history)
-        quiz_attempts = QuizAttempt.objects.filter(student=student).select_related(
+        quiz_attempts = QuizAttempt.objects.filter(
+            student=student,
+            quiz__subject__semester__number=student.current_semester
+        ).select_related(
             'quiz', 'quiz__subject'
         )
 
-        # 3. Fetch ALL Component Marks for this student (including quizzes, midterms, etc.)
-        # NOTE: We intentionally do NOT filter by is_visible_to_students here.
-        # Students should always see their own graded marks in their grade report.
-        # The visibility flag controls the grading setup UI, not the student's own report.
+        # 3. Fetch ALL Component Marks for this student
         component_marks = StudentMark.objects.filter(
-            student=student
+            student=student,
+            component__subject__semester__number=student.current_semester
         ).select_related('component', 'component__subject', 'component__linked_quiz')
 
         # Use a dictionary to track unique assessment entries by their source ID or title+subject
@@ -752,21 +763,18 @@ class StudentViewSet(BaseProfileViewSet):
             'distribution': distribution,
             'performance_summary': performance_summary,
             'subject_performance': subject_performance,
-            'full_history': history['full_history'], # Flat list at top level
-            'history': history
+            'history': history,
         })
 
-    
     @action(detail=True)
-    def attendance(self, request, pk=None):
-        return Response(AttendanceSerializer(self.get_object().attendance_records.all(), many=True).data)
-    
-    @action(detail=True)
-    def enrolled_subjects(self, request, pk=None):
-        
-        
+    def enrollments(self, request, pk=None):
         student = self.get_object()
-        queryset = student.enrolled_subjects.all().select_related('subject', 'semester')
+        
+        # Default to only returning current semester subjects unless history=true is requested
+        if request.query_params.get('history') == 'true':
+            queryset = student.enrolled_subjects.all().select_related('subject', 'semester')
+        else:
+            queryset = self._current_enrollments(student).select_related('subject', 'semester')
         
         # Annotate with evidence counts to see if teacher has created anything to grade
         queryset = queryset.annotate(
@@ -814,6 +822,16 @@ class StudentViewSet(BaseProfileViewSet):
         enrolled_subject_ids = self._current_enrollments(student).values_list('subject_id', flat=True)
         exams = Exam.objects.filter(subject_id__in=enrolled_subject_ids).select_related('subject')
         return Response(ExamSerializer(exams, many=True).data)
+
+    @action(detail=True)
+    def attendance(self, request, pk=None):
+        student = self.get_object()
+        return Response(AttendanceSerializer(student.attendance_records.all(), many=True).data)
+        
+    @action(detail=True, url_path='grade-report')
+    def grade_report(self, request, pk=None):
+        """Alias for academic_history to satisfy frontend calls"""
+        return self.academic_history(request, pk)
 
 
 class TeacherViewSet(BaseProfileViewSet):

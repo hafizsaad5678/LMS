@@ -35,13 +35,21 @@ class TimetableSerializer(serializers.ModelSerializer):
     subject_name = serializers.CharField(source='subject.name', read_only=True)
     subject_code = serializers.CharField(source='subject.code', read_only=True)
     teacher_name = serializers.CharField(source='teacher.full_name', read_only=True)
-    program_name = serializers.CharField(source='program.name', read_only=True)
+    program_name = serializers.SerializerMethodField()
     semester_name = serializers.CharField(source='semester.name', read_only=True)
     
     class Meta:
         model = Timetable
         fields = '__all__'
         read_only_fields = ['id', 'created_at', 'updated_at']
+
+    def get_program_name(self, obj):
+        if obj.program:
+            # Check if semester exists and has a session
+            if obj.semester and obj.semester.session:
+                return f"{obj.program.name} ({obj.semester.session.session_name})"
+            return obj.program.name
+        return "N/A"
 
     def validate(self, attrs):
         instance = getattr(self, 'instance', None)

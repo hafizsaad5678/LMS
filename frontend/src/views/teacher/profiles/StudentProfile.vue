@@ -210,21 +210,22 @@ const loadStudent = async () => {
   try {
     const [response, enrolledSubjectsResponse, attendanceResponse, assignmentsResponse, gradesResponse] = await Promise.all([
       teacherPanelService.getStudentDetail(studentId.value),
-      studentService.getStudentSubjects(studentId.value).catch(() => []),
+      studentService.getEnrolledSubjects(studentId.value).catch(() => []),
       studentService.getAttendance(studentId.value).catch(() => []),
       studentService.getAssignments(studentId.value).catch(() => []),
       studentService.getGrades(studentId.value).catch(() => [])
     ])
 
-    allEnrolledSubjects.value = Array.isArray(enrolledSubjectsResponse)
-      ? enrolledSubjectsResponse
-      : (enrolledSubjectsResponse?.results || [])
+    const detailSubjects = response?.enrolled_subjects || response?.enrolledSubjects
+    const subjects = detailSubjects || enrolledSubjectsResponse?.results || enrolledSubjectsResponse || []
+    allEnrolledSubjects.value = Array.isArray(subjects) ? subjects : []
 
-    const attendanceRecords = Array.isArray(attendanceResponse)
-      ? attendanceResponse
-      : (attendanceResponse?.results || [])
+    const detailAttendance = response?.attendance_records || response?.attendanceRecords
+    const attendanceRecords = detailAttendance || attendanceResponse?.results || attendanceResponse || []
+    const recordsArray = Array.isArray(attendanceRecords) ? attendanceRecords : []
+    
     attendanceStats.value = {
-      percentage: calculateAttendancePercentage(attendanceRecords)
+      percentage: calculateAttendancePercentage(recordsArray)
     }
 
     const assignments = Array.isArray(assignmentsResponse)
@@ -246,6 +247,9 @@ const loadStudent = async () => {
       // API returns the student object directly for a retrieve call
       const studentData = response
       
+      const subjects = allEnrolledSubjects.value
+      const currentSub = subjects.length > 0 ? subjects[0] : null
+
       student.value = {
         ...studentData,
         name: studentData.full_name || studentData.name || 'N/A',
@@ -253,10 +257,8 @@ const loadStudent = async () => {
         department_name: studentData.department_name || studentData.program?.department?.name || 'N/A',
         program_name: studentData.program_name || studentData.program?.name || 'N/A',
         semester_number: studentData.current_semester || studentData.semester_number,
-        // The detailed view might not have the specific subject context from class students
-        // but we keep the structure
-        subject_name: studentData.subject_name || 'N/A',
-        subject_code: studentData.subject_code || 'N/A'
+        subject_name: studentData.subject_name || currentSub?.subject_name || 'N/A',
+        subject_code: studentData.subject_code || currentSub?.subject_code || 'N/A'
       }
     } else {
       student.value = {}

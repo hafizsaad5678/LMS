@@ -61,7 +61,7 @@ export const studentService = {
 
     async getEnrolledSubjects(id) {
         return dedupeRequest(getCacheKey(id, 'subjects'), () =>
-            apiGet(`/students/${id}/enrolled_subjects/`, null, `fetching enrolled subjects for student ${id}`)
+            apiGet(`/students/${id}/enrollments/`, null, `fetching enrolled subjects for student ${id}`)
         )
     },
 

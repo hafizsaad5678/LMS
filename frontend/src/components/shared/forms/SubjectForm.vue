@@ -140,7 +140,11 @@ const filteredPrograms = computed(() => {
 // Mapped options for SelectInput
 const deptOptions = computed(() => props.departments.map(d => ({ value: d.id, label: `${d.name} (${d.code})` })))
 const progOptions = computed(() => filteredPrograms.value.map(p => ({ value: p.id, label: `${p.name} (${p.code})` })))
-const semesterOptions = computed(() => displaySemesters.value.map(s => ({ value: s.id, label: `${s.name} (Semester ${s.number})` })))
+const semesterOptions = computed(() => displaySemesters.value.map(s => {
+  const sessionName = s.session_name || (s.session?.session_name) || '';
+  const label = sessionName ? `${s.name} (${sessionName})` : `${s.name} (Semester ${s.number})`;
+  return { value: s.id, label: label };
+}))
 
 watch([
   () => props.activeSemestersOnly,

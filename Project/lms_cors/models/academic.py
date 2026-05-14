@@ -102,7 +102,7 @@ class Program(models.Model):
     name = models.CharField(max_length=200)
     code = models.CharField(max_length=20, unique=True)
     department = models.ForeignKey(
-        Department, on_delete=models.CASCADE, 
+        Department, on_delete=models.SET_NULL, 
         related_name='programs', null=True, blank=True
     )
     duration_years = models.IntegerField(default=4)
@@ -149,7 +149,7 @@ class AcademicSession(models.Model):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     program = models.ForeignKey(
-        Program, on_delete=models.CASCADE,
+        Program, on_delete=models.SET_NULL,
         related_name='sessions', null=True, blank=True
     )
     session_name = models.CharField(max_length=100)
@@ -209,7 +209,7 @@ class Semester(models.Model):
     
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     program = models.ForeignKey(
-        Program, on_delete=models.CASCADE, 
+        Program, on_delete=models.SET_NULL, 
         related_name='semesters_legacy', null=True, blank=True
     )
     session = models.ForeignKey(
@@ -234,6 +234,15 @@ class Semester(models.Model):
         return f"Semester {self.number}: {self.name}"
 
     def save(self, *args, **kwargs):
+        # Strict validation for semester limits
+        if self.session and self.session.program:
+            limit = self.session.program.default_semesters
+            if self.number > limit:
+                raise ValidationError(
+                    f"Semester number {self.number} exceeds the limit of {limit} "
+                    f"for program '{self.session.program.name}'."
+                )
+
         if self.status == 'active':
             # 1. Check within session if it exists
             if self.session:

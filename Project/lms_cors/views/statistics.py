@@ -127,7 +127,11 @@ def teacher_dashboard_stats(request):
 
     # 1. Stats logic (efficient aggregation)
     # Classes count
-    classes = TeacherSubject.objects.filter(teacher=teacher, subject__isnull=False)
+    classes = TeacherSubject.objects.filter(
+        teacher=teacher,
+        subject__isnull=False,
+        subject__semester__status='active'
+    )
     classes_count = classes.count()
     
     # Students count (distinct students across all assigned subjects)
@@ -135,7 +139,10 @@ def teacher_dashboard_stats(request):
     students_count = StudentSubject.objects.filter(subject_id__in=subject_ids).values('student_id').distinct().count()
     
     # Assignments count
-    assignments = Assignment.objects.filter(created_by=teacher).annotate(
+    assignments = Assignment.objects.filter(
+        created_by=teacher,
+        subject__semester__status='active'
+    ).annotate(
         submission_count=Count('submissions', distinct=True),
         graded_count=Count('submissions__grade', distinct=True)
     )
@@ -202,7 +209,9 @@ def student_dashboard_stats(request):
         return Response({'detail': 'Student profile not found.'}, status=404)
 
     # 1. Subjects & GPA
-    enrolled_subjects = student.enrolled_subjects.all().annotate(
+    enrolled_subjects = student.enrolled_subjects.filter(
+        subject__semester__number=student.current_semester
+    ).annotate(
         total_components=Count('subject__grade_components', distinct=True),
         total_assignments=Count('subject__assignments', distinct=True)
     )
@@ -210,8 +219,15 @@ def student_dashboard_stats(request):
     
     # Grading Progress (graded subjects / active subjects)
     # This is a bit complex, we'll use a simplified version of the logic in grade_report
-    assignment_grades = Grade.objects.filter(submission__student=student)
-    component_marks = StudentMark.objects.filter(student=student, component__is_visible_to_students=True)
+    assignment_grades = Grade.objects.filter(
+        submission__student=student,
+        submission__assignment__subject__semester__number=student.current_semester
+    )
+    component_marks = StudentMark.objects.filter(
+        student=student,
+        component__is_visible_to_students=True,
+        component__subject__semester__number=student.current_semester
+    )
     
     graded_subjects_ids = set(assignment_grades.values_list('submission__assignment__subject_id', flat=True))
     graded_subjects_ids.update(component_marks.values_list('component__subject_id', flat=True))
@@ -248,7 +264,9 @@ def student_dashboard_stats(request):
         gpa = sum(get_gp(p) for p in records) / len(records)
     
     # Attendance
-    attendance_records = student.attendance_records.all()
+    attendance_records = student.attendance_records.filter(
+        subject__semester__number=student.current_semester
+    )
     attendance_pct = 0
     if attendance_records.exists():
         present = attendance_records.filter(status='present').count()

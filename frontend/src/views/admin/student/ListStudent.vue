@@ -74,7 +74,9 @@
       </template>
 
       <template #cell-program_name="{ value }">
-        <span class="badge bg-info-light text-info">{{ value || 'N/A' }}</span>
+        <span class="badge bg-info-light text-info text-wrap text-start" style="max-width: 250px; line-height: 1.4;">
+          {{ value || 'N/A' }}
+        </span>
       </template>
 
       <template #cell-is_active="{ row }">
@@ -135,13 +137,13 @@ const actions = [
 ]
 
 const tableColumns = [
-  { key: 'enrollment_number', label: 'ID' },
-  { key: 'full_name', label: 'Name' },
+  { key: 'enrollment_number', label: 'ID', width: '120px' },
+  { key: 'full_name', label: 'Name', width: '250px' },
   { key: 'program_name', label: 'Program', hideOnMobile: true, default: 'N/A' },
-  { key: 'is_active', label: 'Status' },
-  { key: 'edit_count', label: 'Edits', hideOnMobile: true },
-  { key: 'created_at', label: 'Joined', type: 'date', hideOnMobile: true },
-  { key: 'actions', label: 'Actions', center: true }
+  { key: 'is_active', label: 'Status', width: '100px' },
+  { key: 'edit_count', label: 'Edits', hideOnMobile: true, width: '80px' },
+  { key: 'created_at', label: 'Joined', type: 'date', hideOnMobile: true, width: '120px' },
+  { key: 'actions', label: 'Actions', center: true, width: '150px' }
 ]
 
 // Use composable for list logic

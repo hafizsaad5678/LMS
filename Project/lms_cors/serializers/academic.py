@@ -178,10 +178,28 @@ class ProgramSerializer(serializers.ModelSerializer):
     department_name = serializers.CharField(source='department.name', read_only=True)
     semester_count = serializers.SerializerMethodField()
     student_count = serializers.SerializerMethodField()
+    display_name = serializers.SerializerMethodField()
     
     class Meta:
         model = Program
         fields = '__all__'
+
+    def to_representation(self, instance):
+        ret = super().to_representation(instance)
+        # Force the 'name' field to include session info for frontend components
+        # that use 'item.name' instead of 'item.display_name'
+        session = instance.sessions.all().order_by('-created_at').first()
+        if session:
+            ret['name'] = f"{instance.name} ({session.session_name})"
+        else:
+            ret['name'] = instance.name
+        return ret
+
+    def get_display_name(self, obj):
+        session = obj.sessions.all().order_by('-created_at').first()
+        if session:
+            return f"{obj.name} ({session.session_name})"
+        return obj.name
 
     def validate(self, attrs):
         department = attrs.get('department', getattr(self.instance, 'department', None))
@@ -194,14 +212,14 @@ class ProgramSerializer(serializers.ModelSerializer):
         return attrs
     
     def get_semester_count(self, obj):
-        return obj.semesters_legacy.count()
+        return obj.default_semesters
     
     def get_student_count(self, obj):
         return obj.students_legacy.count()
 
 
 class AcademicSessionSerializer(serializers.ModelSerializer):
-    program_name = serializers.CharField(source='program.name', read_only=True)
+    program_name = serializers.SerializerMethodField()
     department_name = serializers.CharField(source='program.department.name', read_only=True)
     institution_id = serializers.CharField(source='program.department.institution_id', read_only=True)
     program_level = serializers.CharField(source='program.program_level', read_only=True)
@@ -214,6 +232,11 @@ class AcademicSessionSerializer(serializers.ModelSerializer):
         model = AcademicSession
         fields = '__all__'
         read_only_fields = ['id', 'created_at', 'updated_at', 'edit_count']
+    
+    def get_program_name(self, obj):
+        if obj.program:
+            return f"{obj.program.name} ({obj.session_name})"
+        return "N/A"
     
     def get_program_level_display(self, obj):
         if obj.program and obj.program.program_level:
@@ -247,7 +270,7 @@ class AcademicSessionSerializer(serializers.ModelSerializer):
 class SemesterSerializer(serializers.ModelSerializer):
     id = serializers.CharField(read_only=True)
     program = serializers.PrimaryKeyRelatedField(queryset=Program.objects.all())
-    program_name = serializers.CharField(source='program.name', read_only=True, allow_blank=True)
+    program_name = serializers.SerializerMethodField()
     session_name = serializers.CharField(source='session.session_name', read_only=True, allow_null=True)
     subject_count = serializers.SerializerMethodField()
     
@@ -256,6 +279,13 @@ class SemesterSerializer(serializers.ModelSerializer):
         fields = ['id', 'program', 'program_name', 'session', 'session_name', 'number', 'name', 
                   'start_date', 'end_date', 'status', 'created_at', 'updated_at', 'subject_count']
         read_only_fields = ['id', 'program_name', 'created_at', 'updated_at']
+
+    def get_program_name(self, obj):
+        if obj.program and obj.session:
+            return f"{obj.program.name} ({obj.session.session_name})"
+        elif obj.program:
+            return obj.program.name
+        return "N/A"
 
     def get_subject_count(self, obj):
         return obj.subjects.count()
@@ -308,12 +338,18 @@ class SemesterSerializer(serializers.ModelSerializer):
 
 
 class SubjectSerializer(serializers.ModelSerializer):
-    semester_name = serializers.CharField(source='semester.name', read_only=True)
+    semester_name = serializers.SerializerMethodField()
     program_name = serializers.CharField(source='semester.program.name', read_only=True)
     
     class Meta:
         model = Subject
         fields = '__all__'
+
+    def get_semester_name(self, obj):
+        if obj.semester:
+            session_part = f" ({obj.semester.session.session_name})" if obj.semester.session else ""
+            return f"{obj.semester.name}{session_part}"
+        return "N/A"
 
     def validate(self, attrs):
         semester = attrs.get('semester', getattr(self.instance, 'semester', None))

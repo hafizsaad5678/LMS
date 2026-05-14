@@ -159,6 +159,38 @@ class AcademicSessionViewSet(BaseViewSet):
             next_semester = semesters.filter(number__gt=active_semester.number).first()
 
         return semesters, active_semester, next_semester
+
+    def _enroll_students_in_subject(self, subject):
+        """Helper to enroll all students in a semester into a specific subject."""
+        if not subject.semester:
+            return 0
+
+        semester = subject.semester
+        # Find students whose current_semester matches this subject's semester number
+        # AND who are in the same academic session as the semester.
+        students = Student.objects.filter(
+            is_active=True,
+            academic_session=semester.session,
+            current_semester=semester.number
+        )
+
+        existing_enrollment_ids = set(
+            StudentSubject.objects.filter(subject=subject).values_list('student_id', flat=True)
+        )
+
+        new_enrollments = []
+        for student in students:
+            if student.id not in existing_enrollment_ids:
+                new_enrollments.append(StudentSubject(
+                    student=student,
+                    subject=subject,
+                    semester=semester
+                ))
+
+        if new_enrollments:
+            StudentSubject.objects.bulk_create(new_enrollments, ignore_conflicts=True)
+
+        return len(new_enrollments)
     
     @action(detail=True)
     def semesters(self, request, pk=None):
@@ -309,6 +341,7 @@ class AcademicSessionViewSet(BaseViewSet):
         held_students = list(held_students_qs)
 
         with transaction.atomic():
+            # Mark all currently active semesters in this session as completed
             Semester.objects.filter(session=session, status='active').exclude(id=active_semester.id).update(status='completed')
 
             active_semester.status = 'completed'
@@ -317,15 +350,38 @@ class AcademicSessionViewSet(BaseViewSet):
             next_semester.status = 'active'
             next_semester.save(update_fields=['status', 'updated_at'])
 
+            # Identify subjects from the outgoing semester to deactivate related items
+            outgoing_subjects = Subject.objects.filter(semester=active_semester)
+            outgoing_subject_ids = list(outgoing_subjects.values_list('id', flat=True))
+
+            # Deactivate teacher assignments for the outgoing semester
+            from .people import TeacherSubject
+            TeacherSubject.objects.filter(subject_id__in=outgoing_subject_ids).update(is_active=False)
+
+            # Deactivate timetable slots for the outgoing semester
+            from .scheduling import Timetable, Exam
+            Timetable.objects.filter(semester=active_semester).update(is_active=False)
+
+            # Mark exams for outgoing subjects as completed
+            Exam.objects.filter(subject_id__in=outgoing_subject_ids, status='scheduled').update(status='completed')
+
+            # --- Activate Next Semester Items ---
+            # Identify subjects for the incoming semester
+            next_semester_subjects = list(Subject.objects.filter(semester=next_semester))
+            next_semester_subject_ids = [subject.id for subject in next_semester_subjects]
+
+            # Ensure teacher assignments for the next semester are active
+            TeacherSubject.objects.filter(subject_id__in=next_semester_subject_ids).update(is_active=True)
+
+            # Ensure timetable slots for the next semester are active
+            Timetable.objects.filter(semester=next_semester).update(is_active=True)
+
             if promoted_students:
                 Student.objects.filter(id__in=[student.id for student in promoted_students]).update(
                     current_semester=next_semester.number
                 )
 
                 # Sync promoted students to next semester subjects.
-                next_semester_subjects = list(
-                    Subject.objects.filter(semester=next_semester).only('id')
-                )
                 if next_semester_subjects:
                     promoted_student_ids = [student.id for student in promoted_students]
 
@@ -333,7 +389,7 @@ class AcademicSessionViewSet(BaseViewSet):
                         StudentSubject.objects.filter(
                             student_id__in=promoted_student_ids,
                             semester=next_semester,
-                            subject_id__in=[subject.id for subject in next_semester_subjects]
+                            subject_id__in=next_semester_subject_ids
                         ).values_list('student_id', 'subject_id')
                     )
 
@@ -476,11 +532,101 @@ class SemesterViewSet(BaseViewSet):
 
 
 class SubjectViewSet(BaseViewSet):
+    pagination_class = None
     queryset = Subject.objects.select_related(
         'semester', 'semester__program', 'semester__session', 
         'semester__program__department', 'semester__program__department__institution'
     )
-    
+    serializer_class = SubjectSerializer
+    search_fields = ['name', 'code', 'description']
+    filterset_fields = ['semester', 'semester__program', 'semester__program__department', 'semester__status']
+    ordering_fields = ['code', 'name', 'credit_hours']
+
+    def create(self, request, *args, **kwargs):
+        # Create a mutable copy of the data
+        data = request.data.copy() if hasattr(request.data, 'copy') else dict(request.data)
+        semester_ids = data.get('semester')
+
+        if isinstance(semester_ids, list):
+            if len(semester_ids) > 1:
+                # Handle bulk creation for multiple semesters
+                created_subjects = []
+                for sem_id in semester_ids:
+                    item_data = data.copy()
+                    item_data['semester'] = sem_id
+                    serializer = self.get_serializer(data=item_data)
+                    serializer.is_valid(raise_exception=True)
+                    self.perform_create(serializer)
+                    
+                    # Auto-enroll students if the semester is active
+                    subject = serializer.instance
+                    if subject.semester and subject.semester.status == 'active':
+                        self._enroll_students_in_subject(subject)
+                    
+                    created_subjects.append(serializer.data)
+                return Response(created_subjects, status=status.HTTP_201_CREATED)
+            elif len(semester_ids) == 1:
+                # If it's a list of one, normalize to a single ID
+                data['semester'] = semester_ids[0]
+
+        # Standard creation logic using the mutable data
+        serializer = self.get_serializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+
+        # Auto-enroll students if the semester is active
+        subject = serializer.instance
+        if subject.semester and subject.semester.status == 'active':
+            self._enroll_students_in_subject(subject)
+
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+
+    @action(detail=True, methods=['post'], url_path='sync-enrollments')
+    def sync_enrollments(self, request, pk=None):
+        """Manually trigger enrollment of all eligible students into this subject."""
+        subject = self.get_object()
+        if not subject.semester:
+            return Response({'detail': 'Subject is not linked to a semester.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        count = self._enroll_students_in_subject(subject)
+        return Response({
+            'message': f'Enrollment sync completed. {count} students enrolled.',
+            'total_students': StudentSubject.objects.filter(subject=subject).count()
+        })
+
+    def _enroll_students_in_subject(self, subject):
+        """Internal helper to enroll students who belong in this subject's semester."""
+        if not subject.semester:
+            return 0
+            
+        semester = subject.semester
+        # Logic to match students to subject
+        students = Student.objects.filter(
+            session=semester.session,
+            current_semester=semester.number,
+            is_active=True
+        )
+        
+        # Check existing
+        existing_student_ids = StudentSubject.objects.filter(
+            subject=subject
+        ).values_list('student_id', flat=True)
+        
+        to_create = []
+        for student in students:
+            if student.id not in existing_student_ids:
+                to_create.append(StudentSubject(
+                    student=student,
+                    subject=subject,
+                    semester=semester
+                ))
+        
+        if to_create:
+            StudentSubject.objects.bulk_create(to_create, ignore_conflicts=True)
+            
+        return len(to_create)
+
     def get_queryset(self):
         queryset = super().get_queryset()
         
@@ -504,11 +650,6 @@ class SubjectViewSet(BaseViewSet):
         
         return queryset
 
-    serializer_class = SubjectSerializer
-    search_fields = ['name', 'code', 'description']
-    filterset_fields = ['semester', 'semester__program', 'semester__program__department', 'semester__status']
-    ordering_fields = ['code', 'name', 'credit_hours']
-    
     def get_serializer_class(self):
         if self.action == 'retrieve':
             return SubjectDetailSerializer

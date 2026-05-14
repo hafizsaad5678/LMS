@@ -92,6 +92,13 @@ class TimetableViewSet(BaseViewSet):
     search_fields = ['subject__name', 'subject__code', 'teacher__full_name', 'room']
     filterset_fields = ['day', 'subject', 'teacher', 'program', 'semester', 'room', 'is_active']
     ordering_fields = ['day', 'start_time']
+
+    def get_queryset(self):
+        # By default, only show timetable slots for active subjects/semesters
+        return self.queryset.filter(
+            is_active=True,
+            subject__semester__status='active'
+        )
     
     @action(detail=False)
     def by_day(self, request):

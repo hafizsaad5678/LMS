@@ -37,7 +37,7 @@
           :semesters="semesters"
           :selected-department="selectedDepartment"
           :selected-program="selectedProgram"
-          :active-semesters-only="true"
+          :active-semesters-only="false"
           :loading-semesters="loadingSemesters"
           :is-edit-mode="false"
           :submitting="submitting"
@@ -96,7 +96,7 @@ const {
 } = useCascadingDropdowns()
 
 const handleProgramChange = async (progId) => {
-  await onProgramChange(progId, { status: 'active' })
+  await onProgramChange(progId)
 }
 
 const form = ref({ name: '', code: '', semester: '', credit_hours: 3, description: '' })
@@ -147,7 +147,7 @@ onMounted(async () => {
         if (deptId) {
           selectedDepartment.value = deptId
           selectedProgram.value = progId
-          await loadSemesters(progId, { status: 'active' })
+          await loadSemesters(progId)
           form.value.semester = semId
         }
       }

@@ -11,7 +11,7 @@ from django.db import transaction
 from decimal import Decimal
 from datetime import timedelta
 from ..models.grading import GradeComponent, StudentMark, Quiz, QuizQuestion, QuizOption, QuizAttempt, QuizAnswer
-from ..models.people import Student, StudentSubject
+from ..models.people import Student, StudentSubject, TeacherSubject
 from ..serializers.grading import (
     GradeComponentSerializer, 
     StudentMarkSerializer,
@@ -140,10 +140,11 @@ class QuizViewSet(viewsets.ModelViewSet):
             # Teachers see what they created
             queryset = queryset.filter(created_by=user.teacher_profile)
         elif hasattr(user, 'student_profile'):
-            # Students see published quizzes for their enrolled subjects
+            # Students see published quizzes for their enrolled subjects of current semester
             student = user.student_profile
             enrolled_subject_ids = StudentSubject.objects.filter(
-                student=student
+                student=student,
+                subject__semester__number=student.current_semester
             ).values_list('subject_id', flat=True)
             
             queryset = queryset.filter(
@@ -348,7 +349,12 @@ class QuizAttemptViewSet(viewsets.ModelViewSet):
             # Teachers see attempts for their quizzes
             queryset = queryset.filter(quiz__created_by=user.teacher_profile)
         elif hasattr(user, 'student_profile'):
-            queryset = queryset.filter(student=user.student_profile)
+            # Students only see their own attempts from current semester
+            student = user.student_profile
+            queryset = queryset.filter(
+                student=student,
+                quiz__subject__semester__number=student.current_semester
+            )
         else:
             return QuizAttempt.objects.none()
 
@@ -570,14 +576,26 @@ class GradeComponentViewSet(viewsets.ModelViewSet):
             return GradeComponent.objects.none()
 
         if user.is_staff or user.is_superuser or hasattr(user, 'admin_profile'):
-            queryset = GradeComponent.objects.all().select_related('linked_quiz')
+            queryset = GradeComponent.objects.all()
         elif hasattr(user, 'teacher_profile'):
-            queryset = GradeComponent.objects.filter(created_by=user.teacher_profile).select_related('linked_quiz')
+            teacher = user.teacher_profile
+            # Teachers only see components for their active subjects
+            teacher_subjects = TeacherSubject.objects.filter(
+                teacher=teacher, is_active=True, subject__semester__status='active'
+            ).values_list('subject_id', flat=True)
+            queryset = GradeComponent.objects.filter(subject_id__in=teacher_subjects).select_related('linked_quiz')
         elif hasattr(user, 'student_profile'):
-            # Students can see published grade components for their enrolled subjects
+            # Students can see published grade components for their current enrolled subjects
             student = user.student_profile
-            enrolled_subjects = StudentSubject.objects.filter(student=student).values_list('subject_id', flat=True)
-            queryset = GradeComponent.objects.filter(subject_id__in=enrolled_subjects, is_visible_to_students=True).select_related('linked_quiz')
+            enrolled_subjects = StudentSubject.objects.filter(
+                student=student,
+                subject__semester__number=student.current_semester
+            ).values_list('subject_id', flat=True)
+            queryset = GradeComponent.objects.filter(
+                subject_id__in=enrolled_subjects, 
+                is_visible_to_students=True,
+                subject__semester__number=student.current_semester
+            )
         else:
             return GradeComponent.objects.none()
         
@@ -706,14 +724,21 @@ class StudentMarkViewSet(viewsets.ReadOnlyModelViewSet):
         
         # Authorization filtering
         if user.is_staff or user.is_superuser or hasattr(user, 'admin_profile'):
-            # Admins see everything
             pass
         elif hasattr(user, 'teacher_profile'):
-            # Teachers only see marks for their components
-            queryset = queryset.filter(component__created_by=user.teacher_profile)
+            teacher = user.teacher_profile
+            # Teachers only see marks for their active subjects
+            teacher_subjects = TeacherSubject.objects.filter(
+                teacher=teacher, is_active=True, subject__semester__status='active'
+            ).values_list('subject_id', flat=True)
+            queryset = queryset.filter(component__subject_id__in=teacher_subjects)
         elif hasattr(user, 'student_profile'):
-            # Students only see their own marks
-            queryset = queryset.filter(student=user.student_profile)
+            # Students only see their own marks from current semester
+            student = user.student_profile
+            queryset = queryset.filter(
+                student=student,
+                component__subject__semester__number=student.current_semester
+            )
         else:
             return StudentMark.objects.none()
 
@@ -744,52 +769,56 @@ class StudentMarkViewSet(viewsets.ReadOnlyModelViewSet):
         
         # 2. Fetch and include legacy Grade objects (Assignments)
         user = request.user
-        try:
-            
-            
-            legacy_grades_qs = Grade.objects.all().select_related(
-                'submission', 'submission__student', 'submission__assignment', 'submission__assignment__subject'
+        legacy_grades_qs = Grade.objects.all().select_related(
+            'submission', 'submission__student', 'submission__assignment', 'submission__assignment__subject'
+        )
+        
+        # Apply filters to legacy grades
+        if hasattr(user, 'teacher_profile'):
+            teacher = user.teacher_profile
+            teacher_subjects = TeacherSubject.objects.filter(
+                teacher=teacher, is_active=True, subject__semester__status='active'
+            ).values_list('subject_id', flat=True)
+            legacy_grades_qs = legacy_grades_qs.filter(
+                Q(submission__assignment__created_by=teacher) | 
+                Q(submission__assignment__subject_id__in=teacher_subjects)
             )
+        elif hasattr(user, 'student_profile'):
+            student = user.student_profile
+            legacy_grades_qs = legacy_grades_qs.filter(
+                submission__student=student,
+                submission__assignment__subject__semester__number=student.current_semester
+            )
+        
+        subject_id = request.query_params.get('subject')
+        if subject_id:
+            legacy_grades_qs = legacy_grades_qs.filter(submission__assignment__subject_id=subject_id)
+        
+        student_id = request.query_params.get('student')
+        if student_id:
+            legacy_grades_qs = legacy_grades_qs.filter(submission__student_id=student_id)
+        
+        # Serialize legacy grades manually or with custom structure
+        for g in legacy_grades_qs:
+            assignment = g.submission.assignment
+            st_profile = g.submission.student
             
-            # Apply same filters as StudentMark
-            if hasattr(user, 'teacher_profile'):
-                legacy_grades_qs = legacy_grades_qs.filter(submission__assignment__created_by=user.teacher_profile)
-            elif hasattr(user, 'student_profile'):
-                legacy_grades_qs = legacy_grades_qs.filter(submission__student=user.student_profile)
-            
-            subject_id = request.query_params.get('subject')
-            if subject_id:
-                legacy_grades_qs = legacy_grades_qs.filter(submission__assignment__subject_id=subject_id)
-            
-            student_id = request.query_params.get('student')
-            if student_id:
-                legacy_grades_qs = legacy_grades_qs.filter(submission__student_id=student_id)
-            
-            # Serialize legacy grades
-            for g in legacy_grades_qs:
-                assignment = g.submission.assignment
-                student = g.submission.student
-                
-                # Check if this assignment is already represented by a StudentMark to avoid duplicates
-                # We match by title and subject if they share the same name
-                if any(m.get('title') == assignment.title for m in marks_data):
-                    continue
+            # Check if this assignment is already represented by a StudentMark to avoid duplicates
+            if any(m.get('title') == assignment.title for m in marks_data):
+                continue
 
-                marks_data.append({
-                    'id': str(g.id),
-                    'student_id': str(student.id),
-                    'student_name': student.full_name,
-                    'student_roll_no': student.enrollment_number,
-                    'component_name': assignment.title,
-                    'component_type': 'assignment',
-                    'marks_obtained': float(g.marks_obtained or 0),
-                    'max_marks': float(assignment.total_marks or 0),
-                    'percentage': round((float(g.marks_obtained or 0) / float(assignment.total_marks or 1)) * 100, 2) if assignment.total_marks else 0,
-                    'is_locked': True,
-                    'graded_at': g.graded_at.isoformat() if g.graded_at else None
-                })
-        except Exception as e:
-            # Fallback to just returning the standard marks if legacy lookup fails
-            logging.getLogger(__name__).error("Error including legacy grades in StudentMark list: %s", e)
+            marks_data.append({
+                'id': str(g.id),
+                'student_id': str(st_profile.id),
+                'student_name': st_profile.full_name,
+                'student_roll_no': st_profile.enrollment_number,
+                'component_name': assignment.title,
+                'component_type': 'assignment',
+                'marks_obtained': float(g.marks_obtained or 0),
+                'max_marks': float(assignment.total_marks or 0),
+                'percentage': round((float(g.marks_obtained or 0) / float(assignment.total_marks or 1)) * 100, 2) if assignment.total_marks else 0,
+                'is_locked': True,
+                'graded_at': g.graded_at.isoformat() if g.graded_at else None
+            })
             
         return Response(marks_data)

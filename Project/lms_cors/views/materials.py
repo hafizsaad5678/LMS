@@ -35,6 +35,8 @@ class MaterialViewSet(BaseViewSet):
             return self.queryset.filter(
                 Q(uploaded_by=teacher) | Q(subject__in=teacher_subjects),
                 is_active=True
+            ).filter(
+                Q(subject__isnull=True) | Q(subject__semester__status='active')
             ).distinct()
             
         # Students can see materials for subjects they are enrolled in (class_only) OR public materials
@@ -48,6 +50,8 @@ class MaterialViewSet(BaseViewSet):
             qs = self.queryset.filter(
                 Q(is_active=True),
                 Q(access_level='public') | Q(access_level='class_only', subject__in=student_subjects)
+            ).filter(
+                Q(subject__isnull=True) | Q(subject__semester__number=student.current_semester)
             ).distinct()
             return qs
             
@@ -179,6 +183,8 @@ def teacher_materials(request):
     # Teachers see materials they uploaded (even inactive ones) OR active materials for subjects they teach
     materials = Material.objects.filter(
         Q(uploaded_by=teacher) | (Q(subject__in=teacher_subjects) & Q(is_active=True))
+    ).filter(
+        Q(subject__isnull=True) | Q(subject__semester__status='active')
     ).select_related('subject', 'uploaded_by').order_by('-uploaded_at').distinct()
     
     material_data = []

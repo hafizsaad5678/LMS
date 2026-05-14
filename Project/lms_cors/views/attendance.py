@@ -37,8 +37,12 @@ class AttendanceViewSet(BaseViewSet):
             ).values_list('subject_id', flat=True)
             queryset = queryset.filter(subject_id__in=teacher_subjects)
         elif hasattr(user, 'student_profile'):
-            # Students only see their own attendance
-            queryset = queryset.filter(student=user.student_profile)
+            # Students only see their own attendance from current semester
+            student = user.student_profile
+            queryset = queryset.filter(
+                student=student,
+                subject__semester__number=student.current_semester
+            )
         else:
             return Attendance.objects.none()
 

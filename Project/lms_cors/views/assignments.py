@@ -27,8 +27,9 @@ class AssignmentViewSet(BaseViewSet):
         if getattr(student, 'session_id', None):
             queryset = queryset.filter(semester__session_id=student.session_id)
 
+        # Force filtering by the absolute current_semester of the student
         if getattr(student, 'current_semester', None):
-            queryset = queryset.filter(semester__number=student.current_semester)
+            queryset = queryset.filter(subject__semester__number=student.current_semester)
 
         return queryset
 
@@ -42,7 +43,8 @@ class AssignmentViewSet(BaseViewSet):
             # Get subjects assigned to this teacher
             assigned_subjects = TeacherSubject.objects.filter(
                 teacher=teacher, 
-                is_active=True
+                is_active=True,
+                subject__semester__status='active'
             ).values_list('subject_id', flat=True)
             
             # Filter assignments either created by them OR belonging to their assigned subjects
@@ -180,9 +182,13 @@ class SubmissionHistoryViewSet(BaseViewSet):
         qs = super().get_queryset()
         user = self.request.user
         
-        # If student, only show their own submissions
+        # If student, show only their submissions from current semester
         if hasattr(user, 'student_profile'):
-            return qs.filter(student=user.student_profile).select_related(
+            student = user.student_profile
+            return qs.filter(
+                student=student,
+                assignment__subject__semester__number=student.current_semester
+            ).select_related(
                 'student', 'assignment', 'assignment__subject'
             ).prefetch_related('grade', 'grade__graded_by').order_by('-submitted_at')
         
@@ -191,11 +197,13 @@ class SubmissionHistoryViewSet(BaseViewSet):
             teacher = user.teacher_profile
             # Get subjects the teacher teaches
             teacher_subjects = TeacherSubject.objects.filter(
-                teacher=teacher, is_active=True
+                teacher=teacher, is_active=True, subject__semester__status='active'
             ).values_list('subject_id', flat=True)
             # Return submissions for assignments created by teacher OR in their subjects
             return qs.filter(
                 Q(assignment__created_by=teacher) | Q(assignment__subject_id__in=teacher_subjects)
+            ).filter(
+                Q(assignment__subject__isnull=True) | Q(assignment__subject__semester__status='active')
             ).select_related(
                 'student', 'assignment', 'assignment__subject'
             ).prefetch_related('grade', 'grade__graded_by').distinct().order_by('-submitted_at')
