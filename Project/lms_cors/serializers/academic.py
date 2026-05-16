@@ -184,22 +184,16 @@ class ProgramSerializer(serializers.ModelSerializer):
         model = Program
         fields = '__all__'
 
-    def to_representation(self, instance):
-        ret = super().to_representation(instance)
-        # Force the 'name' field to include session info for frontend components
-        # that use 'item.name' instead of 'item.display_name'
-        session = instance.sessions.all().order_by('-created_at').first()
-        if session:
-            ret['name'] = f"{instance.name} ({session.session_name})"
-        else:
-            ret['name'] = instance.name
-        return ret
-
     def get_display_name(self, obj):
-        session = obj.sessions.all().order_by('-created_at').first()
-        if session:
-            return f"{obj.name} ({session.session_name})"
         return obj.name
+
+    def get_semester_count(self, obj):
+        return obj.default_semesters if hasattr(obj, 'default_semesters') else 8
+        
+    def get_student_count(self, obj):
+        if hasattr(obj, 'students_legacy'):
+            return obj.students_legacy.count()
+        return 0
 
     def validate(self, attrs):
         department = attrs.get('department', getattr(self.instance, 'department', None))
@@ -210,21 +204,16 @@ class ProgramSerializer(serializers.ModelSerializer):
         if department and department.institution and department.institution.is_active is False:
             raise serializers.ValidationError({'department': 'Selected department belongs to an inactive institution.'})
         return attrs
-    
-    def get_semester_count(self, obj):
-        return obj.default_semesters
-    
-    def get_student_count(self, obj):
-        return obj.students_legacy.count()
 
 
 class AcademicSessionSerializer(serializers.ModelSerializer):
     program_name = serializers.SerializerMethodField()
-    department_name = serializers.CharField(source='program.department.name', read_only=True)
-    institution_id = serializers.CharField(source='program.department.institution_id', read_only=True)
+    department_name = serializers.SerializerMethodField()
+    institution_id = serializers.SerializerMethodField()
     program_level = serializers.CharField(source='program.program_level', read_only=True)
     program_level_display = serializers.SerializerMethodField()
     semester_count = serializers.SerializerMethodField()
+    duration_years = serializers.SerializerMethodField()
     current_enrollment = serializers.SerializerMethodField()
     capacity_percentage = serializers.SerializerMethodField()
     
@@ -234,9 +223,17 @@ class AcademicSessionSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'created_at', 'updated_at', 'edit_count']
     
     def get_program_name(self, obj):
-        if obj.program:
-            return f"{obj.program.name} ({obj.session_name})"
+        return obj.session_name
+
+    def get_department_name(self, obj):
+        if obj.program and obj.program.department:
+            return obj.program.department.name
         return "N/A"
+
+    def get_institution_id(self, obj):
+        if obj.program and obj.program.department:
+            return obj.program.department.institution_id
+        return None
     
     def get_program_level_display(self, obj):
         if obj.program and obj.program.program_level:
@@ -249,6 +246,9 @@ class AcademicSessionSerializer(serializers.ModelSerializer):
     def get_current_enrollment(self, obj):
         return obj.students.count()
     
+    def get_duration_years(self, obj):
+        return obj.program.duration_years if obj.program else 0
+
     def get_capacity_percentage(self, obj):
         total_capacity = getattr(obj, 'total_capacity', None)
         if total_capacity and total_capacity > 0:
@@ -281,8 +281,8 @@ class SemesterSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'program_name', 'created_at', 'updated_at']
 
     def get_program_name(self, obj):
-        if obj.program and obj.session:
-            return f"{obj.program.name} ({obj.session.session_name})"
+        if obj.session:
+            return obj.session.session_name
         elif obj.program:
             return obj.program.name
         return "N/A"

@@ -85,42 +85,69 @@ class ExamViewSet(BaseViewSet):
 
 
 class TimetableViewSet(BaseViewSet):
-    queryset = Timetable.objects.all()
-    serializer_class = TimetableSerializer
-    pagination_class = None
+    """
+    Admin timetable CRUD.
+
+    Semester locking rule:
+      - Default queryset shows ONLY slots whose semester is currently active
+        (semester__status='active').  Old semester slots are NOT deleted — they
+        are simply hidden when their semester is marked completed/archived.
+      - Admin can pass ?semester=<id> or ?show_all=true to see other semesters.
+
+    Schedule type filtering:
+      - ?schedule_type=permanent  → only recurring weekly slots
+      - ?schedule_type=temporary  → only one-off dated slots
+    """
+
+    queryset          = Timetable.objects.all()
+    serializer_class  = TimetableSerializer
+    pagination_class  = None
     permission_classes = [IsAuthenticated, ReadOnlyForStudents]
-    search_fields = ['subject__name', 'subject__code', 'teacher__full_name', 'room']
-    filterset_fields = ['day', 'subject', 'teacher', 'program', 'semester', 'room', 'is_active']
+    search_fields      = ['subject__name', 'subject__code', 'teacher__full_name', 'room']
+    filterset_fields   = [
+        'day', 'subject', 'teacher', 'program', 'semester',
+        'room', 'is_active', 'schedule_type', 'academic_session'
+    ]
     ordering_fields = ['day', 'start_time']
 
     def get_queryset(self):
-        # By default, only show timetable slots for active subjects/semesters
-        return self.queryset.filter(
-            is_active=True,
-            subject__semester__status='active'
+        qs = self.queryset.select_related(
+            'subject', 'teacher', 'program', 'semester', 'semester__session'
         )
-    
+
+        # ── Semester locking: default to active semesters only ─────────
+        # If the caller explicitly passes ?semester=<id>, use that instead.
+        # If ?show_all=true, skip the active-semester filter (admin history view).
+        show_all     = self.request.query_params.get('show_all', '').lower() == 'true'
+        has_semester = bool(self.request.query_params.get('semester', ''))
+
+        if not show_all and not has_semester:
+            qs = qs.filter(semester__status='active')
+
+        return qs.filter(is_active=True)
+
     @action(detail=False)
     def by_day(self, request):
         day = request.query_params.get('day', 'monday')
-        slots = self.get_queryset().filter(day=day.lower(), is_active=True)
+        slots = self.get_queryset().filter(day=day.lower())
         return Response(self.get_serializer(slots, many=True).data)
-    
+
     @action(detail=False)
     def by_teacher(self, request):
         teacher_id = request.query_params.get('teacher_id')
         if teacher_id:
-            slots = self.get_queryset().filter(teacher_id=teacher_id, is_active=True)
+            slots = self.get_queryset().filter(teacher_id=teacher_id)
             return Response(self.get_serializer(slots, many=True).data)
         return Response({'error': 'teacher_id required'}, status=status.HTTP_400_BAD_REQUEST)
-    
+
     @action(detail=False)
     def by_room(self, request):
         room = request.query_params.get('room')
         if room:
-            slots = self.get_queryset().filter(room=room, is_active=True)
+            slots = self.get_queryset().filter(room=room)
             return Response(self.get_serializer(slots, many=True).data)
         return Response({'error': 'room required'}, status=status.HTTP_400_BAD_REQUEST)
+
 
 
 # Teacher-specific endpoints

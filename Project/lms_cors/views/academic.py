@@ -79,10 +79,7 @@ class InstitutionViewSet(BaseViewSet):
 
 
 class DepartmentViewSet(BaseViewSet):
-    queryset = Department.objects.select_related('institution').prefetch_related('programs', 'teachers').filter(
-        institution__isnull=False,
-        institution__is_active=True
-    )
+    queryset = Department.objects.select_related('institution').prefetch_related('programs', 'teachers').all()
     serializer_class = DepartmentSerializer
     search_fields = ['name', 'code', 'description', 'head_of_department']
     filterset_fields = ['institution', 'is_active']
@@ -101,11 +98,7 @@ class DepartmentViewSet(BaseViewSet):
 
 
 class ProgramViewSet(BaseViewSet):
-    queryset = Program.objects.select_related('department', 'department__institution').filter(
-        department__isnull=False,
-        department__is_active=True,
-        department__institution__is_active=True
-    )
+    queryset = Program.objects.select_related('department', 'department__institution').all()
     serializer_class = ProgramSerializer
     search_fields = ['name', 'code', 'description']
     filterset_fields = ['department', 'program_level', 'academic_system']
@@ -129,11 +122,7 @@ class ProgramViewSet(BaseViewSet):
 
 class AcademicSessionViewSet(BaseViewSet):
     """ViewSet for Academic Session (Batch/Intake) management."""
-    queryset = AcademicSession.objects.select_related('program', 'program__department', 'program__department__institution').filter(
-        program__isnull=False,
-        program__department__is_active=True,
-        program__department__institution__is_active=True
-    )
+    queryset = AcademicSession.objects.select_related('program', 'program__department', 'program__department__institution').all()
     serializer_class = AcademicSessionSerializer
     search_fields = ['session_name', 'session_code', 'program__name', 'program__code']
     filterset_fields = ['program', 'start_year', 'end_year', 'status', 'is_active', 
@@ -261,8 +250,8 @@ class AcademicSessionViewSet(BaseViewSet):
         stats.update({
             'session_name': session.session_name,
             'session_code': session.session_code,
-            'program_name': session.program.name,
-            'program_level': session.program.get_program_level_display() if session.program.program_level else 'N/A',
+            'program_name': session.program.name if session.program else 'N/A',
+            'program_level': session.program.get_program_level_display() if session.program and session.program.program_level else 'N/A',
             'total_semesters': session.total_semesters,
             'semester_count': session.semesters.count(),
             'status': session.status
@@ -637,11 +626,7 @@ class SubjectViewSet(BaseViewSet):
             return queryset.filter(id__in=id_list)
             
         # Default filters for general listing
-        queryset = queryset.filter(
-            semester__isnull=False,
-            semester__program__department__is_active=True,
-            semester__program__department__institution__is_active=True
-        )
+        queryset = queryset.all()
         
         # Only show subjects from active sessions (or legacy subjects without a session)
         queryset = queryset.filter(

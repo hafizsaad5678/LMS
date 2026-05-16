@@ -119,7 +119,24 @@ class Exam(models.Model):
 
 
 class Timetable(models.Model):
-    """Class schedule/timetable"""
+    """
+    Class schedule / timetable slot.
+
+    Semester locking rule:
+      - When a semester ends, set semester.is_active = False (do NOT delete slots).
+      - The ViewSet filters by semester__status='active' so old slots are hidden
+        from the live timetable but remain in the database for historical records.
+
+    Schedule types:
+      - permanent  → repeats every week for the semester duration
+      - temporary  → applies to one specific date only (specific_date is required)
+
+    Future upgrade path (not implemented yet):
+      You can later add `effective_start_date` and `effective_end_date` DateFields
+      to handle overlapping semesters, exam-period extensions, or academic holidays
+      without changing the core filtering logic.
+    """
+
     DAYS = [
         ('monday', 'Monday'),
         ('tuesday', 'Tuesday'),
@@ -128,14 +145,19 @@ class Timetable(models.Model):
         ('friday', 'Friday'),
         ('saturday', 'Saturday'),
     ]
-    
+
+    SCHEDULE_TYPE_CHOICES = [
+        ('permanent', 'Permanent (every week)'),
+        ('temporary', 'Temporary (specific date only)'),
+    ]
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     subject = models.ForeignKey(
-        'lms_cors.Subject', on_delete=models.CASCADE, 
+        'lms_cors.Subject', on_delete=models.CASCADE,
         related_name='timetable_slots', null=True, blank=True
     )
     teacher = models.ForeignKey(
-        'lms_cors.Teacher', on_delete=models.CASCADE, 
+        'lms_cors.Teacher', on_delete=models.CASCADE,
         related_name='timetable_slots', null=True, blank=True
     )
     day = models.CharField(max_length=15, choices=DAYS)
@@ -150,39 +172,69 @@ class Timetable(models.Model):
         'lms_cors.Semester', on_delete=models.CASCADE,
         related_name='timetable_slots', null=True, blank=True
     )
+    academic_session = models.ForeignKey(
+        'lms_cors.AcademicSession', on_delete=models.CASCADE,
+        related_name='timetable_slots', null=True, blank=True,
+        help_text="Explicitly binds timetable to a specific year/session to separate old records"
+    )
+
+    # --- Schedule type (permanent vs temporary) ---
+    schedule_type = models.CharField(
+        max_length=15,
+        choices=SCHEDULE_TYPE_CHOICES,
+        default='permanent',
+        help_text="Permanent = repeats every week. Temporary = one specific date only."
+    )
+    specific_date = models.DateField(
+        null=True, blank=True,
+        help_text="Only required when schedule_type is 'temporary'."
+    )
+
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    
+
     class Meta:
         ordering = ['day', 'start_time']
         db_table = 'timetables'
         unique_together = ['day', 'start_time', 'room']
         verbose_name = 'Timetable Slot'
         verbose_name_plural = 'Timetable Slots'
-    
+
     def __str__(self):
         subject = self.subject.code if self.subject else "Unknown"
-        return f"{self.day} {self.start_time}-{self.end_time}: {subject} in {self.room}"
+        type_label = f" [{self.schedule_type}]" if self.schedule_type == 'temporary' else ""
+        return f"{self.day} {self.start_time}-{self.end_time}: {subject} in {self.room}{type_label}"
 
     def clean(self):
+        # ── Basic time validation ──────────────────────────────────────
         if self.start_time and self.end_time and self.start_time >= self.end_time:
-             raise ValidationError("End time must be after start time")
+            raise ValidationError("End time must be after start time.")
 
-        # Teacher conflict
+        # ── Schedule type validation ───────────────────────────────────
+        if self.schedule_type == 'temporary' and not self.specific_date:
+            raise ValidationError(
+                {"specific_date": "A specific date is required for temporary schedules."}
+            )
+        if self.schedule_type == 'permanent':
+            # Prevent accidental date being stored on a permanent slot
+            self.specific_date = None
+
+        # ── Teacher conflict ───────────────────────────────────────────
         if self.teacher:
             conflicts = Timetable.objects.filter(
                 day=self.day,
                 start_time__lt=self.end_time,
                 end_time__gt=self.start_time,
                 teacher=self.teacher,
-                is_active=True
+                is_active=True,
             ).exclude(pk=self.pk)
-            
             if conflicts.exists():
-                raise ValidationError(f"Teacher {self.teacher.full_name} is already booked at this time.")
-            
-        # Program/Semester conflict (Class)
+                raise ValidationError(
+                    f"Teacher {self.teacher.full_name} is already booked at this time."
+                )
+
+        # ── Program / Semester (class group) conflict ──────────────────
         if self.program and self.semester:
             conflicts = Timetable.objects.filter(
                 day=self.day,
@@ -190,25 +242,28 @@ class Timetable(models.Model):
                 end_time__gt=self.start_time,
                 program=self.program,
                 semester=self.semester,
-                is_active=True
+                is_active=True,
             ).exclude(pk=self.pk)
-            
             if conflicts.exists():
-                raise ValidationError(f"Semester {self.semester.number} of {self.program.name} is already booked at this time.")
-        
-        # Room conflict
+                raise ValidationError(
+                    f"Semester {self.semester.number} of {self.program.name} "
+                    f"is already booked at this time."
+                )
+
+        # ── Room conflict ──────────────────────────────────────────────
         if self.room:
             conflicts = Timetable.objects.filter(
-                 day=self.day,
-                 start_time__lt=self.end_time,
-                 end_time__gt=self.start_time,
-                 room=self.room,
-                 is_active=True
+                day=self.day,
+                start_time__lt=self.end_time,
+                end_time__gt=self.start_time,
+                room=self.room,
+                is_active=True,
             ).exclude(pk=self.pk)
-            
             if conflicts.exists():
-                 raise ValidationError(f"Room {self.room} is occupied at this time.")
+                raise ValidationError(f"Room {self.room} is occupied at this time.")
 
     def save(self, *args, **kwargs):
+        if self.semester and hasattr(self.semester, 'session'):
+            self.academic_session = self.semester.session
         self.clean()
         super().save(*args, **kwargs)
