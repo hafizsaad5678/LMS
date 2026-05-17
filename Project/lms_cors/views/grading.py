@@ -1,5 +1,5 @@
 import logging
-from django.db.models import OuterRef, Subquery
+from django.db.models import OuterRef, Subquery, Q
 
 from rest_framework import viewsets, status, permissions
 from rest_framework.decorators import action
@@ -804,7 +804,12 @@ class StudentMarkViewSet(viewsets.ReadOnlyModelViewSet):
             st_profile = g.submission.student
             
             # Check if this assignment is already represented by a StudentMark to avoid duplicates
-            if any(m.get('title') == assignment.title for m in marks_data):
+            if any(
+                (m.get('component_name') == assignment.title or m.get('assignment_title') == assignment.title) and 
+                float(m.get('marks_obtained') or 0) == float(g.marks_obtained or 0) and 
+                float(m.get('total_marks') or 0) == float(assignment.total_marks or 0)
+                for m in marks_data
+            ):
                 continue
 
             marks_data.append({
@@ -816,9 +821,461 @@ class StudentMarkViewSet(viewsets.ReadOnlyModelViewSet):
                 'component_type': 'assignment',
                 'marks_obtained': float(g.marks_obtained or 0),
                 'max_marks': float(assignment.total_marks or 0),
+                'weightage': 10.00, # Default weight for legacy assignments
                 'percentage': round((float(g.marks_obtained or 0) / float(assignment.total_marks or 1)) * 100, 2) if assignment.total_marks else 0,
                 'is_locked': True,
                 'graded_at': g.graded_at.isoformat() if g.graded_at else None
             })
             
         return Response(marks_data)
+
+
+# ── Subject Result (Pass/Fail) ViewSet ──────────────────────────────────────
+
+from ..models.academic import SubjectResult, Subject, Semester
+from ..models.grading import GradingScheme, StudentGradeSummary
+from ..serializers.grading import SubjectResultSerializer, SubjectResultBulkSerializer
+
+
+class SubjectResultViewSet(viewsets.ModelViewSet):
+    """ViewSet for managing student subject pass/fail results."""
+    serializer_class = SubjectResultSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    PASSING_THRESHOLD = 40  # Default fallback
+
+    def get_permissions(self):
+        if self.action in ('create', 'update', 'partial_update', 'destroy',
+                           'bulk_update', 'initialize', 'auto_calculate'):
+            return [permissions.IsAuthenticated(), IsAdminOrTeacher()]
+        return [permissions.IsAuthenticated()]
+
+    def get_queryset(self):
+        user = self.request.user
+        if not user.is_authenticated:
+            return SubjectResult.objects.none()
+
+        qs = SubjectResult.objects.select_related(
+            'student', 'subject', 'semester', 'decided_by'
+        )
+
+        if user.is_staff or user.is_superuser or hasattr(user, 'admin_profile'):
+            pass
+        elif hasattr(user, 'teacher_profile'):
+            teacher = user.teacher_profile
+            teacher_subject_ids = TeacherSubject.objects.filter(
+                teacher=teacher, is_active=True
+            ).values_list('subject_id', flat=True)
+            qs = qs.filter(subject_id__in=teacher_subject_ids)
+        elif hasattr(user, 'student_profile'):
+            qs = qs.filter(student=user.student_profile)
+        else:
+            return SubjectResult.objects.none()
+
+        # Query param filters
+        subject_id = self.request.query_params.get('subject')
+        if subject_id:
+            qs = qs.filter(subject_id=subject_id)
+
+        semester_id = self.request.query_params.get('semester')
+        if semester_id:
+            qs = qs.filter(semester_id=semester_id)
+
+        student_id = self.request.query_params.get('student')
+        if student_id:
+            qs = qs.filter(student_id=student_id)
+
+        return qs.order_by('student__full_name', 'subject__code')
+
+    def _get_passing_threshold(self, subject):
+        """Get passing marks threshold from GradingScheme for this subject."""
+        scheme = GradingScheme.objects.filter(subject=subject).first()
+        if not scheme:
+            scheme = GradingScheme.objects.filter(is_default=True).first()
+        return float(scheme.passing_marks) if scheme else self.PASSING_THRESHOLD
+
+    def _get_letter_grade(self, percentage):
+        """Calculate letter grade from percentage."""
+        if percentage >= 90: return 'A+'
+        if percentage >= 85: return 'A'
+        if percentage >= 80: return 'A-'
+        if percentage >= 75: return 'B+'
+        if percentage >= 70: return 'B'
+        if percentage >= 65: return 'B-'
+        if percentage >= 60: return 'C+'
+        if percentage >= 55: return 'C'
+        if percentage >= 50: return 'C-'
+        if percentage >= 40: return 'D'
+        return 'F'
+
+    def _calc_student_percentage(self, student, subject):
+        """Calculate weighted percentage for a student in a subject from StudentMark data."""
+        marks = StudentMark.objects.filter(
+            student=student, component__subject=subject
+        ).select_related('component')
+
+        total_weighted = Decimal('0')
+        total_weight = Decimal('0')
+
+        for mark in marks:
+            max_marks = Decimal(str(mark.component.max_marks or 0))
+            obtained = Decimal(str(mark.marks_obtained or 0))
+            weight = Decimal(str(mark.component.weightage or 0))
+
+            if max_marks > 0:
+                pct = (obtained / max_marks) * 100
+                total_weighted += pct * weight / 100
+                total_weight += weight
+
+        if total_weight > 0:
+            return float((total_weighted / total_weight) * 100)
+
+        # Fallback: simple average if no weightage
+        if marks.exists():
+            total_obtained = sum(float(m.marks_obtained or 0) for m in marks)
+            total_max = sum(float(m.component.max_marks or 0) for m in marks)
+            if total_max > 0:
+                return round((total_obtained / total_max) * 100, 2)
+
+        return 0.0
+
+    @action(detail=False, methods=['post'])
+    def initialize(self, request):
+        """Create pending SubjectResult entries for all students enrolled in a subject."""
+        subject_id = request.data.get('subject') or request.data.get('subject_id')
+
+        if not subject_id:
+            return Response({'error': 'subject ID is required.'},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        subject = get_object_or_404(Subject, id=subject_id)
+        semester = subject.semester
+
+        if not semester:
+            return Response({'error': 'Subject is not linked to a semester.'},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        enrollments = StudentSubject.objects.filter(subject=subject)
+        created_count = 0
+
+        for enrollment in enrollments:
+            _, created = SubjectResult.objects.get_or_create(
+                student=enrollment.student,
+                subject=subject,
+                semester=semester,
+                defaults={'result': 'pending'}
+            )
+            if created:
+                created_count += 1
+
+        return Response({
+            'status': 'success',
+            'created': created_count,
+            'total_enrolled': enrollments.count()
+        })
+
+    @action(detail=False, methods=['post'])
+    def auto_calculate(self, request):
+        """Auto-calculate pass/fail for all students in a subject."""
+        subject_id = request.data.get('subject') or request.data.get('subject_id')
+
+        if not subject_id:
+            return Response({'error': 'subject ID is required.'},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        subject = get_object_or_404(Subject, id=subject_id)
+        semester = subject.semester
+        
+        if not semester:
+            return Response({'error': 'Subject is not linked to a semester.'},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        # 1. Sync QuizAttempts & SubmissionHistory grades to StudentMark first!
+        from lms_cors.models import Quiz, QuizAttempt
+        from lms_cors.models.assignments import Assignment, SubmissionHistory, Grade
+
+        components = GradeComponent.objects.filter(subject=subject)
+        for comp in components:
+            if comp.component_type == 'quiz':
+                try:
+                    linked_quiz = comp.linked_quiz
+                except Exception:
+                    linked_quiz = None
+
+                if linked_quiz:
+                    attempts = QuizAttempt.objects.filter(quiz=linked_quiz, status='completed')
+                for attempt in attempts:
+                    StudentMark.objects.update_or_create(
+                        component=comp,
+                        student=attempt.student,
+                        defaults={
+                            'marks_obtained': Decimal(str(attempt.score or 0)),
+                            'is_locked': True
+                        }
+                    )
+            elif comp.component_type == 'assignment':
+                a_obj = Assignment.objects.filter(title=comp.name, subject=subject).first()
+                if a_obj:
+                    submissions = SubmissionHistory.objects.filter(assignment=a_obj)
+                    for sub in submissions:
+                        try:
+                            grade = sub.grade
+                            StudentMark.objects.update_or_create(
+                                component=comp,
+                                student=sub.student,
+                                defaults={
+                                    'marks_obtained': Decimal(str(grade.marks_obtained or 0)),
+                                    'is_locked': True
+                                }
+                            )
+                        except Grade.DoesNotExist:
+                            pass
+
+        # 2. Iterate through SubjectResults and calculate midterm (40) and sessional (60)
+        results = SubjectResult.objects.filter(subject=subject, semester=semester)
+        updated_count = 0
+
+        for result in results:
+            # Fetch all StudentMark entries for this subject
+            student_marks = StudentMark.objects.filter(
+                student=result.student, component__subject=subject
+            ).select_related('component')
+
+            # Calculate Mid Term marks (out of 40) - Split by categories:
+            # - Quizzes: max 10 marks
+            # - Assignments: max 10 marks
+            # - Midterm paper: max 20 marks
+            # - Total = 40 marks
+            
+            # 1. Quizzes (out of 10)
+            quiz_list = [m for m in student_marks if m.component.component_type == 'quiz']
+            quiz_val = Decimal('0')
+            if quiz_list:
+                quiz_weighted = Decimal('0')
+                quiz_weight_sum = Decimal('0')
+                for m in quiz_list:
+                    max_m = Decimal(str(m.component.max_marks or 0))
+                    obt = Decimal(str(m.marks_obtained or 0))
+                    w = Decimal(str(m.component.weightage or 0))
+                    if max_m > 0:
+                        pct = (obt / max_m) * Decimal('100')
+                        quiz_weighted += pct * w / Decimal('100')
+                        quiz_weight_sum += w
+                if quiz_weight_sum > 0:
+                    quiz_pct = (quiz_weighted / quiz_weight_sum) * Decimal('100')
+                    quiz_val = (quiz_pct / Decimal('100')) * Decimal('10')
+                else:
+                    quiz_max = sum(Decimal(str(m.component.max_marks or 0)) for m in quiz_list)
+                    quiz_obt = sum(Decimal(str(m.marks_obtained or 0)) for m in quiz_list)
+                    if quiz_max > 0:
+                        quiz_val = (quiz_obt / quiz_max) * Decimal('10')
+
+            # 2. Assignments (out of 10)
+            assignment_list = [m for m in student_marks if m.component.component_type == 'assignment']
+            assignment_val = Decimal('0')
+            if assignment_list:
+                assignment_weighted = Decimal('0')
+                assignment_weight_sum = Decimal('0')
+                for m in assignment_list:
+                    max_m = Decimal(str(m.component.max_marks or 0))
+                    obt = Decimal(str(m.marks_obtained or 0))
+                    w = Decimal(str(m.component.weightage or 0))
+                    if max_m > 0:
+                        pct = (obt / max_m) * Decimal('100')
+                        assignment_weighted += pct * w / Decimal('100')
+                        assignment_weight_sum += w
+                if assignment_weight_sum > 0:
+                    assignment_pct = (assignment_weighted / assignment_weight_sum) * Decimal('100')
+                    assignment_val = (assignment_pct / Decimal('100')) * Decimal('10')
+                else:
+                    assignment_max = sum(Decimal(str(m.component.max_marks or 0)) for m in assignment_list)
+                    assignment_obt = sum(Decimal(str(m.marks_obtained or 0)) for m in assignment_list)
+                    if assignment_max > 0:
+                        assignment_val = (assignment_obt / assignment_max) * Decimal('10')
+
+            # 3. Midterm Paper (out of 20)
+            midterm_paper_list = [m for m in student_marks if m.component.component_type == 'midterm']
+            if result.mid_paper_marks is not None:
+                midterm_paper_val = result.mid_paper_marks
+            else:
+                midterm_paper_val = Decimal('0')
+                if midterm_paper_list:
+                    mid_weighted = Decimal('0')
+                    mid_weight_sum = Decimal('0')
+                    for m in midterm_paper_list:
+                        max_m = Decimal(str(m.component.max_marks or 0))
+                        obt = Decimal(str(m.marks_obtained or 0))
+                        w = Decimal(str(m.component.weightage or 0))
+                        if max_m > 0:
+                            pct = (obt / max_m) * Decimal('100')
+                            mid_weighted += pct * w / Decimal('100')
+                            mid_weight_sum += w
+                    if mid_weight_sum > 0:
+                        mid_pct = (mid_weighted / mid_weight_sum) * Decimal('100')
+                        midterm_paper_val = (mid_pct / Decimal('100')) * Decimal('20')
+                    else:
+                        mid_max = sum(Decimal(str(m.component.max_marks or 0)) for m in midterm_paper_list)
+                        mid_obt = sum(Decimal(str(m.marks_obtained or 0)) for m in midterm_paper_list)
+                        if mid_max > 0:
+                            midterm_paper_val = (mid_obt / mid_max) * Decimal('20')
+
+            # Midterm Val is the sum of Quizzes (10) + Assignments (10) + Midterm Exam (20) = 40 max
+            mid_val = quiz_val + assignment_val + midterm_paper_val
+
+            # Sessional is not calculated by the system; keep the teacher's manually entered sessional marks
+            sess_val = result.sessional_marks or Decimal('0')
+            total_val = mid_val + sess_val
+
+            scheme = GradingScheme.objects.filter(subject=subject).first()
+            if not scheme:
+                scheme = GradingScheme.objects.filter(is_default=True).first()
+
+            percentage_float = float(total_val)
+            letter_grade = 'F'
+            if scheme:
+                if percentage_float >= float(scheme.a_plus_min): letter_grade = 'A+'
+                elif percentage_float >= float(scheme.a_min): letter_grade = 'A'
+                elif percentage_float >= float(scheme.a_minus_min): letter_grade = 'A-'
+                elif percentage_float >= float(scheme.b_plus_min): letter_grade = 'B+'
+                elif percentage_float >= float(scheme.b_min): letter_grade = 'B'
+                elif percentage_float >= float(scheme.b_minus_min): letter_grade = 'B-'
+                elif percentage_float >= float(scheme.c_plus_min): letter_grade = 'C+'
+                elif percentage_float >= float(scheme.c_min): letter_grade = 'C'
+                elif percentage_float >= float(scheme.c_minus_min): letter_grade = 'C-'
+                elif percentage_float >= float(scheme.d_min): letter_grade = 'D'
+            else:
+                if percentage_float >= 90: letter_grade = 'A+'
+                elif percentage_float >= 85: letter_grade = 'A'
+                elif percentage_float >= 80: letter_grade = 'A-'
+                elif percentage_float >= 75: letter_grade = 'B+'
+                elif percentage_float >= 70: letter_grade = 'B'
+                elif percentage_float >= 65: letter_grade = 'B-'
+                elif percentage_float >= 60: letter_grade = 'C+'
+                elif percentage_float >= 55: letter_grade = 'C'
+                elif percentage_float >= 50: letter_grade = 'C-'
+                elif percentage_float >= 40: letter_grade = 'D'
+
+            gpa_map = {
+                'A+': 4.0, 'A': 4.0, 'A-': 3.7, 'B+': 3.3, 'B': 3.0, 'B-': 2.7,
+                'C+': 2.3, 'C': 2.0, 'C-': 1.7, 'D': 1.0, 'F': 0.0
+            }
+            gpa_val = gpa_map.get(letter_grade, 0.0)
+
+            result.mid_paper_marks = Decimal(str(round(midterm_paper_val, 2)))
+            result.mid_marks = Decimal(str(round(mid_val, 2)))
+            result.sessional_marks = Decimal(str(round(sess_val, 2)))
+            result.total_marks = Decimal(str(round(total_val, 2)))
+            result.percentage = result.total_marks
+            result.letter_grade = letter_grade
+            result.result = 'pass' if percentage_float >= 50.0 else 'fail'
+            result.gpa = Decimal(str(gpa_val))
+            result.is_overridden = False
+            result.save()
+            updated_count += 1
+
+        return Response({
+            'status': 'success',
+            'updated': updated_count,
+            'passing_threshold': 50.0
+        })
+
+    @action(detail=False, methods=['post'])
+    def bulk_update(self, request):
+        """Bulk update pass/fail results by SubjectResult ID."""
+        if not hasattr(request.user, 'teacher_profile') and not request.user.is_staff:
+            return Response({'error': 'Only teachers and admins can update results.'},
+                            status=status.HTTP_403_FORBIDDEN)
+
+        results_data = request.data.get('results', [])
+        if not results_data:
+            return Response({'error': 'No results provided.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        teacher = getattr(request.user, 'teacher_profile', None)
+        updated_count = 0
+
+        with transaction.atomic():
+            for item in results_data:
+                result_id = item.get('id')
+                if not result_id:
+                    continue
+                
+                try:
+                    res_obj = SubjectResult.objects.get(id=result_id)
+                    mid_paper_marks = item.get('mid_paper_marks')
+                    mid_marks = item.get('mid_marks')
+                    sessional_marks = item.get('sessional_marks')
+
+                    if mid_paper_marks is not None:
+                        res_obj.mid_paper_marks = Decimal(str(mid_paper_marks)) if mid_paper_marks != '' else None
+                    elif mid_marks is not None:
+                        res_obj.mid_paper_marks = Decimal(str(mid_marks)) if mid_marks != '' else None
+
+                    if sessional_marks is not None:
+                        res_obj.sessional_marks = Decimal(str(sessional_marks)) if sessional_marks != '' else None
+
+                    # If mid_paper_marks is provided, res_obj.save() will calculate the new mid_marks.
+                    # We save the object first to ensure the save() calculations run.
+                    res_obj.save()
+
+                    # Automatically calculate total, percentage, grade, gpa and result if marks exist
+                    if res_obj.mid_marks is not None or res_obj.sessional_marks is not None:
+                        mid_val = res_obj.mid_marks or Decimal('0')
+                        sess_val = res_obj.sessional_marks or Decimal('0')
+                        res_obj.total_marks = mid_val + sess_val
+                        res_obj.percentage = res_obj.total_marks
+
+                        scheme = GradingScheme.objects.filter(subject=res_obj.subject).first()
+                        if not scheme:
+                            scheme = GradingScheme.objects.filter(is_default=True).first()
+
+                        percentage_float = float(res_obj.percentage)
+                        letter_grade = 'F'
+                        if scheme:
+                            if percentage_float >= float(scheme.a_plus_min): letter_grade = 'A+'
+                            elif percentage_float >= float(scheme.a_min): letter_grade = 'A'
+                            elif percentage_float >= float(scheme.a_minus_min): letter_grade = 'A-'
+                            elif percentage_float >= float(scheme.b_plus_min): letter_grade = 'B+'
+                            elif percentage_float >= float(scheme.b_min): letter_grade = 'B'
+                            elif percentage_float >= float(scheme.b_minus_min): letter_grade = 'B-'
+                            elif percentage_float >= float(scheme.c_plus_min): letter_grade = 'C+'
+                            elif percentage_float >= float(scheme.c_min): letter_grade = 'C'
+                            elif percentage_float >= float(scheme.c_minus_min): letter_grade = 'C-'
+                            elif percentage_float >= float(scheme.d_min): letter_grade = 'D'
+                        else:
+                            if percentage_float >= 90: letter_grade = 'A+'
+                            elif percentage_float >= 85: letter_grade = 'A'
+                            elif percentage_float >= 80: letter_grade = 'A-'
+                            elif percentage_float >= 75: letter_grade = 'B+'
+                            elif percentage_float >= 70: letter_grade = 'B'
+                            elif percentage_float >= 65: letter_grade = 'B-'
+                            elif percentage_float >= 60: letter_grade = 'C+'
+                            elif percentage_float >= 55: letter_grade = 'C'
+                            elif percentage_float >= 50: letter_grade = 'C-'
+                            elif percentage_float >= 40: letter_grade = 'D'
+
+                        res_obj.letter_grade = letter_grade
+                        
+                        gpa_map = {
+                            'A+': 4.0, 'A': 4.0, 'A-': 3.7, 'B+': 3.3, 'B': 3.0, 'B-': 2.7,
+                            'C+': 2.3, 'C': 2.0, 'C-': 1.7, 'D': 1.0, 'F': 0.0
+                        }
+                        res_obj.gpa = Decimal(str(gpa_map.get(letter_grade, 0.0)))
+                        
+                        # "under 50 fail" threshold
+                        res_obj.result = 'pass' if percentage_float >= 50.0 else 'fail'
+
+                    # Teacher custom result selection has precedence (explicit control)
+                    custom_result = item.get('result')
+                    if custom_result in ['pass', 'fail']:
+                        res_obj.result = custom_result
+                        res_obj.is_overridden = True
+
+                    res_obj.remarks = item.get('remarks', res_obj.remarks)
+                    res_obj.decided_by = teacher
+                    res_obj.decided_at = timezone.now()
+                    res_obj.save()
+                    updated_count += 1
+                except SubjectResult.DoesNotExist:
+                    continue
+
+        return Response({'status': 'success', 'updated': updated_count})

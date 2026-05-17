@@ -1,6 +1,8 @@
 from collections import defaultdict
+from decimal import Decimal
 from django.db.models import Q, Count, Exists, OuterRef, Sum
 from django.db import IntegrityError
+from django.shortcuts import get_object_or_404
 
 from rest_framework import status
 from rest_framework.decorators import action, api_view, permission_classes
@@ -10,7 +12,7 @@ from django.utils import timezone
 
 from .base import BaseProfileViewSet, BaseViewSet
 from ..models import (
-    Student, Teacher, Admin, TeacherSubject, StudentSubject, 
+    Student, StudentSemesterHistory, Teacher, Admin, TeacherSubject, StudentSubject, 
     Grade, StudentMark, Assignment, SubmissionHistory, Subject, Timetable,
     Quiz, QuizAttempt, GradeComponent, Announcement, Exam
 )
@@ -170,12 +172,9 @@ def teacher_my_assignments(request):
     
     
     # Get assignments with submission counts using annotation (avoids N+1 queries)
-    # Filter out assignments that are already linked to a GradeComponent
     assignments = Assignment.objects.filter(
         created_by=teacher,
         subject__semester__status='active'
-    ).exclude(
-        Exists(GradeComponent.objects.filter(name=OuterRef('title'), subject=OuterRef('subject')))
     ).select_related(
         'subject', 'subject__semester'
     ).annotate(
@@ -310,6 +309,11 @@ class StudentViewSet(BaseProfileViewSet):
     
     def get_serializer_class(self):
         return StudentDetailSerializer if self.action == 'retrieve' else StudentSerializer
+
+    def get_permissions(self):
+        if self.action == 'upload_semester_result':
+            return [IsAuthenticated(), IsAdminOrTeacher()]
+        return super().get_permissions()
 
     def _current_enrollments(self, student):
         queryset = student.enrolled_subjects.all()
@@ -786,7 +790,333 @@ class StudentViewSet(BaseProfileViewSet):
             current_qs = self._current_enrollments(student).values_list('id', flat=True)
             queryset = queryset.filter(id__in=current_qs)
         return Response(StudentSubjectSerializer(queryset, many=True).data)
-    
+
+    @action(detail=True, url_path='semester-history')
+    def semester_history(self, request, pk=None):
+        """Returns all semesters up to current with enrolled subjects and pass/fail status + per-semester GPA."""
+        from ..models.academic import SubjectResult, Semester
+
+        student = self.get_object()
+
+        # 1. Pre-fill all semesters for the student's session up to their current semester
+        semester_map = {}
+        if student.session:
+            # Fetch all semesters for the session, up to the student's current semester
+            all_semesters = Semester.objects.filter(
+                session=student.session,
+                number__lte=student.current_semester
+            ).order_by('number')
+            
+            for semester in all_semesters:
+                sem_id = str(semester.id)
+                session = semester.session
+                semester_map[sem_id] = {
+                    'semester_id': sem_id,
+                    'semester_number': semester.number,
+                    'semester_name': semester.name or f'Semester {semester.number}',
+                    'session_name': session.session_name if session else 'N/A',
+                    'status': semester.status,
+                    'is_current': semester.number == student.current_semester,
+                    'subjects': [],
+                    '_subject_ids': []
+                }
+
+        # 2. Get all enrollments for this student (across all semesters)
+        all_enrollments = StudentSubject.objects.filter(
+            student=student
+        ).select_related(
+            'subject', 'subject__semester', 'subject__semester__session'
+        ).order_by('subject__semester__number', 'subject__code')
+
+        # 3. Populate enrollments into the semester_map
+        for enrollment in all_enrollments:
+            subject = enrollment.subject
+            semester = subject.semester if subject else None
+            if not semester:
+                continue
+
+            sem_id = str(semester.id)
+            if sem_id not in semester_map:
+                # Fallback if a semester somehow isn't in the pre-filled list
+                session = semester.session
+                semester_map[sem_id] = {
+                    'semester_id': sem_id,
+                    'semester_number': semester.number,
+                    'semester_name': semester.name or f'Semester {semester.number}',
+                    'session_name': session.session_name if session else 'N/A',
+                    'status': semester.status,
+                    'is_current': semester.number == student.current_semester,
+                    'subjects': [],
+                    '_subject_ids': []
+                }
+            
+            # Avoid duplicate subjects
+            if str(subject.id) not in semester_map[sem_id]['_subject_ids']:
+                semester_map[sem_id]['_subject_ids'].append(str(subject.id))
+                semester_map[sem_id]['subjects'].append({
+                    'subject_id': str(subject.id),
+                    'name': subject.name,
+                    'code': subject.code,
+                    'credit_hours': subject.credit_hours,
+                    'result': 'pending',
+                    'percentage': 0,
+                    'letter_grade': '',
+                    'remarks': '',
+                    'mid_marks': None,
+                    'sessional_marks': None,
+                    'total_marks': None,
+                    'gpa': None
+                })
+
+        # Fetch all SubjectResult records for this student
+        results = SubjectResult.objects.filter(student=student).select_related('subject', 'semester')
+        result_map = {}
+        for r in results:
+            key = f"{r.semester_id}:{r.subject_id}"
+            result_map[key] = r
+
+        # Fetch grading components (StudentMark) and legacy Grades
+        from ..models.grading import StudentMark
+        from ..models.assignments import Grade
+        components_map = {} # subject_id -> list of components
+        
+        # 1. Standard StudentMarks
+        marks = StudentMark.objects.filter(student=student).select_related('component', 'component__subject')
+        for m in marks:
+            comp = m.component
+            subj_id = str(comp.subject_id)
+            if subj_id not in components_map:
+                components_map[subj_id] = []
+            components_map[subj_id].append({
+                'title': comp.name,
+                'type': comp.component_type,
+                'marks_obtained': float(m.marks_obtained or 0),
+                'max_marks': float(comp.max_marks or 0),
+                'percentage': float(m.percentage or 0)
+            })
+            
+        # 2. Legacy Grades (Assignments)
+        legacy_grades = Grade.objects.filter(submission__student=student).select_related(
+            'submission', 'submission__assignment', 'submission__assignment__subject'
+        )
+        for g in legacy_grades:
+            assignment = g.submission.assignment
+            subj_id = str(assignment.subject_id)
+            if subj_id not in components_map:
+                components_map[subj_id] = []
+                
+            # Avoid duplicates if already caught by StudentMark (match title, marks obtained, and max marks)
+            if any(
+                c['title'] == assignment.title and 
+                c['marks_obtained'] == float(g.marks_obtained or 0) and
+                c['max_marks'] == float(assignment.total_marks or 0)
+                for c in components_map[subj_id]
+            ):
+                continue
+                
+            percentage = round((float(g.marks_obtained or 0) / float(assignment.total_marks or 1)) * 100, 2) if assignment.total_marks else 0
+            components_map[subj_id].append({
+                'title': assignment.title,
+                'type': 'assignment',
+                'marks_obtained': float(g.marks_obtained or 0),
+                'max_marks': float(assignment.total_marks or 0),
+                'percentage': percentage
+            })
+
+        # Fetch all StudentSemesterHistory entries for this student to merge result_pdf and overrides
+        history_records = StudentSemesterHistory.objects.filter(student=student).select_related('from_semester')
+        history_map = {str(h.from_semester_id): h for h in history_records if h.from_semester_id}
+
+        # Merge results and components into semester subjects and calculate per-semester GPA
+        for sem_id, sem_data in semester_map.items():
+            total_gp = 0
+            total_credits = 0
+            passed_count = 0
+            failed_count = 0
+
+            for subj in sem_data['subjects']:
+                subj_id = subj['subject_id']
+                subj['components'] = components_map.get(subj_id, [])
+                
+                key = f"{sem_id}:{subj_id}"
+                result_obj = result_map.get(key)
+                subject_obj = Semester.objects.get(id=sem_id).subjects.filter(id=subj_id).first()
+
+                if result_obj:
+                    subj['result'] = result_obj.result
+                    subj['percentage'] = float(result_obj.percentage)
+                    subj['letter_grade'] = result_obj.letter_grade
+                    subj['remarks'] = result_obj.remarks
+                    subj['mid_marks'] = float(result_obj.mid_marks) if result_obj.mid_marks is not None else None
+                    subj['sessional_marks'] = float(result_obj.sessional_marks) if result_obj.sessional_marks is not None else None
+                    subj['total_marks'] = float(result_obj.total_marks) if result_obj.total_marks is not None else None
+                    
+                    if result_obj.result == 'pass':
+                        passed_count += 1
+                    elif result_obj.result == 'fail':
+                        failed_count += 1
+
+                    # Calculate GPA contribution
+                    credit_hrs = subj['credit_hours'] or 3
+                    gp = float(result_obj.gpa) if result_obj.gpa is not None else self._grade_point_from_percentage(float(result_obj.percentage), subject_obj)
+                    subj['gpa'] = gp
+                    total_gp += gp * credit_hrs
+                    total_credits += credit_hrs
+                else:
+                    # No official result yet - calculate dynamic real-time percentage and letter grade from components if present
+                    credit_hrs = subj['credit_hours'] or 3
+                    total_credits += credit_hrs
+                    
+                    components = subj.get('components', [])
+                    if components:
+                        total_obtained = sum(c['marks_obtained'] for c in components)
+                        total_max = sum(c['max_marks'] for c in components)
+                        if total_max > 0:
+                            calc_pct = round((total_obtained / total_max) * 100, 2)
+                            subj['percentage'] = calc_pct
+                            subj['letter_grade'] = self._get_letter_grade(calc_pct, subject_obj)
+
+            # Get semester history record to extract uploaded pdf and overrides
+            h_entry = history_map.get(sem_id)
+            semester_gpa = round(total_gp / total_credits, 2) if total_credits > 0 else 0.0
+
+            sem_data['gpa'] = float(h_entry.sgpa) if h_entry and h_entry.sgpa is not None else semester_gpa
+            sem_data['result_pdf'] = request.build_absolute_uri(h_entry.result_pdf.url) if h_entry and h_entry.result_pdf else None
+            sem_data['total_subjects'] = len(sem_data['subjects'])
+            sem_data['passed_count'] = passed_count
+            sem_data['failed_count'] = failed_count
+            sem_data['pending_count'] = sem_data['total_subjects'] - passed_count - failed_count
+            del sem_data['_subject_ids']
+
+        # Sort semesters by number (descending so current is first)
+        semesters_list = sorted(semester_map.values(), key=lambda s: s['semester_number'], reverse=True)
+
+        # Calculate cumulative CGPA (only include officially completed subjects)
+        all_gp = 0
+        all_credits = 0
+        for sem in semesters_list:
+            for subj in sem['subjects']:
+                if subj['percentage'] > 0 and subj['result'] != 'pending':
+                    credit_hrs = subj['credit_hours'] or 3
+                    # Fetch subject object for grading scheme
+                    subject_obj = None
+                    try:
+                        subject_obj = Semester.objects.get(id=sem['semester_id']).subjects.filter(id=subj['subject_id']).first()
+                    except Exception:
+                        pass
+                    gp = subj['gpa'] if subj.get('gpa') is not None else self._grade_point_from_percentage(subj['percentage'], subject_obj)
+                    all_gp += gp * credit_hrs
+                    all_credits += credit_hrs
+        cgpa_calculated = round(all_gp / all_credits, 2) if all_credits > 0 else 0.0
+
+        # Retrieve cumulative cgpa from the latest history record if overridden
+        latest_history = history_records.order_by('-from_semester__number').first()
+        cgpa_final = float(latest_history.cgpa) if latest_history and latest_history.cgpa is not None else cgpa_calculated
+
+        return Response({
+            'student': {
+                'id': str(student.id),
+                'full_name': student.full_name,
+                'enrollment_number': student.enrollment_number,
+                'current_semester': student.current_semester,
+            },
+            'cgpa': cgpa_final,
+            'total_semesters': len(semesters_list),
+            'semesters': semesters_list
+        })
+
+    @action(detail=True, methods=['post'], url_path='upload-semester-result')
+    def upload_semester_result(self, request, pk=None):
+        """Upload result/transcript PDF and set manual GPA/CGPA for a student semester."""
+        student = self.get_object()
+        semester_id = request.data.get('semester_id')
+        result_pdf = request.FILES.get('result_pdf')
+        sgpa = request.data.get('sgpa')
+        cgpa = request.data.get('cgpa')
+
+        if not semester_id:
+            return Response({'error': 'semester_id is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        from ..models.academic import Semester
+        semester = get_object_or_404(Semester, id=semester_id)
+
+        history, created = StudentSemesterHistory.objects.get_or_create(
+            student=student,
+            from_semester=semester,
+            defaults={
+                'session': student.session or semester.session,
+                'action': 'promoted',
+            }
+        )
+
+        if result_pdf:
+            history.result_pdf = result_pdf
+        if sgpa is not None and sgpa != '':
+            history.sgpa = Decimal(str(sgpa))
+        if cgpa is not None and cgpa != '':
+            history.cgpa = Decimal(str(cgpa))
+        history.save()
+
+        return Response({
+            'status': 'success',
+            'message': 'Semester result updated successfully.',
+            'result_pdf': request.build_absolute_uri(history.result_pdf.url) if history.result_pdf else None,
+            'sgpa': history.sgpa,
+            'cgpa': history.cgpa
+        })
+
+    def _get_letter_grade(self, percentage, subject=None):
+        """Calculate letter grade from percentage using subject's custom GradingScheme or defaults."""
+        from ..models.grading import GradingScheme
+        scheme = None
+        if subject:
+            scheme = GradingScheme.objects.filter(subject=subject).first()
+        if not scheme:
+            scheme = GradingScheme.objects.filter(is_default=True).first()
+
+        if scheme:
+            if percentage >= float(scheme.a_plus_min): return 'A+'
+            if percentage >= float(scheme.a_min): return 'A'
+            if percentage >= float(scheme.a_minus_min): return 'A-'
+            if percentage >= float(scheme.b_plus_min): return 'B+'
+            if percentage >= float(scheme.b_min): return 'B'
+            if percentage >= float(scheme.b_minus_min): return 'B-'
+            if percentage >= float(scheme.c_plus_min): return 'C+'
+            if percentage >= float(scheme.c_min): return 'C'
+            if percentage >= float(scheme.c_minus_min): return 'C-'
+            if percentage >= float(scheme.d_min): return 'D'
+            return 'F'
+
+        if percentage >= 90: return 'A+'
+        if percentage >= 85: return 'A'
+        if percentage >= 80: return 'A-'
+        if percentage >= 75: return 'B+'
+        if percentage >= 70: return 'B'
+        if percentage >= 65: return 'B-'
+        if percentage >= 60: return 'C+'
+        if percentage >= 55: return 'C'
+        if percentage >= 50: return 'C-'
+        if percentage >= 40: return 'D'
+        return 'F'
+
+    def _grade_point_from_percentage(self, percentage, subject=None):
+        """Helper to map percentage to standard 4.0 scale GPA points based on GradingScheme's letter grade."""
+        letter = self._get_letter_grade(percentage, subject)
+        gpa_map = {
+            'A+': 4.0,
+            'A': 4.0,
+            'A-': 3.7,
+            'B+': 3.3,
+            'B': 3.0,
+            'B-': 2.7,
+            'C+': 2.3,
+            'C': 2.0,
+            'C-': 1.7,
+            'D': 1.0,
+            'F': 0.0
+        }
+        return gpa_map.get(letter, 0.0)
+
     @action(detail=True)
     def announcements(self, request, pk=None):
         """Get all announcements for subjects the student is enrolled in"""
@@ -813,7 +1143,11 @@ class StudentViewSet(BaseProfileViewSet):
     def class_schedule(self, request, pk=None):
         student = self.get_object()
         enrolled_subject_ids = self._current_enrollments(student).values_list('subject_id', flat=True)
-        timetable = Timetable.objects.filter(subject_id__in=enrolled_subject_ids, is_active=True).select_related('subject', 'teacher')
+        timetable = Timetable.objects.filter(
+            subject_id__in=enrolled_subject_ids, 
+            is_active=True,
+            semester__status='active'
+        ).select_related('subject', 'teacher')
         return Response(TimetableSerializer(timetable, many=True).data)
 
     @action(detail=True)

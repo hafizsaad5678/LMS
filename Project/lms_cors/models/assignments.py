@@ -18,6 +18,7 @@ class Assignment(models.Model):
         related_name='created_assignments', null=True, blank=True
     )
     total_marks = models.DecimalField(max_digits=6, decimal_places=2, default=100.00)
+    weightage = models.DecimalField(max_digits=5, decimal_places=2, default=10.00, help_text="Percentage weightage in final grade (0-100)")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     

@@ -82,6 +82,9 @@ class StudentSemesterHistory(models.Model):
         related_name='history_to_semester'
     )
     action = models.CharField(max_length=20, choices=ACTION_CHOICES, default='promoted')
+    sgpa = models.DecimalField(max_digits=4, decimal_places=2, null=True, blank=True)
+    cgpa = models.DecimalField(max_digits=4, decimal_places=2, null=True, blank=True)
+    result_pdf = models.FileField(upload_to='student_results/pdfs/', null=True, blank=True)
     notes = models.TextField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
 

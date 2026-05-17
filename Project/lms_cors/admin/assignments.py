@@ -4,7 +4,7 @@ from ..models import Assignment, SubmissionHistory, Grade
 
 @admin.register(Assignment)
 class AssignmentAdmin(admin.ModelAdmin):
-    list_display = ['title', 'subject', 'due_date', 'created_by', 'total_marks', 'submission_count']
+    list_display = ['title', 'subject', 'due_date', 'created_by', 'total_marks', 'weightage', 'submission_count']
     list_filter = ['subject', 'created_by', 'due_date', 'subject__semester']
     search_fields = ['title', 'description', 'subject__name', 'subject__code']
     list_per_page = 20

@@ -384,6 +384,7 @@ class StudentMarkSerializer(serializers.ModelSerializer):
     graded_by_name = serializers.CharField(source='graded_by.full_name', read_only=True)
     
     component_type = serializers.CharField(source='component.component_type', read_only=True)
+    weightage = serializers.DecimalField(source='component.weightage', max_digits=5, decimal_places=2, read_only=True)
     
     # Aliases for frontend compatibility and consistency with GradeSerializer
     assignment_title = serializers.CharField(source='component.name', read_only=True)
@@ -496,7 +497,7 @@ class StudentMarkSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'student', 'student_name', 'student_enrollment', 
             'component', 'component_name', 'component_type',
-            'assignment_title', 'subject_name', 'subject_code',
+            'assignment_title', 'subject_name', 'subject_code', 'weightage',
             'marks_obtained', 'total_marks', 'max_marks', 
             'percentage', 'weighted_marks', 'remarks', 
             'grade_value', 'assignment_id',
@@ -583,3 +584,43 @@ class GradeOverviewSerializer(serializers.Serializer):
     pending_students = serializers.IntegerField()
     class_average = serializers.DecimalField(max_digits=5, decimal_places=2)
     components = GradeComponentSerializer(many=True)
+
+
+# ── Subject Result (Pass/Fail) Serializers ──────────────────────────────────
+
+from ..models.academic import SubjectResult
+
+
+class SubjectResultSerializer(serializers.ModelSerializer):
+    """Serializer for subject pass/fail results."""
+    student_name = serializers.CharField(source='student.full_name', read_only=True)
+    student_enrollment = serializers.CharField(source='student.enrollment_number', read_only=True)
+    subject_name = serializers.CharField(source='subject.name', read_only=True)
+    subject_code = serializers.CharField(source='subject.code', read_only=True)
+    credit_hours = serializers.IntegerField(source='subject.credit_hours', read_only=True)
+    semester_number = serializers.IntegerField(source='semester.number', read_only=True)
+    semester_name = serializers.CharField(source='semester.name', read_only=True)
+    decided_by_name = serializers.CharField(source='decided_by.full_name', read_only=True, default='')
+
+    class Meta:
+        model = SubjectResult
+        fields = [
+            'id', 'student', 'student_name', 'student_enrollment',
+            'subject', 'subject_name', 'subject_code', 'credit_hours',
+            'semester', 'semester_number', 'semester_name',
+            'result', 'percentage', 'letter_grade', 'remarks',
+            'mid_marks', 'mid_paper_marks', 'sessional_marks', 'total_marks', 'gpa',
+            'is_overridden', 'decided_by', 'decided_by_name', 'decided_at',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
+
+class SubjectResultBulkSerializer(serializers.Serializer):
+    """Serializer for bulk pass/fail updates."""
+    student_id = serializers.UUIDField()
+    subject_id = serializers.UUIDField()
+    semester_id = serializers.UUIDField()
+    result = serializers.ChoiceField(choices=['pass', 'fail', 'pending'])
+    remarks = serializers.CharField(allow_blank=True, required=False, default='')
+    is_overridden = serializers.BooleanField(default=False)

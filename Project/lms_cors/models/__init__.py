@@ -2,7 +2,7 @@
 from .base import BaseProfile, validate_profile_image_size, profile_image_path
 from .academic import (
     Department, Program, AcademicSession, 
-    Semester, Subject, generate_sequential_id
+    Semester, Subject, SubjectResult, generate_sequential_id
 )
 from institution_profile.models import (
     Institution, InstitutionGallery, InstitutionFeature, InstitutionEvent,
@@ -24,7 +24,7 @@ __all__ = [
     # Academic
     'Institution', 'InstitutionGallery', 'InstitutionFeature', 'InstitutionEvent',
     'InstitutionAdmissionInfo', 'InstitutionContact', 'Department', 'Program', 'AcademicSession', 
-    'Semester', 'Subject', 'generate_sequential_id', 'InstitutionTestimonial', 'InstitutionAdmissionFeatured',
+    'Semester', 'Subject', 'SubjectResult', 'generate_sequential_id', 'InstitutionTestimonial', 'InstitutionAdmissionFeatured',
     # People
     'Student', 'StudentSemesterHistory', 'Teacher', 'Admin', 'TeacherSubject', 'StudentSubject',
     # Assignments

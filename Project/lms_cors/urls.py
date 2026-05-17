@@ -12,7 +12,8 @@ from .views import (
 )
 from .views.grading import (
     GradeComponentViewSet, StudentMarkViewSet, 
-    QuizViewSet, QuizQuestionViewSet, QuizAttemptViewSet
+    QuizViewSet, QuizQuestionViewSet, QuizAttemptViewSet,
+    SubjectResultViewSet
 )
 from .views.people import teacher_my_classes, teacher_my_assignments, teacher_class_students
 from .views.scheduling import teacher_timetable, teacher_exams, teacher_attendance_report
@@ -51,6 +52,7 @@ router.register(r'quiz-questions', QuizQuestionViewSet, basename='quiz-question'
 router.register(r'quiz-attempts', QuizAttemptViewSet, basename='quiz-attempt')
 router.register(r'grade-components', GradeComponentViewSet, basename='grade-component')
 router.register(r'student-marks', StudentMarkViewSet, basename='student-mark')
+router.register(r'subject-results', SubjectResultViewSet, basename='subject-result')
 router.register(r'attendance', AttendanceViewSet)
 
 # Academic Scheduling

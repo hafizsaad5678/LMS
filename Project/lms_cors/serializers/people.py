@@ -51,6 +51,9 @@ class StudentSerializer(BaseProfileSerializer):
     department_name = serializers.CharField(source='program.department.name', read_only=True)
     session_name = serializers.CharField(source='session.session_name', read_only=True)
     current_semester_name = serializers.SerializerMethodField()
+    current_semester_status = serializers.SerializerMethodField()
+    current_semester_start_date = serializers.SerializerMethodField()
+    current_semester_end_date = serializers.SerializerMethodField()
     completed_assignments = serializers.SerializerMethodField()
     pending_assignments = serializers.SerializerMethodField()
     attendance_rate = serializers.SerializerMethodField()
@@ -59,6 +62,30 @@ class StudentSerializer(BaseProfileSerializer):
         model = Student
         fields = '__all__'
         read_only_fields = BaseProfileSerializer.Meta.read_only_fields + ['enrollment_number']
+
+    def get_current_semester_status(self, obj):
+        if obj.session and obj.current_semester:
+            from ..models.academic import Semester
+            sem = Semester.objects.filter(session=obj.session, number=obj.current_semester).first()
+            if sem:
+                return sem.status
+        return None
+
+    def get_current_semester_start_date(self, obj):
+        if obj.session and obj.current_semester:
+            from ..models.academic import Semester
+            sem = Semester.objects.filter(session=obj.session, number=obj.current_semester).first()
+            if sem:
+                return sem.start_date
+        return None
+
+    def get_current_semester_end_date(self, obj):
+        if obj.session and obj.current_semester:
+            from ..models.academic import Semester
+            sem = Semester.objects.filter(session=obj.session, number=obj.current_semester).first()
+            if sem:
+                return sem.end_date
+        return None
 
     def get_program_name(self, obj):
         if obj.program and obj.session:

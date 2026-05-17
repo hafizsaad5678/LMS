@@ -291,3 +291,171 @@ class Subject(models.Model):
     
     def __str__(self):
         return f"{self.code} - {self.name}"
+
+
+class SubjectResult(models.Model):
+    """Stores the final pass/fail result for a student in a subject."""
+    RESULT_CHOICES = [
+        ('pass', 'Pass'),
+        ('fail', 'Fail'),
+        ('pending', 'Pending'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    student = models.ForeignKey(
+        'lms_cors.Student', on_delete=models.CASCADE,
+        related_name='subject_results'
+    )
+    subject = models.ForeignKey(
+        Subject, on_delete=models.CASCADE,
+        related_name='results'
+    )
+    semester = models.ForeignKey(
+        Semester, on_delete=models.CASCADE,
+        related_name='results'
+    )
+    result = models.CharField(max_length=10, choices=RESULT_CHOICES, default='pending')
+    percentage = models.DecimalField(max_digits=5, decimal_places=2, default=0)
+    letter_grade = models.CharField(max_length=3, blank=True)
+    mid_marks = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    mid_paper_marks = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    sessional_marks = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    total_marks = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    gpa = models.DecimalField(max_digits=3, decimal_places=2, null=True, blank=True)
+    remarks = models.TextField(blank=True)
+    is_overridden = models.BooleanField(
+        default=False,
+        help_text="True if teacher manually changed the auto-calculated result"
+    )
+    decided_by = models.ForeignKey(
+        'lms_cors.Teacher', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='decided_results'
+    )
+    decided_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def save(self, *args, **kwargs):
+        from decimal import Decimal
+        # Retrieve student's quizzes and assignments to dynamically calculate mid_marks
+        # if mid_paper_marks is provided!
+        if self.mid_paper_marks is not None:
+            from .grading import StudentMark  # Avoid circular imports
+            student_marks = StudentMark.objects.filter(
+                student=self.student, component__subject=self.subject
+            ).select_related('component')
+            
+            # 1. Quizzes (out of 10)
+            quiz_list = [m for m in student_marks if m.component.component_type == 'quiz']
+            quiz_val = Decimal('0')
+            if quiz_list:
+                quiz_weighted = Decimal('0')
+                quiz_weight_sum = Decimal('0')
+                for m in quiz_list:
+                    max_m = Decimal(str(m.component.max_marks or 0))
+                    obt = Decimal(str(m.marks_obtained or 0))
+                    w = Decimal(str(m.component.weightage or 0))
+                    if max_m > 0:
+                        pct = (obt / max_m) * Decimal('100')
+                        quiz_weighted += pct * w / Decimal('100')
+                        quiz_weight_sum += w
+                if quiz_weight_sum > 0:
+                    quiz_pct = (quiz_weighted / quiz_weight_sum) * Decimal('100')
+                    quiz_val = (quiz_pct / Decimal('100')) * Decimal('10')
+                else:
+                    quiz_max = sum(Decimal(str(m.component.max_marks or 0)) for m in quiz_list)
+                    quiz_obt = sum(Decimal(str(m.marks_obtained or 0)) for m in quiz_list)
+                    if quiz_max > 0:
+                        quiz_val = (quiz_obt / quiz_max) * Decimal('10')
+                        
+            # 2. Assignments (out of 10)
+            assignment_list = [m for m in student_marks if m.component.component_type == 'assignment']
+            assignment_val = Decimal('0')
+            if assignment_list:
+                assignment_weighted = Decimal('0')
+                assignment_weight_sum = Decimal('0')
+                for m in assignment_list:
+                    max_m = Decimal(str(m.component.max_marks or 0))
+                    obt = Decimal(str(m.marks_obtained or 0))
+                    w = Decimal(str(m.component.weightage or 0))
+                    if max_m > 0:
+                        pct = (obt / max_m) * Decimal('100')
+                        assignment_weighted += pct * w / Decimal('100')
+                        assignment_weight_sum += w
+                if assignment_weight_sum > 0:
+                    assignment_pct = (assignment_weighted / assignment_weight_sum) * Decimal('100')
+                    assignment_val = (assignment_pct / Decimal('100')) * Decimal('10')
+                else:
+                    assignment_max = sum(Decimal(str(m.component.max_marks or 0)) for m in assignment_list)
+                    assignment_obt = sum(Decimal(str(m.marks_obtained or 0)) for m in assignment_list)
+                    if assignment_max > 0:
+                        assignment_val = (assignment_obt / assignment_max) * Decimal('10')
+                        
+            # 3. Midterm Paper is self.mid_paper_marks (out of 20)
+            mid_paper_val = Decimal(str(self.mid_paper_marks))
+            
+            # Sum of Quizzes (10) + Assignments (10) + Midterm Paper (20) = 40 max
+            self.mid_marks = quiz_val + assignment_val + mid_paper_val
+
+        # Automatically calculate total marks, percentage, letter grade, and GPA
+        mid = self.mid_marks or Decimal('0')
+        sess = self.sessional_marks or Decimal('0')
+        self.total_marks = mid + sess
+        self.percentage = self.total_marks
+        
+        # Calculate letter grade based on Subject's GradingScheme
+        from .grading import GradingScheme  # Safe local import to avoid circular imports
+        scheme = GradingScheme.objects.filter(subject=self.subject).first()
+        if not scheme:
+            scheme = GradingScheme.objects.filter(is_default=True).first()
+            
+        percentage_float = float(self.total_marks)
+        letter_grade = 'F'
+        if scheme:
+            if percentage_float >= float(scheme.a_plus_min): letter_grade = 'A+'
+            elif percentage_float >= float(scheme.a_min): letter_grade = 'A'
+            elif percentage_float >= float(scheme.a_minus_min): letter_grade = 'A-'
+            elif percentage_float >= float(scheme.b_plus_min): letter_grade = 'B+'
+            elif percentage_float >= float(scheme.b_min): letter_grade = 'B'
+            elif percentage_float >= float(scheme.b_minus_min): letter_grade = 'B-'
+            elif percentage_float >= float(scheme.c_plus_min): letter_grade = 'C+'
+            elif percentage_float >= float(scheme.c_min): letter_grade = 'C'
+            elif percentage_float >= float(scheme.c_minus_min): letter_grade = 'C-'
+            elif percentage_float >= float(scheme.d_min): letter_grade = 'D'
+        else:
+            if percentage_float >= 90: letter_grade = 'A+'
+            elif percentage_float >= 85: letter_grade = 'A'
+            elif percentage_float >= 80: letter_grade = 'A-'
+            elif percentage_float >= 75: letter_grade = 'B+'
+            elif percentage_float >= 70: letter_grade = 'B'
+            elif percentage_float >= 65: letter_grade = 'B-'
+            elif percentage_float >= 60: letter_grade = 'C+'
+            elif percentage_float >= 55: letter_grade = 'C'
+            elif percentage_float >= 50: letter_grade = 'C-'
+            elif percentage_float >= 40: letter_grade = 'D'
+            
+        gpa_map = {
+            'A+': 4.0, 'A': 4.0, 'A-': 3.7, 'B+': 3.3, 'B': 3.0, 'B-': 2.7,
+            'C+': 2.3, 'C': 2.0, 'C-': 1.7, 'D': 1.0, 'F': 0.0
+        }
+        gpa_val = gpa_map.get(letter_grade, 0.0)
+        
+        self.letter_grade = letter_grade
+        self.gpa = Decimal(str(gpa_val))
+        
+        passing_threshold = float(scheme.passing_marks) if scheme else 50.0
+        self.result = 'pass' if percentage_float >= passing_threshold else 'fail'
+        
+        super().save(*args, **kwargs)
+
+    class Meta:
+        db_table = 'subject_results'
+        unique_together = ['student', 'subject', 'semester']
+        ordering = ['semester__number', 'subject__code']
+        verbose_name = 'Subject Result'
+        verbose_name_plural = 'Subject Results'
+
+    def __str__(self):
+        student_name = self.student.enrollment_number if self.student else 'N/A'
+        subject_code = self.subject.code if self.subject else 'N/A'
+        return f"{student_name} - {subject_code}: {self.result}"
