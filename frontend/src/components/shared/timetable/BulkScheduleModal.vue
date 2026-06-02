@@ -19,53 +19,76 @@
               </button>
             </div>
             <div class="card-body">
+              <div class="row g-3 mb-3 border-bottom pb-3">
+                <div class="col-md-6">
+                  <label class="form-label small fw-bold">Program <span class="text-danger">*</span></label>
+                  <select v-model="form.program" class="form-select form-select-sm" required @change="$emit('program-change', index)">
+                    <option value="">Select Program</option>
+                    <option v-for="program in programs" :key="program.id" :value="program.id">{{ program.name }}</option>
+                  </select>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label small fw-bold">Semester <span class="text-danger">*</span></label>
+                  <select v-model="form.semester" class="form-select form-select-sm" :disabled="!form.program" required @change="form.subject = ''">
+                    <option value="">Select Semester</option>
+                    <option v-for="semester in form.availableSemesters || []" :key="semester.id" :value="semester.id">Sem {{ semester.number }}</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="row g-3 mb-3 border-bottom pb-3">
+                <div class="col-md-6">
+                  <label class="form-label small fw-bold">Schedule Type <span class="text-danger">*</span></label>
+                  <div class="mt-1">
+                    <div class="form-check form-check-inline">
+                      <input class="form-check-input" type="radio" :name="'scheduleType' + index" :id="'typePermanent' + index" value="permanent" v-model="form.schedule_type">
+                      <label class="form-check-label small" :for="'typePermanent' + index">Permanent</label>
+                    </div>
+                    <div class="form-check form-check-inline">
+                      <input class="form-check-input" type="radio" :name="'scheduleType' + index" :id="'typeTemporary' + index" value="temporary" v-model="form.schedule_type">
+                      <label class="form-check-label small" :for="'typeTemporary' + index">Temporary</label>
+                    </div>
+                  </div>
+                </div>
+                <div class="col-md-6" v-if="form.schedule_type === 'temporary'">
+                  <label class="form-label small fw-bold text-warning">Specific Date <span class="text-danger">*</span></label>
+                  <input v-model="form.specific_date" type="date" class="form-control form-control-sm border-warning" required>
+                </div>
+              </div>
+
               <div class="row g-3">
                 <div class="col-md-3">
-                  <label class="form-label small">Day <span class="text-danger">*</span></label>
+                  <label class="form-label small fw-bold">Day <span class="text-danger">*</span></label>
                   <select v-model="form.day" class="form-select form-select-sm" required>
                     <option value="">Select</option>
                     <option v-for="(day, idx) in days" :key="day" :value="day">{{ dayLabels[idx] }}</option>
                   </select>
                 </div>
                 <div class="col-md-2">
-                  <label class="form-label small">Start <span class="text-danger">*</span></label>
+                  <label class="form-label small fw-bold">Start <span class="text-danger">*</span></label>
                   <input v-model="form.start_time" type="time" class="form-control form-control-sm" required>
                 </div>
                 <div class="col-md-2">
-                  <label class="form-label small">End <span class="text-danger">*</span></label>
+                  <label class="form-label small fw-bold">End <span class="text-danger">*</span></label>
                   <input v-model="form.end_time" type="time" class="form-control form-control-sm" required>
                 </div>
                 <div class="col-md-5">
-                  <label class="form-label small">Subject <span class="text-danger">*</span></label>
+                  <label class="form-label small fw-bold">Subject <span class="text-danger">*</span></label>
                   <select v-model="form.subject" class="form-select form-select-sm" :disabled="!form.semester" required>
                     <option value="">{{ form.semester ? 'Select Subject' : 'Select Semester First' }}</option>
                     <option v-for="subject in getFilteredSubjects(form)" :key="subject.id" :value="subject.id">{{ subject.code }} - {{ subject.name }}</option>
                   </select>
                 </div>
-                <div class="col-md-4">
-                  <label class="form-label small">Teacher <span class="text-danger">*</span></label>
+                <div class="col-md-8">
+                  <label class="form-label small fw-bold">Teacher <span class="text-danger">*</span></label>
                   <select v-model="form.teacher" class="form-select form-select-sm" required>
                     <option value="">Select Teacher</option>
                     <option v-for="teacher in teachers" :key="teacher.id" :value="teacher.id">{{ teacher.full_name }}</option>
                   </select>
                 </div>
-                <div class="col-md-2">
-                  <label class="form-label small">Room <span class="text-danger">*</span></label>
+                <div class="col-md-4">
+                  <label class="form-label small fw-bold">Room <span class="text-danger">*</span></label>
                   <input v-model="form.room" type="text" class="form-control form-control-sm" placeholder="101" required>
-                </div>
-                <div class="col-md-3">
-                  <label class="form-label small">Program <span class="text-danger">*</span></label>
-                  <select v-model="form.program" class="form-select form-select-sm" required @change="$emit('program-change', index)">
-                    <option value="">Select Program</option>
-                    <option v-for="program in programs" :key="program.id" :value="program.id">{{ program.name }}</option>
-                  </select>
-                </div>
-                <div class="col-md-3">
-                  <label class="form-label small">Semester <span class="text-danger">*</span></label>
-                  <select v-model="form.semester" class="form-select form-select-sm" :disabled="!form.program" required @change="form.subject = ''">
-                    <option value="">Select Semester</option>
-                    <option v-for="semester in form.availableSemesters || []" :key="semester.id" :value="semester.id">Sem {{ semester.number }}</option>
-                  </select>
                 </div>
               </div>
             </div>

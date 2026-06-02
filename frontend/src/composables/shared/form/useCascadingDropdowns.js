@@ -35,8 +35,11 @@ export const useCascadingDropdowns = (options = {}) => {
         )
     })
 
-    // Helper to normalize API response
-    const activeOnly = (items) => normalizeToArray(items).filter(item => item?.is_active !== false)
+    // Helper to normalize API response (handles both array and paginated {results:[]} formats)
+    const activeOnly = (items) => {
+        const arr = Array.isArray(items) ? items : (items?.results || normalizeToArray(items))
+        return arr.filter(item => item?.is_active !== false)
+    }
 
     // Load Institutions
     const loadInstitutions = async () => {

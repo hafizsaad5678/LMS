@@ -55,7 +55,8 @@ export const sidebarSections = [
       createMenuWithSubmenu('Grades', '/grades', '🏆', [
         { name: 'Grade Management', path: '/grades', icon: '📊' },
         { name: 'Grade Students', path: '/grades/students', icon: '📈' },
-        { name: 'Grade Report', path: '/grades/report', icon: '📄' }
+        { name: 'Grade Report', path: '/grades/report', icon: '📄' },
+        { name: 'Student Results', path: '/grades/results', icon: '📚' }
       ]),
       createMenuWithSubmenu('Attendance', '/attendance/mark', '📅', [
         { name: 'Mark Attendance', path: '/attendance/mark', icon: '✏️' },

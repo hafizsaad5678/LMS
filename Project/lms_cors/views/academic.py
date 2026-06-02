@@ -81,6 +81,7 @@ class InstitutionViewSet(BaseViewSet):
 class DepartmentViewSet(BaseViewSet):
     queryset = Department.objects.select_related('institution').prefetch_related('programs', 'teachers').all()
     serializer_class = DepartmentSerializer
+    pagination_class = None  # Ensure all departments load for frontend dropdowns
     search_fields = ['name', 'code', 'description', 'head_of_department']
     filterset_fields = ['institution', 'is_active']
     ordering_fields = ['name', 'code', 'created_at']
@@ -100,6 +101,7 @@ class DepartmentViewSet(BaseViewSet):
 class ProgramViewSet(BaseViewSet):
     queryset = Program.objects.select_related('department', 'department__institution').all()
     serializer_class = ProgramSerializer
+    pagination_class = None  # Ensure all programs/courses load for frontend
     search_fields = ['name', 'code', 'description']
     filterset_fields = ['department', 'program_level', 'academic_system']
     ordering_fields = ['name', 'code', 'duration_years']

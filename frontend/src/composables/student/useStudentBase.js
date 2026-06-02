@@ -8,6 +8,9 @@ import { STORAGE_KEYS } from '@/utils/constants/storage'
 export function useStudentBase() {
     const studentName = ref('')
     const studentEnrollment = ref('')
+    const currentSemesterStatus = ref('')
+    const currentSemesterStartDate = ref('')
+    const currentSemesterEndDate = ref('')
     const studentId = localStorage.getItem(STORAGE_KEYS.USER_ID)
     const loading = ref(false)
 
@@ -20,6 +23,9 @@ export function useStudentBase() {
             const profile = await studentService.getStudent(studentId)
             studentName.value = profile.full_name || profile.name
             studentEnrollment.value = profile.enrollment_number || profile.roll_no
+            currentSemesterStatus.value = profile.current_semester_status || ''
+            currentSemesterStartDate.value = profile.current_semester_start_date || ''
+            currentSemesterEndDate.value = profile.current_semester_end_date || ''
         } catch (err) {
             console.warn('Fail to fetch student profile:', err)
         } finally {
@@ -31,6 +37,9 @@ export function useStudentBase() {
         studentId,
         studentName,
         studentEnrollment,
+        currentSemesterStatus,
+        currentSemesterStartDate,
+        currentSemesterEndDate,
         loadProfile,
         loadingProfile: loading
     }

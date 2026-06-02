@@ -110,6 +110,7 @@ export const TEACHER_ROUTES = {
     GRADE_MANAGEMENT: { name: 'TeacherGradeManagement', path: '/teacher-dashboard/grades' },
     GRADE_STUDENTS: { name: 'TeacherGradeStudents', path: '/teacher-dashboard/grades/students' },
     GRADE_REPORT: { name: 'TeacherGradeReport', path: '/teacher-dashboard/grades/report' },
+    STUDENT_RESULTS: { name: 'TeacherStudentResults', path: '/teacher-dashboard/grades/results' },
 
     // Classes
     CLASS_LIST: { name: 'TeacherClassList', path: '/teacher-dashboard/classes' },
@@ -150,6 +151,7 @@ export const STUDENT_ROUTES = {
     MY_GRADES: { name: 'StudentMyGrade', path: '/student-dashboard/grades' },
     GRADE_REPORT: { name: 'StudentGradeReport', path: '/student-dashboard/grades/report' },
     GPA_CGPA_CALCULATOR: { name: 'StudentGpaCgpaCalculator', path: '/student-dashboard/grades/gpa-cgpa-calculator' },
+    SEMESTER_HISTORY: { name: 'StudentSemesterHistory', path: '/student-dashboard/grades/semester-history' },
 
     // Attendance
     MY_ATTENDANCE: { name: 'StudentMyAttendance', path: '/student-dashboard/attendance' },

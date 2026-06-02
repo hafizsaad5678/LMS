@@ -130,6 +130,7 @@ const actions = [
 ]
 
 const tableColumns = [
+  { key: 'code', label: 'Code', hideOnMobile: true },
   { key: 'name', label: 'Course' },
   { key: 'department_name', label: 'Department', hideOnMobile: true },
   { key: 'duration_years', label: 'Duration', hideOnMobile: true },
@@ -172,7 +173,10 @@ const stats = listStats.summary({
   totalSemesters: list => list.reduce((sum, course) => sum + (course.semester_count || 0), 0)
 })
 
-const fetchCourses = () => programService.getAllPrograms()
+const fetchCourses = async () => {
+  const data = await programService.getAllPrograms()
+  return Array.isArray(data) ? data : (data.results || [])
+}
 
 const loadCourses = () => loadData(fetchCourses)
 

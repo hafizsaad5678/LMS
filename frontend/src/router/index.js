@@ -71,12 +71,48 @@ const verifyTokenWithBackend = async (token, userRole) => {
   pendingAuthCheckKey = cacheKey
   pendingAuthCheck = (async () => {
     try {
-      const response = await fetch(probeUrl, {
+      let response = await fetch(probeUrl, {
         method: 'GET',
         headers: {
           Authorization: `Bearer ${token}`,
         },
       })
+
+      // If token is expired (401), try to refresh it before giving up
+      if (response.status === 401) {
+        const refreshToken = safeStorage.get('refresh_token')
+        if (refreshToken) {
+          try {
+            const refreshResponse = await fetch(`${API_BASE_URL}/token/refresh/`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ refresh: refreshToken }),
+            })
+
+            if (refreshResponse.ok) {
+              const refreshData = await refreshResponse.json()
+              const newAccessToken = refreshData.access
+
+              if (newAccessToken) {
+                // Save new token so Axios and future page requests pick it up
+                safeStorage.set('access_token', newAccessToken)
+
+                // Retry probe request with the newly acquired token
+                response = await fetch(probeUrl, {
+                  method: 'GET',
+                  headers: {
+                    Authorization: `Bearer ${newAccessToken}`,
+                  },
+                })
+              }
+            }
+          } catch (refreshErr) {
+            console.error('Token refresh failed in router guard:', refreshErr)
+          }
+        }
+      }
 
       // Only explicit auth failures should invalidate the session.
       if (response.status === 401 || response.status === 403) {
@@ -88,8 +124,10 @@ const verifyTokenWithBackend = async (token, userRole) => {
         return true
       }
 
+      // Update auth check cache with the current token
+      const currentToken = safeStorage.get('access_token') || token
       lastAuthCheckAt = Date.now()
-      lastAuthCheckKey = cacheKey
+      lastAuthCheckKey = `${currentToken}:${userRole}:${userId || ''}`
       return true
     } catch {
       // Dev reloads or temporary network issues should not force logout.

@@ -37,4 +37,6 @@ export { default as GenericListView } from './specialized/GenericListView.vue'
 export { default as EntityFormModal } from './specialized/EntityFormModal.vue'
 export { default as QuizQuestionPalette } from './specialized/QuizQuestionPalette.vue'
 export { default as RichTextEditor } from './RichTextEditor.vue'
+export { default as DashboardChart } from './specialized/DashboardChart.vue'
+
 

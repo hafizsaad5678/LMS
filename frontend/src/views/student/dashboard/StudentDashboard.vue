@@ -27,6 +27,37 @@
     </div>
   </div>
 
+  <!-- Charts Row -->
+  <div class="row g-4 mb-5">
+    <div class="col-lg-6">
+      <DashboardChart
+        title="Course Progress"
+        type="bar"
+        :chart-data="courseProgressData"
+        :options="{ 
+          scales: {
+            y: {
+              min: 0,
+              max: 100,
+              ticks: { stepSize: 20 }
+            }
+          }
+        }"
+        :loading="loadingCharts"
+        @refresh="loadCharts"
+      />
+    </div>
+    <div class="col-lg-6">
+      <DashboardChart
+        title="Quiz Marks Trend (Last 5 Quizzes)"
+        type="line"
+        :chart-data="quizTrendData"
+        :loading="loadingCharts"
+        @refresh="loadCharts"
+      />
+    </div>
+  </div>
+
   <!-- Content Grid -->
   <div class="row g-4">
     <div class="col-lg-6">
@@ -72,7 +103,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { ActivityFeed, QuickActionCard, StatCard } from '@/components/shared/common'
+import { ActivityFeed, QuickActionCard, StatCard, DashboardChart } from '@/components/shared/common'
 import studentPanelService from '@/services/student/studentPanelService'
 import { useStudentBase } from '@/composables/student/useStudentBase'
 import { STUDENT_ROUTES } from '@/utils/constants/routes'
@@ -109,6 +140,49 @@ const dashboardStats = computed(() => [
   { value: stats.value.attendance, title: 'Attendance', icon: 'bi bi-calendar-check-fill', type: 'department', variant: 'glass', route: STUDENT_ROUTES.MY_ATTENDANCE.path }
 ])
 
+const chartRawData = ref({
+  course_progress: { labels: [], values: [] },
+  quiz_trend: { labels: [], values: [] }
+})
+const loadingCharts = ref(true)
+
+const courseProgressData = computed(() => ({
+  labels: chartRawData.value.course_progress?.labels || [],
+  datasets: [
+    {
+      label: 'Progress (%)',
+      data: chartRawData.value.course_progress?.values || [],
+      backgroundColor: 'rgba(59, 130, 246, 0.85)',
+      borderRadius: 6
+    }
+  ]
+}))
+
+const quizTrendData = computed(() => ({
+  labels: chartRawData.value.quiz_trend?.labels || [],
+  datasets: [
+    {
+      label: 'Quiz Score (%)',
+      data: chartRawData.value.quiz_trend?.values || [],
+      borderColor: '#10b981',
+      backgroundColor: 'rgba(16, 185, 129, 0.1)',
+      tension: 0.3,
+      fill: true
+    }
+  ]
+}))
+
+const loadCharts = async () => {
+  try {
+    loadingCharts.value = true
+    chartRawData.value = await studentPanelService.getChartData()
+  } catch (error) {
+    console.error('Error loading charts:', error)
+  } finally {
+    loadingCharts.value = false
+  }
+}
+
 const loadDashboard = async () => {
   try {
     await loadProfile()
@@ -118,6 +192,8 @@ const loadDashboard = async () => {
     const { stats: dStats, activities: activityList } = await studentPanelService.getDashboardStats(studentId)
     stats.value = dStats
     activities.value = activityList
+    
+    loadCharts()
   } finally { loading.value = false; loadingActivities.value = false }
 }
 

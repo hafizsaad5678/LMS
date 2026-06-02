@@ -20,40 +20,87 @@
               @close="dismissTeacherAlert"
             />
 
+            <!-- Top Row: Program, Session and Semester -->
+            <div class="row mb-3 border-bottom pb-3">
+              <div class="col-md-4 mb-2 mb-md-0">
+                <label class="form-label fw-bold">Program <span class="text-danger">*</span></label>
+                <select v-model="form.program" class="form-select" required @change="$emit('program-change')">
+                  <option value="">Select Program</option>
+                  <option v-for="program in programs" :key="program.id" :value="program.id">{{ program.name }}</option>
+                </select>
+              </div>
+              <div class="col-md-4 mb-2 mb-md-0">
+                <label class="form-label fw-bold">Session <span class="text-danger">*</span></label>
+                <select v-model="form.academic_session" class="form-select" :disabled="!form.program" required @change="$emit('session-change')">
+                  <option value="">Select Session</option>
+                  <option v-for="session in sessions" :key="session.id" :value="session.id">{{ session.session_name }}</option>
+                </select>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label fw-bold">Semester <span class="text-danger">*</span></label>
+                <select v-model="form.semester" class="form-select" :disabled="!form.academic_session" required @change="$emit('semester-change')">
+                  <option value="">Select Semester</option>
+                  <option v-for="semester in semesters" :key="semester.id" :value="semester.id">
+                    {{ formatSemesterLabel(semester) }}
+                  </option>
+                </select>
+                <small v-if="!form.program" class="text-muted">Select a program first</small>
+                <small v-else-if="!form.academic_session" class="text-muted">Select a session first</small>
+              </div>
+            </div>
+
+            <!-- Schedule Type Row -->
+            <div class="row mb-3">
+              <div class="col-md-6">
+                <label class="form-label fw-bold">Schedule Type <span class="text-danger">*</span></label>
+                <div>
+                  <div class="form-check form-check-inline mt-1">
+                    <input class="form-check-input" type="radio" name="scheduleType" id="typePermanent" value="permanent" v-model="form.schedule_type">
+                    <label class="form-check-label" for="typePermanent">Permanent (Every Week)</label>
+                  </div>
+                  <div class="form-check form-check-inline mt-1">
+                    <input class="form-check-input" type="radio" name="scheduleType" id="typeTemporary" value="temporary" v-model="form.schedule_type">
+                    <label class="form-check-label" for="typeTemporary">Temporary (Specific Date)</label>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-6" v-if="form.schedule_type === 'temporary'">
+                <label class="form-label fw-bold text-warning">Specific Date <span class="text-danger">*</span></label>
+                <input v-model="form.specific_date" type="date" class="form-control border-warning" required>
+              </div>
+            </div>
+
             <!-- Day and Time Selection -->
             <div class="row mb-3">
               <div class="col-md-4">
-                <label class="form-label">Day <span class="text-danger">*</span></label>
+                <label class="form-label fw-bold">Day <span class="text-danger">*</span></label>
                 <select v-model="form.day" class="form-select" required @change="$emit('time-change')">
                   <option value="">Select Day</option>
                   <option v-for="(day, index) in days" :key="day" :value="day">{{ dayLabels[index] }}</option>
                 </select>
               </div>
               <div class="col-md-4">
-                <label class="form-label">Start Time <span class="text-danger">*</span></label>
+                <label class="form-label fw-bold">Start Time <span class="text-danger">*</span></label>
                 <input v-model="form.start_time" type="time" class="form-control" required @change="$emit('time-change')">
-                <small class="text-muted">End time will auto-calculate</small>
               </div>
               <div class="col-md-4">
-                <label class="form-label">End Time <span class="text-danger">*</span></label>
+                <label class="form-label fw-bold">End Time <span class="text-danger">*</span></label>
                 <input v-model="form.end_time" type="time" class="form-control" required>
-                <small class="text-muted">You can adjust manually</small>
               </div>
             </div>
 
             <div class="row">
-              <div class="col-md-6 mb-3">
-                <label class="form-label">Subject <span class="text-danger">*</span></label>
+              <div class="col-md-4 mb-3">
+                <label class="form-label fw-bold">Subject <span class="text-danger">*</span></label>
                 <select v-model="form.subject" class="form-select" :disabled="!form.semester" required>
                   <option value="">{{ form.semester ? 'Select Subject' : 'Select Semester First' }}</option>
                   <option v-for="subject in filteredSubjects" :key="subject.id" :value="subject.id">
                     {{ subject.code }} - {{ subject.name }}
                   </option>
                 </select>
-                <small v-if="!form.semester" class="text-muted">Select a semester first</small>
               </div>
-              <div class="col-md-6 mb-3">
-                <label class="form-label">Teacher <span class="text-danger">*</span></label>
+              <div class="col-md-4 mb-3">
+                <label class="form-label fw-bold">Teacher <span class="text-danger">*</span></label>
                 <select v-model="form.teacher" class="form-select" required>
                   <option value="">Select Teacher</option>
                   <option
@@ -65,45 +112,23 @@
                     {{ teacher.full_name }} - {{ teacher.employee_id }}
                   </option>
                 </select>
-                <small v-if="unavailableTeacherIds.length" class="text-muted">Busy teachers are disabled for the selected day and time.</small>
               </div>
-            </div>
-
-            <div class="row">
-              <div class="col-md-6 mb-3">
-                <label class="form-label">Room <span class="text-danger">*</span></label>
+              <div class="col-md-4 mb-3">
+                <label class="form-label fw-bold">Room <span class="text-danger">*</span></label>
                 <input v-model="form.room" type="text" class="form-control" placeholder="e.g., Room 101" required>
               </div>
-              <div class="col-md-6 mb-3">
-                <label class="form-label">Program <span class="text-danger">*</span></label>
-                <select v-model="form.program" class="form-select" required @change="$emit('program-change')">
-                  <option value="">Select Program</option>
-                  <option v-for="program in programs" :key="program.id" :value="program.id">{{ program.name }}</option>
-                </select>
-              </div>
             </div>
 
             <div class="row">
-              <div class="col-md-6 mb-3">
-                <label class="form-label">Semester <span class="text-danger">*</span></label>
-                <select v-model="form.semester" class="form-select" :disabled="!form.program" required>
-                  <option value="">Select Semester</option>
-                  <option v-for="semester in semesters" :key="semester.id" :value="semester.id">
-                    {{ formatSemesterLabel(semester) }}
-                  </option>
-                </select>
-                <small v-if="!form.program" class="text-muted">Select a program first</small>
-              </div>
-              <div class="col-md-6 mb-3">
-                <label class="form-label">Status</label>
+              <div class="col-md-12 mb-3">
                 <div class="form-check form-switch mt-2">
                   <input v-model="form.is_active" class="form-check-input" type="checkbox" id="activeSwitch">
-                  <label class="form-check-label" for="activeSwitch">{{ form.is_active ? 'Active' : 'Inactive' }}</label>
+                  <label class="form-check-label fw-bold" for="activeSwitch">Active Status</label>
                 </div>
               </div>
             </div>
 
-            <div class="d-flex gap-2 justify-content-end">
+            <div class="d-flex gap-2 justify-content-end border-top pt-3 mt-2">
               <button type="button" @click="$emit('close')" class="btn btn-secondary">Cancel</button>
               <button type="submit" class="btn btn-admin-primary" :disabled="saving">
                 <span v-if="saving" class="spinner-border spinner-border-sm me-2"></span>
@@ -151,6 +176,7 @@ const props = defineProps({
   unavailableTeacherIds: { type: Array, default: () => [] },
   unavailableTeacherConflicts: { type: Object, default: () => ({}) },
   programs: { type: Array, default: () => [] },
+  sessions: { type: Array, default: () => [] },
   semesters: { type: Array, default: () => [] },
   days: { type: Array, default: () => DAYS_OF_WEEK },
   dayLabels: { type: Array, default: () => DAY_LABELS }
@@ -190,12 +216,5 @@ watch(
   }
 )
 
-watch(
-  () => props.form?.semester,
-  () => {
-    props.form.subject = ''
-  }
-)
-
-defineEmits(['close', 'save', 'time-change', 'program-change'])
+defineEmits(['close', 'save', 'time-change', 'program-change', 'session-change', 'semester-change'])
 </script>

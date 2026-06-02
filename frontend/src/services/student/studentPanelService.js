@@ -424,6 +424,22 @@ export const studentPanelService = {
         throw new Error('attemptId is required for submitQuizAttempt')
     },
 
+    /**
+     * Get chart data for student dashboard
+     */
+    async getChartData() {
+        try {
+            const response = await api.get('/student/charts/')
+            return response.data
+        } catch (error) {
+            console.error('Error fetching student chart data:', error)
+            return {
+                course_progress: { labels: [], values: [] },
+                quiz_trend: { labels: [], values: [] }
+            }
+        }
+    },
+
     clearCache(studentId) {
         studentService.clearCache(studentId)
         if (studentId) {

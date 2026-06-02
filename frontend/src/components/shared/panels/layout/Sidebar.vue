@@ -160,8 +160,29 @@ const closeSubmenu = (itemName) => {
   expandedItems[itemName] = false
 }
 
+const allSidebarHrefs = computed(() => {
+  const hrefs = new Set()
+  props.sidebarSections.forEach(section => {
+    if (section && section.items) {
+      section.items.forEach(item => {
+        if (item.href) hrefs.add(item.href)
+        if (item.submenu) {
+          item.submenu.forEach(subitem => {
+            if (subitem.href) hrefs.add(subitem.href)
+          })
+        }
+      })
+    }
+  })
+  return hrefs
+})
+
 const isActive = (href) => {
-  return route.path === href || route.path.startsWith(href + '/')
+  if (route.path === href) return true
+  if (route.path.startsWith(href + '/')) {
+    return !allSidebarHrefs.value.has(route.path)
+  }
+  return false
 }
 
 const toggleSupportCard = () => {

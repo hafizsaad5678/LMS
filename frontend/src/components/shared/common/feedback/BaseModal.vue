@@ -98,8 +98,8 @@ const props = defineProps({
   },
   variant: {
     type: String,
-    default: '', // '', 'teacher', or 'student'
-    validator: (value) => ['', 'teacher', 'student'].includes(value)
+    default: '', // '', 'admin', 'teacher', or 'student'
+    validator: (value) => ['', 'admin', 'teacher', 'student'].includes(value)
   }
 })
 
@@ -107,6 +107,11 @@ const emit = defineEmits(['update:modelValue', 'hidden', 'confirm'])
 
 const modalRef = ref(null)
 let modalInstance = null
+
+const isAdminContext = computed(() => {
+  if (typeof window === 'undefined') return false
+  return window.location.pathname.startsWith('/admin-dashboard')
+})
 
 const isTeacherContext = computed(() => {
   if (typeof window === 'undefined') return false
@@ -120,6 +125,10 @@ const isStudentContext = computed(() => {
 
 const resolvedConfirmVariant = computed(() => {
   if (props.confirmVariant) return props.confirmVariant
+
+  if (props.variant === 'admin' || (!props.variant && isAdminContext.value)) {
+    return 'btn-admin-primary'
+  }
 
   if (props.variant === 'teacher' || (!props.variant && isTeacherContext.value)) {
     return 'btn-teacher-primary'
@@ -160,6 +169,10 @@ onMounted(() => {
 
       syncBodyModalState()
     })
+
+    if (props.modelValue) {
+      modalInstance.show()
+    }
   }
 })
 

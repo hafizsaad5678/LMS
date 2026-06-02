@@ -118,9 +118,6 @@ export const useEntityForm = (options = {}) => {
         return true
     }
 
-    /**
-     * Clear related caches
-     */
     const clearCaches = () => {
         if (cacheKeys.length > 0) {
             cacheKeys.forEach(key => {
@@ -133,6 +130,8 @@ export const useEntityForm = (options = {}) => {
                 }
             })
         }
+        // Always clear admin dashboard stats when modifying entities so it reflects real-time data
+        cacheService.clearPattern('admin:')
     }
 
     /**

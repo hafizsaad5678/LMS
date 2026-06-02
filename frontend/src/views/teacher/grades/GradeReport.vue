@@ -63,11 +63,11 @@
               <thead class="table-light">
                 <tr>
                   <th>Student</th>
-                  <th class="text-center">Assignments</th>
-                  <th class="text-center">Quizzes</th>
-                  <th class="text-center">Midterm</th>
-                  <th class="text-center">Final</th>
-                  <th class="text-center">Overall</th>
+                  <th class="text-center">Assignments (10)</th>
+                  <th class="text-center">Quizzes (10)</th>
+                  <th class="text-center">Mid Paper (20)</th>
+                  <th class="text-center">Final (60)</th>
+                  <th class="text-center">Overall (100)</th>
                   <th class="text-center">Grade</th>
                 </tr>
               </thead>
@@ -77,14 +77,53 @@
                     <div class="fw-bold text-dark">{{ student.name || 'Unknown Student' }}</div>
                     <small v-if="student.roll_no" class="text-muted">{{ student.roll_no }}</small>
                   </td>
-                  <td class="text-center">{{ student.assignments }}%</td>
-                  <td class="text-center">{{ student.quizzes }}%</td>
-                  <td class="text-center">{{ student.midterm }}%</td>
-                  <td class="text-center">{{ student.final }}%</td>
-                  <td class="text-center fw-bold text-dark">{{ student.overall }}%</td>
                   <td class="text-center">
-                    <span v-if="student.is_pending" class="badge px-3 bg-warning-subtle text-warning-emphasis">Pending</span>
-                    <span v-else :class="['badge px-3', getGradeBadge(student.grade)]">{{ student.grade }}</span>
+                    <span class="fw-semibold text-dark">{{ student.assignment_scaled !== null && student.assignment_scaled !== undefined ? student.assignment_scaled : 0 }} / 10</span>
+                    <small class="text-muted text-xs ms-1">({{ student.assignments !== null && student.assignments !== undefined ? student.assignments + '%' : '0%' }})</small>
+                  </td>
+                  <td class="text-center">
+                    <span class="fw-semibold text-dark">{{ student.quiz_scaled !== null && student.quiz_scaled !== undefined ? student.quiz_scaled : 0 }} / 10</span>
+                    <small class="text-muted text-xs ms-1">({{ student.quizzes !== null && student.quizzes !== undefined ? student.quizzes + '%' : '0%' }})</small>
+                  </td>
+                  <td 
+                    class="text-center position-relative midterm-cell" 
+                    style="cursor: pointer; min-width: 140px; transition: background-color 0.2s;" 
+                    @click="openEditMidModal(student)"
+                    title="Click to enter/edit Mid Paper marks"
+                  >
+                    <div class="d-flex align-items-center justify-content-center gap-1 py-1 rounded">
+                      <span class="fw-semibold text-dark">
+                        {{ student.mid_paper_marks !== null && student.mid_paper_marks !== undefined ? student.mid_paper_marks + ' / 20' : '0 / 20' }}
+                      </span>
+                      <small v-if="student.mid_paper_marks !== null && student.mid_paper_marks !== undefined" class="text-muted text-xs ms-1">
+                        ({{ Math.round((student.mid_paper_marks / 20) * 100) }}%)
+                      </small>
+                      <small v-else class="text-muted text-xs ms-1">
+                        (0%)
+                      </small>
+                      <i class="bi bi-pencil-fill text-primary ms-2 edit-pencil-icon" style="font-size: 0.75rem; opacity: 0; transition: opacity 0.2s;"></i>
+                    </div>
+                  </td>
+                  <td class="text-center">
+                    <span class="fw-semibold text-dark">{{ student.sessional_marks !== null && student.sessional_marks !== undefined ? student.sessional_marks : 0 }} / 60</span>
+                    <small class="text-muted text-xs ms-1">({{ student.final !== null && student.final !== undefined ? student.final + '%' : '0%' }})</small>
+                  </td>
+                  <td class="text-center fw-bold text-dark">
+                    <span>{{ student.overall !== null && student.overall !== undefined ? student.overall : 0 }} / 100</span>
+                    <small class="text-muted text-xs ms-1">({{ student.overall !== null && student.overall !== undefined ? student.overall + '%' : '0%' }})</small>
+                  </td>
+                  <td class="text-center">
+                    <button 
+                      class="badge px-3 border-0 font-monospace"
+                      :class="student.is_pending ? 'bg-warning-subtle text-warning-emphasis' : getGradeBadge(student.grade)"
+                      style="cursor: pointer; font-size: 0.85rem; transition: transform 0.2s;"
+                      onmouseover="this.style.transform='scale(1.15)';"
+                      onmouseout="this.style.transform='scale(1)';"
+                      @click="openGradeExplanationModal(student)"
+                      title="Click to view grade explanation"
+                    >
+                      {{ student.is_pending ? 'Pending' : student.grade }}
+                    </button>
                     <div v-if="student.is_pending" class="extra-small text-muted mt-1 fw-semibold">Marks not entered yet</div>
                     <div v-else-if="student.overall < 40" class="extra-small text-danger mt-1 fw-semibold">Below 40%</div>
                   </td>
@@ -99,6 +138,56 @@
         </div>
       </div>
     </div>
+    
+    <GradeBreakdownModal
+      v-model="showGradeModal"
+      v-if="showGradeModal && gradeModalStudent"
+      :student-id="gradeModalStudent.id"
+      :subject-id="gradeModalStudent.subject_id || selectedClass"
+      :student-name="gradeModalStudent.name"
+      :student-enrollment="gradeModalStudent.roll_no"
+      :mid-marks="gradeModalStudent.mid_marks"
+      :mid-paper-marks="gradeModalStudent.mid_paper_marks"
+      :sessional-marks="gradeModalStudent.sessional_marks"
+      :total-marks="gradeModalStudent.overall"
+      :letter-grade="gradeModalStudent.grade"
+      :gpa="gradeModalStudent.gpa"
+    />
+
+    <!-- Sleek Pop-up Modal for Entering Mid Paper Marks -->
+    <BaseModal v-model="showEditMidModal" title="Mid Paper Marks" :show-footer="false">
+      <div class="p-2 pb-3">
+        <div class="bg-light p-3 rounded-4 mb-4 border-start border-4 border-primary d-flex justify-content-between align-items-center">
+          <div>
+            <h6 class="fw-bold text-dark mb-1">{{ editingStudent?.name }}</h6>
+            <p class="text-muted small mb-0 text-uppercase font-monospace">ROLL NO: {{ editingStudent?.roll_no || '—' }}</p>
+          </div>
+        </div>
+        
+        <div class="input-group input-group-lg mx-auto shadow-sm" style="max-width: 180px; border-radius: 12px; overflow: hidden;">
+          <input 
+            type="number" 
+            v-model="editMidMarksVal" 
+            class="form-control text-center fw-bold border-0 bg-light"
+            min="0" 
+            max="20" 
+            step="0.5"
+            placeholder="0"
+            v-focus
+            @keydown.enter="submitEditMidMarks"
+            @keydown.esc="showEditMidModal = false"
+            style="font-size: 1.5rem;"
+          />
+          <span class="input-group-text border-0 bg-light-subtle fw-bold text-secondary" style="font-size: 1.2rem;">/ 20</span>
+        </div>
+        <div class="text-center extra-small text-muted mt-3 mb-4 fw-semibold">Enter paper marks between 0 and 20</div>
+        
+        <div class="d-flex justify-content-center gap-3">
+          <button type="button" class="btn btn-light px-4 rounded-pill fw-bold text-secondary border" @click="showEditMidModal = false">Cancel</button>
+          <button type="button" class="btn btn-primary px-4 rounded-pill fw-bold shadow-sm" style="background-color: var(--teacher-primary);" @click="submitEditMidMarks">Save</button>
+        </div>
+      </div>
+    </BaseModal>
   </TeacherPageTemplate>
 </template>
 
@@ -106,9 +195,10 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { TeacherPageTemplate } from '@/components/shared/panels'
-import { StatCard, AlertMessage, LoadingSpinner } from '@/components/shared/common'
+import { StatCard, AlertMessage, LoadingSpinner, BaseModal } from '@/components/shared/common'
 import GradeDistributionChart from '@/components/teacher/grades/GradeDistributionChart.vue'
 import TopPerformersList from '@/components/teacher/grades/TopPerformersList.vue'
+import GradeBreakdownModal from '@/components/teacher/grades/GradeBreakdownModal.vue'
 import { useGradeManagement } from '@/composables/teacher/useGradeManagement'
 import { useAlert } from '@/composables/shared'
 import teacherPanelService from '@/services/teacher/teacherPanelService'
@@ -137,6 +227,71 @@ const loading = ref(false)
 const gradeDistribution = ref([])
 const topPerformers = ref([])
 const detailedGrades = ref([])
+
+const showGradeModal = ref(false)
+const gradeModalStudent = ref(null)
+
+const openGradeExplanationModal = (student) => {
+  gradeModalStudent.value = student
+  showGradeModal.value = true
+}
+
+// Custom focus directive for inline editing
+const vFocus = {
+  mounted: (el) => el.focus()
+}
+
+const showEditMidModal = ref(false)
+const editingStudent = ref(null)
+const editMidMarksVal = ref('')
+
+const openEditMidModal = (student) => {
+  editingStudent.value = student
+  editMidMarksVal.value = student.mid_paper_marks !== null && student.mid_paper_marks !== undefined ? student.mid_paper_marks.toString() : '0'
+  showEditMidModal.value = true
+}
+
+const submitEditMidMarks = async () => {
+  const student = editingStudent.value
+  if (!student) return
+  
+  const parsedVal = editMidMarksVal.value === '' ? 0 : parseFloat(editMidMarksVal.value)
+  
+  if (isNaN(parsedVal) || parsedVal < 0 || parsedVal > 20) {
+    showAlert('danger', 'Mid Paper marks must be between 0 and 20')
+    return
+  }
+
+  try {
+    loading.value = true
+    showEditMidModal.value = false
+    
+    if (!student.result_id) {
+      await teacherPanelService.initializeSubjectResults(selectedClass.value || student.subject_id)
+      await loadGradeReport()
+      const updatedStudent = detailedGrades.value.find(s => s.id === student.id)
+      if (updatedStudent && updatedStudent.result_id) {
+        student.result_id = updatedStudent.result_id
+      } else {
+        throw new Error('Could not initialize SubjectResult for student')
+      }
+    }
+
+    await teacherPanelService.updateSubjectResult(student.result_id, {
+      mid_paper_marks: parsedVal
+    })
+
+    showAlert('success', `Mid Paper marks updated successfully for ${student.name}`)
+    await loadGradeReport()
+  } catch (error) {
+    console.error('Error saving midterm marks:', error)
+    showAlert('danger', 'Failed to save midterm marks')
+  } finally {
+    loading.value = false
+    editingStudent.value = null
+    editMidMarksVal.value = ''
+  }
+}
 
 const statsCards = computed(() => [
   { title: 'Class Average', value: averageGrade.value, icon: 'bi bi-award', type: 'student' },
@@ -178,10 +333,17 @@ async function loadGradeReport() {
   loading.value = true
   try {
     const params = { subject: selectedClass.value || undefined, period: selectedPeriod.value === 'current' ? undefined : selectedPeriod.value }
-    const response = await teacherPanelService.getAllMarks(params)
-    const marks = response.results || response || []
     
-    if (marks.length === 0) {
+    // Fetch both assessment component marks and final subject results
+    const [marksRes, resultsRes] = await Promise.all([
+      teacherPanelService.getAllMarks(params),
+      teacherPanelService.getSubjectResults(params)
+    ])
+    
+    const marks = marksRes.results || marksRes || []
+    const results = resultsRes.results || resultsRes || []
+    
+    if (marks.length === 0 && results.length === 0) {
       detailedGrades.value = []
       gradeDistribution.value = []
       topPerformers.value = []
@@ -189,18 +351,60 @@ async function loadGradeReport() {
     }
     
     const studentMap = new Map()
+    
+    // 1. Initialize from Subject Results (Ground Truth for Midterm, Final/Sessional, Overall, Grade)
+    results.forEach(res => {
+      const studentId = res.student
+      const midPaperVal = res.mid_paper_marks !== null && res.mid_paper_marks !== undefined ? parseFloat(res.mid_paper_marks) : null
+      const midVal = res.mid_marks !== null && res.mid_marks !== undefined ? parseFloat(res.mid_marks) : null
+      const sessVal = res.sessional_marks !== null && res.sessional_marks !== undefined ? parseFloat(res.sessional_marks) : null
+      const totalVal = res.total_marks !== null && res.total_marks !== undefined ? parseFloat(res.total_marks) : null
+      const isPending = res.result === 'pending' || res.total_marks === null
+      
+      studentMap.set(studentId, {
+        id: studentId,
+        subject_id: res.subject,
+        name: res.student_name || 'Unknown Student',
+        roll_no: res.student_enrollment || null,
+        assignments: null,
+        quizzes: null,
+        midterm: midPaperVal !== null ? Math.round((midPaperVal / 20) * 100) : null,
+        final: sessVal !== null ? Math.round((sessVal / 60) * 100) : null,
+        mid_paper_marks: midPaperVal,
+        mid_marks: midVal,
+        sessional_marks: sessVal,
+        overall: totalVal !== null ? Math.round(totalVal) : 0,
+        grade: res.letter_grade || 'Pending',
+        gpa: res.gpa !== null && res.gpa !== undefined ? parseFloat(res.gpa) : null,
+        is_pending: isPending,
+        assignment_obt: 0, assignment_max: 0,
+        quiz_obt: 0, quiz_max: 0,
+        result_id: res.id
+      })
+    })
+    
+    // 2. Accumulate granular assignment/quiz marks
     marks.forEach(mark => {
       const studentId = mark.student || mark.student_id
       if (!studentMap.has(studentId)) {
         studentMap.set(studentId, {
           id: studentId,
+          subject_id: mark.subject || selectedClass.value || '',
           name: mark.student_name || 'Unknown Student',
           roll_no: mark.student_roll_no || mark.roll_no || mark.student_enrollment || null,
-          assignments: 0, quizzes: 0, midterm: 0, final: 0,
-          componentCount: { assignments: 0, quizzes: 0, midterm: 0, final: 0 },
-          gradedCount: { assignments: 0, quizzes: 0, midterm: 0, final: 0 }
+          assignments: null,
+          quizzes: null,
+          midterm: null,
+          final: null,
+          overall: 0,
+          grade: 'Pending',
+          is_pending: true,
+          assignment_obt: 0, assignment_max: 0,
+          quiz_obt: 0, quiz_max: 0,
+          result_id: null
         })
       }
+      
       const student = studentMap.get(studentId)
       const componentType = mark.component_type || 'assignment'
       const rawMaxMarks = mark.max_marks ?? mark.total_marks
@@ -208,39 +412,45 @@ async function loadGradeReport() {
       const hasValidMax = Number.isFinite(maxMarks) && maxMarks > 0
       const rawMarks = mark.marks_obtained
       const hasMarks = rawMarks !== null && rawMarks !== undefined
-      const isGraded = hasMarks && hasValidMax
-      const computedPercent = isGraded ? (parseFloat(rawMarks) / maxMarks) * 100 : null
-      const apiPercent = Number.isFinite(mark.percentage) ? Number(mark.percentage) : null
-      const useComputed = apiPercent === null || (apiPercent === 0 && Number(rawMarks) > 0)
-      const percentage = isGraded
-        ? (useComputed ? computedPercent : apiPercent)
-        : null
-      const typeMap = { assignment: 'assignments', quiz: 'quizzes', midterm: 'midterm', final: 'final' }
-      const key = typeMap[componentType] || 'assignments'
-      if (isGraded) {
-        student[key] += percentage
-        student.componentCount[key]++
-        student.gradedCount[key]++
+      
+      if (hasMarks && hasValidMax) {
+        const obt = parseFloat(rawMarks)
+        if (componentType === 'assignment') {
+          student.assignment_obt += obt
+          student.assignment_max += maxMarks
+        } else if (componentType === 'quiz') {
+          student.quiz_obt += obt
+          student.quiz_max += maxMarks
+        }
       }
     })
     
+    // 3. Compute final percentages
     detailedGrades.value = Array.from(studentMap.values()).map(student => {
-      const avg = (key) => student.componentCount[key] > 0 ? Math.round(student[key] / student.componentCount[key]) : null
-      const components = [avg('assignments'), avg('quizzes'), avg('midterm'), avg('final')].filter(v => v !== null)
-      const gradedComponents = ['assignments', 'quizzes', 'midterm', 'final'].reduce((sum, key) => sum + (student.gradedCount[key] || 0), 0)
-      const overall = components.length > 0 ? Math.round(components.reduce((sum, v) => sum + v, 0) / components.length) : 0
-      const isPending = gradedComponents === 0
+      const assignments = student.assignment_max > 0 ? Math.round((student.assignment_obt / student.assignment_max) * 100) : null
+      const quizzes = student.quiz_max > 0 ? Math.round((student.quiz_obt / student.quiz_max) * 100) : null
+      const assignment_scaled = assignments !== null ? ((assignments / 100) * 10).toFixed(2) : null
+      const quiz_scaled = quizzes !== null ? ((quizzes / 100) * 10).toFixed(2) : null
+      
       return {
         id: student.id,
+        subject_id: student.subject_id,
         name: student.name,
         roll_no: student.roll_no,
-        assignments: avg('assignments'),
-        quizzes: avg('quizzes'),
-        midterm: avg('midterm'),
-        final: avg('final'),
-        overall,
-        grade: isPending ? 'Pending' : calculateGrade(overall),
-        is_pending: isPending
+        assignments,
+        assignment_scaled,
+        quizzes,
+        quiz_scaled,
+        midterm: student.midterm,
+        final: student.final,
+        mid_paper_marks: student.mid_paper_marks,
+        mid_marks: student.mid_marks,
+        sessional_marks: student.sessional_marks,
+        overall: student.overall,
+        grade: student.is_pending ? 'Pending' : student.grade,
+        gpa: student.gpa,
+        is_pending: student.is_pending,
+        result_id: student.result_id
       }
     })
     

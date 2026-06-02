@@ -48,6 +48,7 @@ export const teacherRoutes = {
         { path: 'grades', name: 'TeacherGradeManagement', component: () => import('../../views/teacher/grades/GradeManagement.vue') },
         { path: 'grades/students', name: 'TeacherGradeStudents', component: () => import('../../views/teacher/grades/GradeStudents.vue') },
         { path: 'grades/report', name: 'TeacherGradeReport', component: () => import('../../views/teacher/grades/GradeReport.vue') },
+        { path: 'grades/results', name: 'TeacherStudentResults', component: () => import('../../views/teacher/grades/StudentResults.vue') },
 
         // Quiz routes
         { path: 'quizzes', name: 'TeacherQuizList', component: () => import('../../views/teacher/quizzes/QuizList.vue') },

@@ -1,34 +1,57 @@
 <template>
-  <div class="d-flex justify-content-between align-items-center mb-5">
-    <div>
-      <h1 class="h2 fw-bold text-dark mb-2">Teacher Dashboard</h1>
-      <p class="text-muted mb-0">Welcome back! Manage your classes and students.</p>
-    </div>
-    
-    <!-- Search Bar -->
-    <div class="search-container position-relative">
-      <div class="input-group">
-        <span class="input-group-text bg-white border-end-0 ps-3">
-          <i class="bi bi-search text-muted"></i>
-        </span>
-        <input 
-          v-model="searchQuery" 
-          type="text" 
-          class="form-control border-start-0 ps-0" 
-          placeholder="Search students..." 
-          @keyup.enter="handleSearch"
-        >
-        <button @click="handleSearch" class="btn btn-teacher-primary px-3">
-          <i class="bi bi-arrow-right"></i>
-        </button>
-      </div>
-    </div>
+  <div class="mb-5">
+    <h1 class="h2 fw-bold text-dark mb-2">Teacher Dashboard</h1>
+    <p class="text-muted mb-0">Welcome back! Manage your classes and students.</p>
   </div>
 
   <!-- Stats Grid -->
   <div class="row g-4 mb-5">
     <div class="col-xl-3 col-md-6" v-for="stat in dashboardStats" :key="stat.title">
       <StatCard v-bind="stat" role="teacher" :loading="loading" @click="router.push(stat.route)" />
+    </div>
+  </div>
+
+  <!-- Charts Row -->
+  <div class="row g-4 mb-5">
+    <div class="col-lg-6">
+      <DashboardChart
+        title="Student Performance (Average Marks)"
+        type="bar"
+        :chart-data="studentPerformanceData"
+        :options="{
+          scales: {
+            y: {
+              min: 0,
+              max: 100,
+              ticks: { stepSize: 20 }
+            }
+          }
+        }"
+        :loading="loadingCharts"
+        @refresh="loadCharts"
+      />
+    </div>
+    <div class="col-lg-6">
+      <DashboardChart
+        title="Assignment Completion Rate"
+        type="doughnut"
+        :chart-data="assignmentCompletionData"
+        :loading="loadingCharts"
+        @refresh="loadCharts"
+      >
+        <template #header-actions>
+          <select 
+            v-if="assignmentsList.length > 0"
+            v-model="selectedAssignmentIndex"
+            class="form-select form-select-sm border shadow-sm fw-medium px-3 py-1 bg-white"
+            style="width: auto; max-width: 240px; font-size: 0.82rem; border-radius: 8px; border-color: rgba(99, 102, 241, 0.25) !important;"
+          >
+            <option v-for="(name, idx) in assignmentsList" :key="idx" :value="idx">
+              {{ name }}
+            </option>
+          </select>
+        </template>
+      </DashboardChart>
     </div>
   </div>
 
@@ -97,12 +120,11 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { ActivityFeed, QuickActionCard, StatCard } from '@/components/shared/common'
+import { ActivityFeed, QuickActionCard, StatCard, DashboardChart } from '@/components/shared/common'
 import teacherPanelService from '@/services/teacher/teacherPanelService'
 import { TEACHER_ROUTES } from '@/utils/constants/routes'
 
 const router = useRouter()
-const searchQuery = ref('')
 const loading = ref(true)
 const loadingActivities = ref(true)
 
@@ -122,6 +144,63 @@ const dashboardStats = computed(() => [
 
 const recentActivities = ref([])
 
+const chartRawData = ref({
+  student_performance: { labels: [], values: [] },
+  assignment_completion: { labels: [], submitted: [], pending: [] }
+})
+const loadingCharts = ref(true)
+const selectedAssignmentIndex = ref(0)
+
+const assignmentsList = computed(() => {
+  return chartRawData.value.assignment_completion?.labels || []
+})
+
+const studentPerformanceData = computed(() => ({
+  labels: chartRawData.value.student_performance?.labels || [],
+  datasets: [
+    {
+      label: 'Average Score (%)',
+      data: chartRawData.value.student_performance?.values || [],
+      backgroundColor: 'rgba(79, 70, 229, 0.85)',
+      borderRadius: 6
+    }
+  ]
+}))
+
+const assignmentCompletionData = computed(() => {
+  const labels = chartRawData.value.assignment_completion?.labels || []
+  const submitted = chartRawData.value.assignment_completion?.submitted || []
+  const pending = chartRawData.value.assignment_completion?.pending || []
+
+  if (labels.length === 0 || selectedAssignmentIndex.value >= labels.length) {
+    return { labels: [], datasets: [] }
+  }
+
+  const idx = selectedAssignmentIndex.value
+  return {
+    labels: ['Submitted', 'Pending'],
+    datasets: [
+      {
+        data: [submitted[idx] || 0, pending[idx] || 0],
+        backgroundColor: ['#10b981', '#f59e0b'],
+        borderWidth: 0
+      }
+    ]
+  }
+})
+
+const loadCharts = async () => {
+  try {
+    loadingCharts.value = true
+    chartRawData.value = await teacherPanelService.getChartData()
+    selectedAssignmentIndex.value = 0
+  } catch (error) {
+    console.error('Error loading charts:', error)
+  } finally {
+    loadingCharts.value = false
+  }
+}
+
 const loadDashboard = async () => {
   try {
     const { stats: dStats, activities: activityList } = await teacherPanelService.getDashboardStats({ forceRefresh: false })
@@ -131,16 +210,13 @@ const loadDashboard = async () => {
     
     loading.value = false
     loadingActivities.value = false
+    
+    loadCharts()
   } catch (error) {
     console.error('Dashboard error:', error)
     loading.value = false
     loadingActivities.value = false
   }
-}
-
-const handleSearch = () => {
-  if (!searchQuery.value.trim()) return
-  router.push({ path: TEACHER_ROUTES.STUDENT_LIST.path, query: { search: searchQuery.value.trim() } })
 }
 
 onMounted(() => loadDashboard())

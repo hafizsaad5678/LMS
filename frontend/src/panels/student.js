@@ -33,10 +33,13 @@ export const sidebarSections = [
     items: [
       createMenuItem('My Subjects', '/resources/subjects', '📚'),
       createMenuItem('Subject Materials', '/resources/material', '📁'),
-      createMenuItem('Online Quizzes', '/quizzes', '🧩'),
-      createMenuItem('My Grades', '/grades', '⭐'),
-      createMenuItem('Grade Report', '/grades/report', '📈'),
-      createMenuItem('CGPA Calculator', '/grades/gpa-cgpa-calculator', '🧮')
+      createMenuItem('Online Quizzes', '/quizzes', '🧩')
+    ]
+  },
+  {
+    title: 'Communication',
+    items: [
+      createMenuItem('Announcements', '/announcements', '📣')
     ]
   },
   {
@@ -55,10 +58,15 @@ export const sidebarSections = [
       createMenuItem('Exam Schedule', '/schedule/exam', '📝')
     ]
   },
+
+
   {
-    title: 'Communication',
+    title: 'Grades',
     items: [
-      createMenuItem('Announcements', '/announcements', '📣')
+      createMenuItem('My Grades', '/grades', '⭐'),
+      createMenuItem('Grade Report', '/grades/report', '📈'),
+      createMenuItem('Semester History', '/grades/semester-history', '📚'),
+      createMenuItem('CGPA Calculator', '/grades/gpa-cgpa-calculator', '🧮')
     ]
   },
   {

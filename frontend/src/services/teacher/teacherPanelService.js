@@ -359,6 +359,36 @@ export const teacherPanelService = {
         return this.getAllMarks(params)
     },
 
+    // --- Subject Results Management (Pass/Fail) ---
+    async getSubjectResults(params = {}) {
+        const response = await api.get('/subject-results/', { params })
+        return response.data
+    },
+    async initializeSubjectResults(subjectId) {
+        const response = await api.post('/subject-results/initialize/', { subject: subjectId })
+        return response.data
+    },
+    async autoCalculateSubjectResults(subjectId) {
+        const response = await api.post('/subject-results/auto_calculate/', { subject: subjectId })
+        return response.data
+    },
+    async bulkUpdateSubjectResults(subjectId, results) {
+        const response = await api.post('/subject-results/bulk_update/', { subject: subjectId, results })
+        return response.data
+    },
+    async updateSubjectResult(id, data) {
+        const response = await api.patch(`/subject-results/${id}/`, data)
+        return response.data
+    },
+    async uploadSemesterResult(studentId, formData) {
+        const response = await api.post(`/students/${studentId}/upload-semester-result/`, formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data'
+            }
+        })
+        return response.data
+    },
+
     // ==================== Quiz Management ====================
     async getQuizzes(params) {
         const response = await api.get('/quizzes/', { params })
@@ -750,6 +780,22 @@ export const teacherPanelService = {
             return response.data.results || []
         } catch {
             return []
+        }
+    },
+
+    /**
+     * Get chart data for teacher dashboard
+     */
+    async getChartData() {
+        try {
+            const response = await api.get('/teacher/charts/')
+            return response.data
+        } catch (error) {
+            console.error('Error fetching teacher chart data:', error)
+            return {
+                student_performance: { labels: [], values: [] },
+                assignment_completion: { labels: [], submitted: [], pending: [] }
+            }
         }
     },
 

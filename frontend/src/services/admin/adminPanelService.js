@@ -242,6 +242,22 @@ export const adminPanelService = {
     },
 
     /**
+     * Get chart data for admin dashboard
+     */
+    async getChartData() {
+        try {
+            const response = await api.get('/admin/charts/')
+            return response.data
+        } catch (error) {
+            console.error('Error fetching admin chart data:', error)
+            return {
+                user_growth: { labels: [], students: [], teachers: [] },
+                course_enrollment: { labels: [], values: [] }
+            }
+        }
+    },
+
+    /**
      * Clear all admin cache
      */
     clearCache() {

@@ -1,33 +1,7 @@
 <template>
-  <div class="d-flex justify-content-between align-items-center mb-5">
-    <div>
-      <h1 class="h2 fw-bold text-dark mb-2">Admin Dashboard</h1>
-      <p class="text-muted mb-0">Welcome back! Here's what's happening today.</p>
-    </div>
-    
-    <!-- Search Bar -->
-    <div class="search-container position-relative">
-      <div class="input-group">
-        <span class="input-group-text bg-white border-end-0 ps-3">
-          <i class="bi bi-search text-muted"></i>
-        </span>
-        <input 
-          v-model="searchQuery" 
-          type="text" 
-          class="form-control border-start-0 ps-0" 
-          placeholder="Search profiles..." 
-          @keyup.enter="handleSearch"
-        >
-        <button @click="handleSearch" class="btn btn-admin-primary px-3" :disabled="loadingSearch">
-          <i class="bi bi-arrow-right"></i>
-        </button>
-      </div>
-      <div v-if="loadingSearch" class="position-absolute top-100 start-0 w-100 mt-1">
-        <div class="progress search-progress">
-          <div class="progress-bar progress-bar-striped progress-bar-animated w-100 bg-admin"></div>
-        </div>
-      </div>
-    </div>
+  <div class="mb-5">
+    <h1 class="h2 fw-bold text-dark mb-2">Admin Dashboard</h1>
+    <p class="text-muted mb-0">Welcome back! Here's what's happening today.</p>
   </div>
 
   <!-- Alert Message -->
@@ -44,6 +18,28 @@
   <div class="row g-4 mb-5">
     <div class="col-xl-3 col-md-4" v-for="stat in statsRow2" :key="stat.title">
       <StatCard v-bind="stat" role="admin" :loading="loading" @click="router.push(stat.route)" />
+    </div>
+  </div>
+
+  <!-- Charts Row -->
+  <div class="row g-4 mb-5">
+    <div class="col-lg-6">
+      <DashboardChart
+        title="User Growth (Last 6 Months)"
+        type="line"
+        :chart-data="userGrowthData"
+        :loading="loadingCharts"
+        @refresh="loadCharts"
+      />
+    </div>
+    <div class="col-lg-6">
+      <DashboardChart
+        title="Course Enrollment Stats"
+        type="bar"
+        :chart-data="courseEnrollmentData"
+        :loading="loadingCharts"
+        @refresh="loadCharts"
+      />
     </div>
   </div>
 
@@ -113,17 +109,16 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuth } from '@/store/auth'
-import { ActivityFeed, QuickActionCard, StatCard, AlertMessage } from '@/components/shared/common'
-import { useAlert } from '@/composables/shared'
+import { ActivityFeed, QuickActionCard, StatCard, AlertMessage, DashboardChart } from '@/components/shared/common'
+
 import adminPanelService from '@/services/admin/adminPanelService'
+import { useAlert } from '@/composables/shared'
 import { ADMIN_ROUTES } from '@/utils/constants/routes'
 import { CURRENCY } from '@/utils/constants/config'
 
 const router = useRouter()
 const authStore = useAuth()
-const { alert, showAlert } = useAlert()
-const searchQuery = ref('')
-const loadingSearch = ref(false)
+const { alert } = useAlert()
 const cachedStats = adminPanelService.getCachedStats()
 const loading = ref(!cachedStats)
 const loadingActivities = ref(true)
@@ -154,6 +149,57 @@ const statsRow2 = computed(() => [
 
 const recentActivities = ref([])
 
+const chartRawData = ref({
+  user_growth: { labels: [], students: [], teachers: [] },
+  course_enrollment: { labels: [], values: [] }
+})
+const loadingCharts = ref(true)
+
+const userGrowthData = computed(() => ({
+  labels: chartRawData.value.user_growth?.labels || [],
+  datasets: [
+    {
+      label: 'Students',
+      data: chartRawData.value.user_growth?.students || [],
+      borderColor: '#4f46e5',
+      backgroundColor: 'rgba(79, 70, 229, 0.1)',
+      tension: 0.3,
+      fill: true
+    },
+    {
+      label: 'Teachers',
+      data: chartRawData.value.user_growth?.teachers || [],
+      borderColor: '#10b981',
+      backgroundColor: 'rgba(16, 185, 129, 0.1)',
+      tension: 0.3,
+      fill: true
+    }
+  ]
+}))
+
+const courseEnrollmentData = computed(() => ({
+  labels: chartRawData.value.course_enrollment?.labels || [],
+  datasets: [
+    {
+      label: 'Students Enrolled',
+      data: chartRawData.value.course_enrollment?.values || [],
+      backgroundColor: '#3b82f6',
+      borderRadius: 6
+    }
+  ]
+}))
+
+const loadCharts = async () => {
+  try {
+    loadingCharts.value = true
+    chartRawData.value = await adminPanelService.getChartData()
+  } catch (error) {
+    console.error('Error loading charts:', error)
+  } finally {
+    loadingCharts.value = false
+  }
+}
+
 const loadDashboard = async (forceRefresh = false) => {
   if (!authStore.isAuthenticated) {
     router.push({ name: 'Login' })
@@ -173,19 +219,11 @@ const loadDashboard = async (forceRefresh = false) => {
     
     loading.value = false
     loadingActivities.value = false
+    
+    loadCharts()
   } catch (error) {
     console.error('Dashboard error:', error)
     loading.value = false
-    loadingActivities.value = false
-  }
-}
-
-const loadActivities = async (forceRefresh = false) => {
-  try {
-    recentActivities.value = await adminPanelService.getRecentActivities(forceRefresh)
-  } catch (error) {
-    console.error('Activities error:', error)
-  } finally {
     loadingActivities.value = false
   }
 }
@@ -200,27 +238,6 @@ const handleWindowFocus = () => {
   loadDashboard(true)
 }
 
-const handleSearch = async () => {
-  if (!searchQuery.value.trim()) return
-  loadingSearch.value = true
-  const query = searchQuery.value.toLowerCase()
-  
-  try {
-    const { students, teachers } = await adminPanelService.searchProfiles(query)
-    if (students.length > 0) {
-      if (students.length === 1) router.push({ name: ADMIN_ROUTES.STUDENT_PROFILE.name, params: { id: students[0].id } })
-      else router.push({ path: ADMIN_ROUTES.STUDENT_LIST.path, query: { search: query } })
-      return
-    }
-    if (teachers.length > 0) {
-      if (teachers.length === 1) router.push({ name: ADMIN_ROUTES.TEACHER_PROFILE.name, params: { id: teachers[0].id } })
-      else router.push({ path: ADMIN_ROUTES.TEACHER_LIST.path, query: { search: query } })
-      return
-    }
-    showAlert('info', 'No direct profile found. Try browsing the lists.', 'Search')
-  } catch (error) { console.error('Search error:', error) }
-  finally { loadingSearch.value = false }
-}
 
 onMounted(() => {
   loadDashboard()

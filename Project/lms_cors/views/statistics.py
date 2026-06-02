@@ -1,12 +1,12 @@
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from django.db.models import Sum, Count, Q
+from django.db.models import Sum, Count, Q, Avg
 from ..models.people import Student, Teacher, TeacherSubject, StudentSubject
 from ..models.academic import Department, Program, AcademicSession, Subject
 from ..models.management import Fee, Expense, Account
 from ..models.assignments import Assignment, SubmissionHistory, Grade
-from ..models.grading import StudentMark
+from ..models.grading import StudentMark, StudentGradeSummary, QuizAttempt
 from ..models.materials import Announcement
 from ..models.scheduling import Holiday, Exam, Event, Timetable
 from ..models.library import LibraryBook, BookBorrowing
@@ -95,6 +95,18 @@ def admin_dashboard_stats(request):
     programs = Program.objects.all().order_by('-updated_at')[:recent_limit]
     for p in programs:
         activities.append(format_activity(p, 'Program', 'program', 'bi bi-mortarboard', 'text-secondary', 'name'))
+
+    fees = Fee.objects.filter(status='paid').order_by('-updated_at')[:recent_limit]
+    for f in fees:
+        name = f.student.full_name if f.student else f.remarks or f.receipt_number or "General Revenue"
+        activities.append({
+            'id': f"fee-{f.id}-paid",
+            'message': f"Revenue received: {name} (PKR {f.amount})",
+            'timestamp': f.updated_at or f.created_at,
+            'type': 'finance',
+            'icon': 'bi bi-cash-coin',
+            'color': 'text-success'
+        })
 
     # Sort all by timestamp and take top 10
     activities = [a for a in activities if a['timestamp']]
@@ -335,3 +347,287 @@ def student_dashboard_stats(request):
         },
         'activities': activities[:5]
     })
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated, IsAdminUser])
+def admin_charts(request):
+    """
+    Endpoint for Admin Dashboard charts:
+    - User growth (students and teachers registered over the last 6 months)
+    - Course enrollment stats (students per program)
+    """
+    import datetime
+    now = timezone.now()
+    months = []
+    labels = []
+    student_counts = []
+    teacher_counts = []
+    
+    # Generate last 6 months list (chronological order)
+    for i in range(5, -1, -1):
+        y = now.year
+        m = now.month - i
+        while m <= 0:
+            m += 12
+            y -= 1
+        month_date = datetime.date(y, m, 1)
+        months.append((y, m))
+        labels.append(month_date.strftime('%b %Y'))
+        student_counts.append(0)
+        teacher_counts.append(0)
+
+    # Fetch created_at timestamps for last 180 days
+    start_date = now - timedelta(days=180)
+    student_dates = Student.objects.filter(created_at__gte=start_date).values_list('created_at', flat=True)
+    teacher_dates = Teacher.objects.filter(created_at__gte=start_date).values_list('created_at', flat=True)
+
+    for dt in student_dates:
+        if dt:
+            for idx, (y, m) in enumerate(months):
+                if dt.year == y and dt.month == m:
+                    student_counts[idx] += 1
+                    break
+
+    for dt in teacher_dates:
+        if dt:
+            for idx, (y, m) in enumerate(months):
+                if dt.year == y and dt.month == m:
+                    teacher_counts[idx] += 1
+                    break
+
+    # Program Enrollments
+    programs = Program.objects.annotate(
+        student_count=Count('students_legacy')
+    ).values('name', 'student_count')
+    
+    enrollment_labels = [p['name'] for p in programs]
+    enrollment_values = [p['student_count'] for p in programs]
+
+    # Clean up empty or cut-off labels to make them look beautiful
+    cleaned_labels = []
+    for lbl in enrollment_labels:
+        if not lbl:
+            cleaned_labels.append("General Program")
+        elif lbl.lower() == 'pp':
+            cleaned_labels.append("Pre-Professional")
+        elif lbl.lower() == 'se':
+            cleaned_labels.append("Software Engineering")
+        elif lbl.lower() == 'pak':
+            cleaned_labels.append("Pakistan Studies")
+        elif lbl.startswith('mputer'):
+            cleaned_labels.append("Computer Science (BSCS)")
+        else:
+            # Capitalize each word nicely
+            cleaned_labels.append(lbl.title())
+    enrollment_labels = cleaned_labels
+
+    return Response({
+        'user_growth': {
+            'labels': labels,
+            'students': student_counts,
+            'teachers': teacher_counts
+        },
+        'course_enrollment': {
+            'labels': enrollment_labels,
+            'values': enrollment_values
+        }
+    })
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated, IsTeacherUser])
+def teacher_charts(request):
+    """
+    Endpoint for Teacher Dashboard charts:
+    - Student performance (avg score per subject)
+    - Assignment completion (submitted vs pending for last 5 assignments)
+    """
+    try:
+        teacher = request.user.teacher_profile
+    except Teacher.DoesNotExist:
+        return Response({'detail': 'Teacher profile not found.'}, status=404)
+
+    # Active classes/subjects taught by this teacher
+    classes = TeacherSubject.objects.filter(
+        teacher=teacher,
+        subject__isnull=False,
+        subject__semester__status='active'
+    )
+
+    performance_labels = []
+    performance_values = []
+    
+    for ts in classes:
+        subj = ts.subject
+        if not subj:
+            continue
+        
+        # 1. Try StudentGradeSummary
+        avg_score = StudentGradeSummary.objects.filter(subject=subj).aggregate(Avg('weighted_percentage'))['weighted_percentage__avg']
+        
+        # 2. Try StudentMark fallback
+        if avg_score is None:
+            marks = StudentMark.objects.filter(component__subject=subj, marks_obtained__isnull=False)
+            pct_list = []
+            if marks.exists():
+                for m in marks:
+                    max_marks = float(m.component.max_marks or 0)
+                    if max_marks > 0:
+                        pct_list.append((float(m.marks_obtained) / max_marks) * 100)
+            
+            # 3. Add Assignment Grades
+            grades = Grade.objects.filter(submission__assignment__subject=subj, marks_obtained__isnull=False)
+            for g in grades:
+                total = float(g.submission.assignment.total_marks or 0)
+                if total > 0:
+                    pct_list.append((float(g.marks_obtained) / total) * 100)
+            
+            # 4. Add Quiz Attempts
+            attempts = QuizAttempt.objects.filter(quiz__subject=subj, score__isnull=False)
+            for qa in attempts:
+                total = float(qa.quiz.total_marks or 0)
+                if total > 0:
+                    pct_list.append((float(qa.score) / total) * 100)
+            
+            avg_score = sum(pct_list) / len(pct_list) if pct_list else None
+                
+        if avg_score is None:
+            avg_score = 0.0
+
+        performance_labels.append(f"{subj.name} ({subj.code})")
+        performance_values.append(round(float(avg_score), 2))
+
+    # Assignments created by this teacher in active semesters
+    latest_assignments = Assignment.objects.filter(
+        created_by=teacher,
+        subject__semester__status='active'
+    ).order_by('-created_at')[:5]
+
+    assignment_labels = []
+    submitted_counts = []
+    pending_counts = []
+
+    for a in latest_assignments:
+        sub_count = a.submissions.count()
+        total_students = StudentSubject.objects.filter(
+            subject=a.subject,
+            semester=a.subject.semester
+        ).count()
+        pending = max(0, total_students - sub_count)
+        
+        # Clean title misspelling
+        title = a.title
+        title = title.replace(',,', ', ')
+        title = title.replace('asignment', 'Assignment')
+        title = title.title()
+        
+        assignment_labels.append(title)
+        submitted_counts.append(sub_count)
+        pending_counts.append(pending)
+
+    return Response({
+        'student_performance': {
+            'labels': performance_labels,
+            'values': performance_values
+        },
+        'assignment_completion': {
+            'labels': assignment_labels,
+            'submitted': submitted_counts,
+            'pending': pending_counts
+        }
+    })
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated, IsStudentUser])
+def student_charts(request):
+    """
+    Endpoint for Student Dashboard charts:
+    - Course progress (% marks per subject)
+    - Quiz trend (score percentage per quiz attempt for the last 5 attempts)
+    """
+    try:
+        student = request.user.student_profile
+    except Student.DoesNotExist:
+        return Response({'detail': 'Student profile not found.'}, status=404)
+
+    enrolled_subjects = student.enrolled_subjects.filter(
+        subject__semester__number=student.current_semester
+    )
+
+    progress_labels = []
+    progress_values = []
+
+    for es in enrolled_subjects:
+        subj = es.subject
+        if not subj:
+            continue
+        
+        # 1. Try StudentGradeSummary
+        summary = StudentGradeSummary.objects.filter(student=student, subject=subj).first()
+        pct = float(summary.weighted_percentage) if summary else 0.0
+        
+        # 2. Try StudentMark fallback
+        if not pct:
+            pct_list = []
+            marks = StudentMark.objects.filter(student=student, component__subject=subj, marks_obtained__isnull=False)
+            if marks.exists():
+                for m in marks:
+                    max_marks = float(m.component.max_marks or 0)
+                    if max_marks > 0:
+                        pct_list.append((float(m.marks_obtained) / max_marks) * 100)
+            
+            # 3. Add Assignment Grades fallback
+            grades = Grade.objects.filter(submission__student=student, submission__assignment__subject=subj, marks_obtained__isnull=False)
+            for g in grades:
+                total = float(g.submission.assignment.total_marks or 0)
+                if total > 0:
+                    pct_list.append((float(g.marks_obtained) / total) * 100)
+            
+            # 4. Add Quiz Attempts fallback
+            attempts = QuizAttempt.objects.filter(student=student, quiz__subject=subj, score__isnull=False)
+            for qa in attempts:
+                total = float(qa.quiz.total_marks or 0)
+                if total > 0:
+                    pct_list.append((float(qa.score) / total) * 100)
+                    
+            pct = sum(pct_list) / len(pct_list) if pct_list else 0.0
+            
+        if not pct:
+            pct = 0.0
+
+        progress_labels.append(f"{subj.name} ({subj.code})")
+        progress_values.append(round(pct, 2))
+
+    # Quiz Attempts
+    quiz_attempts = QuizAttempt.objects.filter(
+        student=student
+    ).order_by('-started_at')[:5]
+
+    quiz_labels = []
+    quiz_values = []
+
+    # Reverse to show chronological order
+    for qa in reversed(quiz_attempts):
+        total = float(qa.quiz.total_marks) if qa.quiz and qa.quiz.total_marks else 100.0
+        score_pct = (float(qa.score) / total) * 100 if total > 0 else 0.0
+        
+        quiz_title = qa.quiz.title if qa.quiz else "Quiz"
+        subj_name = ""
+        if qa.quiz and qa.quiz.subject:
+            subj_name = f" ({qa.quiz.subject.code})"
+        quiz_labels.append(f"{quiz_title}{subj_name}")
+        quiz_values.append(round(score_pct, 2))
+
+    return Response({
+        'course_progress': {
+            'labels': progress_labels,
+            'values': progress_values
+        },
+        'quiz_trend': {
+            'labels': quiz_labels,
+            'values': quiz_values
+        }
+    })
+

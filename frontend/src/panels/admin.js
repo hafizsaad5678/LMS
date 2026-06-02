@@ -122,7 +122,7 @@ export const sidebarSections = [
       }
     ]
   },
- 
+
   {
     title: 'Subjects',
     items: [
@@ -156,7 +156,7 @@ export const sidebarSections = [
       }
     ]
   },
-  
+
   {
     title: 'Departments',
     items: [
@@ -198,26 +198,26 @@ export const sidebarSections = [
       }
     ]
   },
-  {
-    title: 'Assignments',
-    items: [
-      {
-        name: 'Assignments',
-        href: `${BASE_PATH}/assignments`,
-        icon: '✏️',
-        submenu: createCrudSubmenu('assignments', 'Assignment', {
-          showAdd: FEATURE_FLAGS.ADMIN_ASSIGNMENT_MANAGEMENT,
-          showEdit: FEATURE_FLAGS.ADMIN_ASSIGNMENT_MANAGEMENT,
-          showDelete: FEATURE_FLAGS.ADMIN_ASSIGNMENT_MANAGEMENT,
-          showProfile: false,
-          listLabel: 'Assignment List',
-          extraItems: [
-            { name: 'View Assignment', href: `${BASE_PATH}/assignments/view`, icon: '👁️' }
-          ]
-        })
-      }
-    ]
-  },
+  // {
+  //   title: 'Assignments',
+  //   items: [
+  //     {
+  //       name: 'Assignments',
+  //       href: `${BASE_PATH}/assignments`,
+  //       icon: '✏️',
+  //       submenu: createCrudSubmenu('assignments', 'Assignment', {
+  //         showAdd: FEATURE_FLAGS.ADMIN_ASSIGNMENT_MANAGEMENT,
+  //         showEdit: FEATURE_FLAGS.ADMIN_ASSIGNMENT_MANAGEMENT,
+  //         showDelete: FEATURE_FLAGS.ADMIN_ASSIGNMENT_MANAGEMENT,
+  //         showProfile: false,
+  //         listLabel: 'Assignment List',
+  //         extraItems: [
+  //           { name: 'View Assignment', href: `${BASE_PATH}/assignments/view`, icon: '👁️' }
+  //         ]
+  //       })
+  //     }
+  //   ]
+  // },
   {
     title: 'Institute Profile',
     items: [
@@ -226,15 +226,15 @@ export const sidebarSections = [
         href: '#',
         icon: '🏢',
         submenu: [
-          { 
-            name: 'Admissions', 
-            href: `${BASE_PATH}/management/admissions`, 
-            icon: '📢' 
+          {
+            name: 'Admissions',
+            href: `${BASE_PATH}/management/admissions`,
+            icon: '📢'
           },
-          { 
-            name: 'Profile Settings', 
-            href: `${BASE_PATH}/management/institution-settings`, 
-            icon: '⚙️' 
+          {
+            name: 'Profile Settings',
+            href: `${BASE_PATH}/management/institution-settings`,
+            icon: '⚙️'
           }
         ]
       }
