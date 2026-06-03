@@ -69,11 +69,6 @@ class QuizQuestionSerializer(serializers.ModelSerializer):
             if correct_count != 1:
                 raise serializers.ValidationError({'options': 'Exactly one correct option is required for MCQ.'})
 
-        if question_type in {'short_answer', 'essay'}:
-            correct_text = str(attrs.get('correct_answer_text', '')).strip()
-            if not correct_text:
-                raise serializers.ValidationError({'correct_answer_text': 'Correct answer is required for non-MCQ questions.'})
-
         return attrs
 
 
@@ -95,7 +90,7 @@ class QuizSerializer(serializers.ModelSerializer):
     class Meta:
         model = Quiz
         fields = [
-            'id', 'title', 'subject', 'subject_name', 'time_limit_minutes', 
+            'id', 'title', 'description', 'subject', 'subject_name', 'time_limit_minutes', 
             'total_marks', 'is_published', 'created_at', 'updated_at', 
             'created_by', 'created_by_name', 'question_count', 'last_attempt',
             'attempt_stats', 'questions'

@@ -61,10 +61,38 @@ class MaterialSerializer(serializers.ModelSerializer):
 class AnnouncementSerializer(serializers.ModelSerializer):
     subject_name = serializers.CharField(source='subject.name', read_only=True)
     created_by_name = serializers.CharField(source='created_by.full_name', read_only=True)
+    description = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    content = serializers.CharField(write_only=True, required=False, allow_blank=True)
     
     class Meta:
         model = Announcement
         fields = '__all__'
+        extra_kwargs = {
+            'message': {'required': False, 'allow_blank': True}
+        }
+
+    def validate(self, attrs):
+        description = attrs.pop('description', None)
+        content = attrs.pop('content', None)
+
+        message = attrs.get('message')
+        if message in (None, ''):
+            for candidate in (description, content):
+                if candidate not in (None, ''):
+                    attrs['message'] = candidate
+                    break
+
+        has_alias = description is not None or content is not None
+        message_supplied = 'message' in attrs or has_alias
+        
+        # If message was supplied (directly or via alias), ensure it exists.
+        # Otherwise, let it be optional as requested.
+        if message_supplied and (attrs.get('message') or '').strip() == '':
+             # If they explicitly sent an empty string/null for an alias, 
+             # we allow it instead of raising error if the model allows it.
+             pass
+
+        return attrs
 
 
 class ActivityLogSerializer(serializers.ModelSerializer):

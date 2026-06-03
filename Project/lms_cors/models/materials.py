@@ -64,7 +64,7 @@ class Announcement(models.Model):
     
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     title = models.CharField(max_length=200)
-    message = models.TextField()
+    message = models.TextField(blank=True, null=True)
     subject = models.ForeignKey(
         'lms_cors.Subject', on_delete=models.CASCADE, 
         related_name='announcements', null=True, blank=True
@@ -119,7 +119,7 @@ class ActivityLog(models.Model):
     )
     user_type = models.CharField(max_length=10, choices=USER_TYPES)
     action_type = models.CharField(max_length=20, choices=ACTION_TYPES)
-    description = models.TextField()
+    description = models.TextField(blank=True, null=True)
     model_name = models.CharField(max_length=50, blank=True)
     object_id = models.CharField(max_length=50, blank=True)
     ip_address = models.GenericIPAddressField(null=True, blank=True)

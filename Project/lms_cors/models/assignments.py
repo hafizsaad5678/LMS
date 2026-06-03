@@ -6,7 +6,7 @@ class Assignment(models.Model):
     """Assignment model for academic assignments"""
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     title = models.CharField(max_length=200)
-    description = models.TextField()
+    description = models.TextField(blank=True, null=True)
     material_file = models.FileField(upload_to='assignments/materials/', blank=True, null=True)
     subject = models.ForeignKey(
         'lms_cors.Subject', on_delete=models.CASCADE, 

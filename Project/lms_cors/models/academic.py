@@ -118,6 +118,16 @@ class Program(models.Model):
     )
     default_semesters = models.IntegerField(default=8)
     min_credit_hours = models.IntegerField(default=130)
+
+    def save(self, *args, **kwargs):
+        # Automatically update default_semesters based on duration_years
+        # and academic system if not explicitly set
+        if self.academic_system == 'annual':
+            self.default_semesters = self.duration_years
+        else:
+            self.default_semesters = self.duration_years * 2
+        super().save(*args, **kwargs)
+
     max_credit_hours = models.IntegerField(default=140)
     requires_fyp = models.BooleanField(default=False)
     requires_thesis = models.BooleanField(default=False)

@@ -3,6 +3,7 @@ from datetime import timedelta
 from decimal import Decimal, InvalidOperation
 
 from django.core.serializers.json import DjangoJSONEncoder
+from django.db import transaction
 from django.utils import timezone
 
 from ai_core.services.config import (
@@ -25,6 +26,13 @@ class QuizSaveService:
     @staticmethod
     def save_quiz(validated_data: dict, user):
         recent_time = timezone.now() - timedelta(seconds=QUIZ_DUPLICATE_WINDOW_SECONDS)
+        quiz_json = validated_data.get("quiz_data", {})
+        questions = quiz_json.get("questions", [])
+
+        if not questions:
+            return {"message": "Cannot save an empty quiz. No questions found in payload.", "status": "error"}, 400
+
+        # Improved duplicate check: look for any quiz with same title and subject by this user recently
         existing_quiz = Quiz.objects.filter(
             title=validated_data["title"],
             subject_id=validated_data["subject_id"],
@@ -39,112 +47,121 @@ class QuizSaveService:
                 "already_exists": True,
             }, 200
 
-        subject = Subject.objects.get(id=validated_data["subject_id"])
-        teacher = Teacher.objects.get(user=user)
-        quiz_json = validated_data["quiz_data"]
+        try:
+            with transaction.atomic():
+                subject = Subject.objects.get(id=validated_data["subject_id"])
+                teacher = Teacher.objects.get(user=user)
 
-        raw_total = quiz_json.get("total_marks")
-        if raw_total is not None:
-            try:
-                total_marks = Decimal(str(raw_total))
-            except (InvalidOperation, TypeError, ValueError):
-                total_marks = Decimal("0")
-        else:
-            total_marks = Decimal("0")
-            for q_data in quiz_json.get("questions", []):
-                try:
-                    total_marks += Decimal(str(q_data.get("marks") or 0))
-                except (InvalidOperation, TypeError, ValueError):
-                    continue
+                raw_total = quiz_json.get("total_marks")
+                if raw_total is not None:
+                    try:
+                        total_marks = Decimal(str(raw_total))
+                    except (InvalidOperation, TypeError, ValueError):
+                        total_marks = Decimal("0")
+                else:
+                    total_marks = Decimal("0")
+                    for q_data in quiz_json.get("questions", []):
+                        try:
+                            total_marks += Decimal(str(q_data.get("marks") or 0))
+                        except (InvalidOperation, TypeError, ValueError):
+                            continue
 
-        grade_comp = GradeComponent.objects.create(
-            subject=subject,
-            created_by=teacher,
-            name=validated_data["title"],
-            component_type="quiz",
-            max_marks=total_marks,
-            weightage=QUIZ_GRADE_COMPONENT_WEIGHTAGE,
-            status=QUIZ_GRADE_COMPONENT_STATUS,
-        )
+                grade_comp = GradeComponent.objects.create(
+                    subject=subject,
+                    created_by=teacher,
+                    name=validated_data["title"],
+                    component_type="quiz",
+                    max_marks=total_marks,
+                    weightage=QUIZ_GRADE_COMPONENT_WEIGHTAGE,
+                    status=QUIZ_GRADE_COMPONENT_STATUS,
+                )
 
-        quiz = Quiz.objects.create(
-            title=validated_data["title"],
-            description=validated_data.get("description", ""),
-            subject=subject,
-            created_by=teacher,
-            grade_component=grade_comp,
-            total_marks=total_marks,
-            is_published=True,
-        )
+                quiz = Quiz.objects.create(
+                    title=validated_data["title"],
+                    description=validated_data.get("description", ""),
+                    subject=subject,
+                    created_by=teacher,
+                    grade_component=grade_comp,
+                    total_marks=total_marks,
+                    is_published=True,
+                )
 
-        q_type_map = {
-            "MCQ": "mcq",
-            "Short Answer": "short_answer",
-            "Long Answer": "essay",
-            # "Mixed" should be decomposed by the generator into concrete question types.
-            # If it leaks through at item-level, default to MCQ for backward compatibility.
-            "Mixed": "mcq",
-        }
+                q_type_map = {
+                    "MCQ": "mcq",
+                    "Short Answer": "short_answer",
+                    "Long Answer": "essay",
+                    "Mixed": "mcq",
+                }
 
-        for q_data in quiz_json.get("questions", []):
-            question = QuizQuestion.objects.create(
-                quiz=quiz,
-                question_text=q_data["question_text"],
-                question_type=q_type_map.get(q_data.get("question_type", "MCQ"), "mcq"),
-                marks=q_data.get("marks", 1),
-                correct_answer_text=q_data.get("correct_answer_text", q_data.get("correct_answer", "")),
-                explanation=q_data.get("explanation", ""),
-            )
-
-            if q_data.get("question_type", "MCQ") == "MCQ":
-                for opt_data in q_data.get("options", []):
-                    if isinstance(opt_data, dict):
-                        text = opt_data.get("text", "")
-                        is_correct = opt_data.get("is_correct", False)
-                    else:
-                        text = opt_data
-                        is_correct = text == q_data.get("correct_answer")
-
-                    QuizOption.objects.create(
-                        question=question,
-                        option_text=text,
-                        is_correct=is_correct,
+                for q_data in quiz_json.get("questions", []):
+                    question = QuizQuestion.objects.create(
+                        quiz=quiz,
+                        question_text=q_data["question_text"],
+                        question_type=q_type_map.get(q_data.get("question_type", "MCQ"), "mcq"),
+                        marks=q_data.get("marks", 1),
+                        correct_answer_text=q_data.get("correct_answer_text", q_data.get("correct_answer", "")),
+                        explanation=q_data.get("explanation", ""),
                     )
 
-        assign_mode = validated_data.get("assign_mode", "all")
-        target_ids = validated_data.get("target_ids", [])
+                    if q_data.get("question_type", "MCQ") == "MCQ":
+                        for opt_data in q_data.get("options", []):
+                            if isinstance(opt_data, dict):
+                                text = opt_data.get("text", "")
+                                is_correct = opt_data.get("is_correct", False)
+                            else:
+                                text = opt_data
+                                is_correct = text == q_data.get("correct_answer")
 
-        assigned_students = []
-        if assign_mode == "all":
-            student_subjects = StudentSubject.objects.filter(subject=subject)
-            assigned_students = [ss.student for ss in student_subjects]
-        elif assign_mode == "department":
-            student_subjects = StudentSubject.objects.filter(subject=subject).select_related(
-                "student", "student__program"
-            )
-            assigned_students = [
-                ss.student
-                for ss in student_subjects
-                if ss.student.program
-                and ss.student.program.department_id
-                and ss.student.program.department_id in target_ids
-            ]
-        elif assign_mode == "students":
-            assigned_students = list(Student.objects.filter(id__in=target_ids))
+                            QuizOption.objects.create(
+                                question=question,
+                                option_text=text,
+                                is_correct=is_correct,
+                            )
 
-        assignment_metadata = {
-            "assign_mode": assign_mode,
-            "target_ids": target_ids,
-            "deadline": validated_data.get("deadline"),
-        }
-        quiz.description = json.dumps(assignment_metadata, cls=DjangoJSONEncoder)
-        quiz.save()
+                assign_mode = validated_data.get("assign_mode", "all")
+                target_ids = validated_data.get("target_ids", [])
 
-        for student in assigned_students:
-            StudentMark.objects.get_or_create(component=grade_comp, student=student)
+                assigned_students = []
+                if assign_mode == "all":
+                    student_subjects = StudentSubject.objects.filter(subject=subject)
+                    assigned_students = [ss.student for ss in student_subjects]
+                elif assign_mode == "department":
+                    student_subjects = StudentSubject.objects.filter(subject=subject).select_related(
+                        "student", "student__program"
+                    )
+                    assigned_students = [
+                        ss.student
+                        for ss in student_subjects
+                        if ss.student.program
+                        and ss.student.program.department_id
+                        and ss.student.program.department_id in target_ids
+                    ]
+                elif assign_mode == "students":
+                    assigned_students = list(Student.objects.filter(id__in=target_ids))
 
-        return {
-            "message": "Quiz generated and assigned successfully",
-            "quiz_id": str(quiz.id),
-            "assigned_count": len(assigned_students),
-        }, 201
+                assignment_metadata = {
+                    "assign_mode": assign_mode,
+                    "target_ids": target_ids,
+                    "deadline": validated_data.get("deadline"),
+                }
+                
+                # Merge existing description with metadata to avoid overwriting user notes
+                user_description = validated_data.get("description", "")
+                if user_description:
+                    quiz.description = f"{user_description}\n\n---\n{json.dumps(assignment_metadata, cls=DjangoJSONEncoder)}"
+                else:
+                    quiz.description = json.dumps(assignment_metadata, cls=DjangoJSONEncoder)
+                
+                quiz.save()
+
+                for student in assigned_students:
+                    StudentMark.objects.get_or_create(component=grade_comp, student=student)
+
+                return {
+                    "message": "Quiz generated and assigned successfully",
+                    "quiz_id": str(quiz.id),
+                    "assigned_count": len(assigned_students),
+                }, 201
+        except Exception as e:
+            # Atomic transaction will rollback on exception
+            raise e

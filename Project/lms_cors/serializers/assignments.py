@@ -36,9 +36,6 @@ class AssignmentSerializer(serializers.ModelSerializer):
         if self.instance is None or 'title' in attrs:
             if not title:
                 raise serializers.ValidationError({'title': 'This field is required.'})
-        if self.instance is None or 'description' in attrs:
-            if not description:
-                raise serializers.ValidationError({'description': 'This field is required.'})
         if self.instance is None or 'due_date' in attrs:
             if attrs.get('due_date') is None:
                 raise serializers.ValidationError({'due_date': 'This field is required.'})

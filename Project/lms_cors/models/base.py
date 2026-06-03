@@ -112,6 +112,18 @@ class BaseProfile(models.Model):
             cnic_digits = self.cnic.replace('-', '').replace(' ', '')
             if len(cnic_digits) != 13 or not cnic_digits.isdigit():
                 raise ValidationError({'cnic': 'CNIC must be exactly 13 digits (with or without dashes)'})
+
+        # Phone validation - strip country code / leading zero, then check length (9 to 10 digits)
+        if self.phone:
+            phone_digits = ''.join(c for c in self.phone if c.isdigit())
+            if phone_digits.startswith('0092'):
+                phone_digits = phone_digits[4:]
+            elif phone_digits.startswith('92'):
+                phone_digits = phone_digits[2:]
+            if phone_digits.startswith('0'):
+                phone_digits = phone_digits[1:]
+            if not (9 <= len(phone_digits) <= 10):
+                raise ValidationError({'phone': 'Phone number must be 9 to 10 digits (excluding leading zero or country code)'})
     
     @property
     def age(self):
