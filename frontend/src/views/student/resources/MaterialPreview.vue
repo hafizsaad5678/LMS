@@ -4,7 +4,7 @@
     <LoadingSpinner v-if="loading" text="Loading preview..." theme="student" class="py-5" />
     <AlertMessage v-else-if="error" type="error" :message="error" title="Error">
       <div class="mt-3">
-        <button class="btn btn-primary" @click="$router.push(STUDENT_ROUTES.COURSE_MATERIAL.path)">Back to
+        <button class="btn btn-student-primary" @click="$router.push(STUDENT_ROUTES.COURSE_MATERIAL.path)">Back to
           Materials</button>
       </div>
     </AlertMessage>
@@ -16,7 +16,7 @@
           <small class="text-muted">{{ material.subject_name }}</small>
         </div>
         <div class="btn-group">
-          <button class="btn btn-outline-primary btn-sm" @click="downloadFile">
+          <button class="btn btn-student-outline btn-sm" @click="downloadFile">
             <i class="bi bi-download me-1"></i> Download
           </button>
           <button class="btn btn-outline-secondary btn-sm" @click="$router.push(STUDENT_ROUTES.COURSE_MATERIAL.path)">
@@ -32,7 +32,7 @@
           </div>
           <h4>PDF preview opens in a new tab</h4>
           <p class="text-muted mb-4">Your browser blocked inline preview. Open the PDF in a separate tab instead.</p>
-          <a class="btn btn-primary" :href="fileUrl" target="_blank" rel="noopener">
+          <a class="btn btn-student-primary" :href="fileUrl" target="_blank" rel="noopener">
             <i class="bi bi-box-arrow-up-right me-2"></i>
             Open PDF
           </a>
@@ -51,7 +51,7 @@
           </div>
           <h4>Preview not available for this file type</h4>
           <p class="text-muted mb-4">You can download the file to view it on your device.</p>
-          <button class="btn btn-success" @click="downloadFile">
+          <button class="btn btn-student-primary" @click="downloadFile">
             <i class="bi bi-download me-2"></i>
             Download {{ material.file_type }}
           </button>
@@ -94,7 +94,7 @@ const fileUrl = computed(() => {
 
 const isPdf = computed(() => {
   const url = fileUrl.value || ''
-  return url.toLowerCase().endsWith('.pdf')
+  return url.toLowerCase().endsWith('.pdf') || material.value.file_type?.toLowerCase() === 'pdf'
 })
 
 const isImage = computed(() => {
@@ -125,9 +125,15 @@ const downloadFile = async () => {
   // Track in background
   studentPanelService.trackMaterialDownload(materialId)
 
+  let filename = material.value.title || 'download'
+  // Ensure .pdf extension if it's a PDF file
+  if (isPdf.value && !filename.toLowerCase().endsWith('.pdf')) {
+    filename += '.pdf'
+  }
+
   const link = document.createElement('a')
   link.href = fileUrl.value
-  link.download = material.value.title || 'download'
+  link.download = filename
   document.body.appendChild(link)
   link.click()
   document.body.removeChild(link)

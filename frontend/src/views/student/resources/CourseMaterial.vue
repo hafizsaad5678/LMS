@@ -113,6 +113,7 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { api, studentService } from '@/services/shared'
 import { StudentPageTemplate } from '@/components/shared/panels'
 import { AlertMessage, SearchFilter, SelectInput, LoadingSpinner } from '@/components/shared/common'
@@ -123,6 +124,8 @@ import { useStudentBase } from '@/composables/student/useStudentBase'
 import { STUDENT_ROUTES } from '@/utils/constants/routes'
 
 const { studentId, loadProfile } = useStudentBase()
+const route = useRoute()
+const router = useRouter()
 const subjects = ref([])
 const { alert, showError } = useAlert()
 
@@ -167,10 +170,14 @@ const openInNewTab = (url) => {
   document.body.removeChild(link)
 }
 
-const downloadDirect = (url, name) => {
+const downloadDirect = (url, name, isPdf = false) => {
   const link = document.createElement('a')
   link.href = url
-  link.download = name || 'download'
+  let filename = name || 'download'
+  if (isPdf && !filename.toLowerCase().endsWith('.pdf')) {
+    filename += '.pdf'
+  }
+  link.download = filename
   document.body.appendChild(link)
   link.click()
   document.body.removeChild(link)
@@ -184,27 +191,27 @@ const downloadMaterial = async (m) => {
     return
   }
 
+  const isPdfFile = (m.file_type?.toLowerCase() === 'pdf' || (m.file_upload || m.file_url || '').toLowerCase().endsWith('.pdf'))
+
   // Track download
   studentPanelService.trackMaterialDownload(m.id)
 
   try {
     const response = await api.get(url, { responseType: 'blob' })
     const blobUrl = window.URL.createObjectURL(response.data)
-    downloadDirect(blobUrl, m.title)
+    downloadDirect(blobUrl, m.title, isPdfFile)
     window.URL.revokeObjectURL(blobUrl)
   } catch (error) {
     console.error('Download error:', error)
-    openInNewTab(url)
+    // Use downloadDirect instead of openInNewTab for download button
+    downloadDirect(url, m.title, isPdfFile)
   }
 }
 
 const viewMaterial = (m) => {
-  const url = getMaterialUrl(m)
-  if (!url) {
-    showError('File URL not found')
-    return
-  }
-  openInNewTab(url)
+  if (!m.id) return
+  // Navigate to dedicated preview page
+  router.push({ name: 'StudentMaterialPreview', params: { id: m.id } })
 }
 const resetFilters = () => { filters.value = { search: '', subject: '' } }
 
@@ -215,6 +222,11 @@ const subjectOptions = computed(() => subjects.value.map(sub => ({
 
 onMounted(async () => {
   loadProfile()
+
+  if (route.query.subject) {
+    filters.value.subject = route.query.subject
+  }
+
   await loadData(async () => {
     const res = await studentService.getEnrolledSubjects(studentId)
     subjects.value = Array.isArray(res) ? res : (res.results || [])

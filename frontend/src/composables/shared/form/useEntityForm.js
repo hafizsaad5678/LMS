@@ -4,7 +4,7 @@
  */
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { validateCNIC, extractErrorMessage, normalizeToArray, cacheService } from '@/services/shared'
+import { validateCNIC, validatePhone, extractErrorMessage, normalizeToArray, cacheService } from '@/services/shared'
 import { ADMIN_ROUTES } from '@/utils/constants/routes'
 
 
@@ -118,6 +118,17 @@ export const useEntityForm = (options = {}) => {
         return true
     }
 
+    /**
+     * Validate Phone field (optional — only validated if provided)
+     */
+    const validatePhoneField = (phone) => {
+        if (!validatePhone(phone)) {
+            showAlert('error', 'Phone number must be 9 to 10 digits (e.g., 3001234567)', 'Validation Error!')
+            return false
+        }
+        return true
+    }
+
     const clearCaches = () => {
         if (cacheKeys.length > 0) {
             cacheKeys.forEach(key => {
@@ -200,6 +211,7 @@ export const useEntityForm = (options = {}) => {
         closeConfirm,
         handleConfirmAction,
         validateCNICField,
+        validatePhoneField,
         handleSubmit,
         handleCancel,
         goToList,

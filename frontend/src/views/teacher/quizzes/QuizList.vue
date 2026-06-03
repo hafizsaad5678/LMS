@@ -33,7 +33,7 @@
     </BaseModal>
 
     <!-- Attempts Detail Modal -->
-    <BaseModal v-model="showAttemptsModal" :title="`Student Attempts: ${selectedQuiz?.title}`" size="lg" :show-confirm="false" cancel-text="Close">
+    <BaseModal v-model="showAttemptsModal" :title="selectedQuiz ? `Student Attempts: ${selectedQuiz.title}` : 'Student Attempts'" size="lg" :show-footer="false" cancel-text="Close">
       <div v-if="loadingAttempts" class="text-center py-5">
         <div class="spinner-border text-primary" role="status"></div>
         <div class="mt-2 text-muted">Loading attempts...</div>

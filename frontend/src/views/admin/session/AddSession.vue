@@ -53,12 +53,13 @@
           <div v-if="selectedProgram" class="alert alert-info">
             <h6 class="fw-semibold"><i class="bi bi-info-circle me-2"></i>Program Details</h6>
             <div class="row mt-3">
-              <div class="col-md-6">
+              <div col-md-6>
                 <p class="mb-2"><strong>Department:</strong> {{ selectedProgram.department_name || 'N/A' }}</p>
                 <p class="mb-2"><strong>Duration:</strong> {{ selectedProgram.duration_years }} years</p>
               </div>
               <div class="col-md-6">
-                <p class="mb-2"><strong>Default Semesters:</strong> {{ selectedProgram.duration_years ? selectedProgram.duration_years * 2 : (selectedProgram.default_semesters || 8) }}</p>
+                <p class="mb-2"><strong>Academic System:</strong> {{ selectedProgram.academic_system === 'annual' ? 'Annual' : 'Semester' }}</p>
+                <p class="mb-2"><strong>Default Semesters:</strong> {{ currentSemesterCount }}</p>
               </div>
             </div>
           </div>
@@ -115,8 +116,8 @@
                 <div class="card-body">
                   <h6 class="text-admin fw-semibold mb-3">Program Information</h6>
                   <p class="mb-2"><strong>Program:</strong> {{ selectedProgram?.name }}</p>
-                  <p class="mb-2"><strong>Department:</strong> {{ selectedProgram?.department_name || 'N/A' }}</p>
-                  <p class="mb-0"><strong>Duration:</strong> {{ selectedProgram?.duration_years }} years</p>
+                  <p class="mb-2"><strong>Duration:</strong> {{ selectedProgram?.duration_years }} years</p>
+                  <p class="mb-0"><strong>Default Semesters:</strong> {{ currentSemesterCount }}</p>
                 </div>
               </div>
             </div>
@@ -211,6 +212,14 @@ const suggestedEndYear = computed(() => {
     return formData.value.start_year + selectedProgram.value.duration_years
   }
   return formData.value.start_year + 4
+})
+
+const currentSemesterCount = computed(() => {
+  if (!selectedProgram.value) return 0
+  
+  // Use duration * 2 for semester system, duration * 1 for annual
+  const multiplier = selectedProgram.value.academic_system === 'annual' ? 1 : 2
+  return selectedProgram.value.duration_years * multiplier
 })
 
 const canProceed = computed(() => {

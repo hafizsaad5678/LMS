@@ -99,6 +99,7 @@ const {
   submitting,
   showAlert,
   validateCNICField,
+  validatePhoneField,
   handleCancel
 } = useEntityForm({
   entityName: 'Teacher',
@@ -174,6 +175,13 @@ const loadTeacher = async () => {
 }
 
 const handleSubmit = async () => {
+  // Validate phone if provided
+  if (form.value.phone && form.value.phone.trim()) {
+    if (!validatePhoneField(form.value.phone)) {
+      return
+    }
+  }
+
   // Validate CNIC if provided
   if (form.value.cnic && form.value.cnic.trim()) {
     if (!validateCNICField(form.value.cnic)) {

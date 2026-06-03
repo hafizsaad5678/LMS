@@ -79,6 +79,7 @@ const {
   submitting,
   showAlert,
   validateCNICField,
+  validatePhoneField,
   handleCancel,
   clearCaches
 } = useEntityForm({
@@ -115,6 +116,13 @@ const generateTemporaryPassword = (length = 16) => {
 }
 
 const handleSubmit = async () => {
+  // Validate phone if provided
+  if (form.value.phone && form.value.phone.trim()) {
+    if (!validatePhoneField(form.value.phone)) {
+      return
+    }
+  }
+
   // Validate CNIC if provided
   if (form.value.cnic && form.value.cnic.trim()) {
     if (!validateCNICField(form.value.cnic)) {

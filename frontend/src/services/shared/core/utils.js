@@ -38,6 +38,31 @@ export const validateCNIC = (cnic) => {
 }
 
 /**
+ * Validate Phone number (Pakistani format)
+ * Must be 9 to 10 digits after stripping country code (92 / 0092) and leading zero
+ * @param {string} phone - Phone number to validate
+ * @returns {boolean} - Is valid
+ */
+export const validatePhone = (phone) => {
+    if (!phone || !phone.trim()) return true // Empty is valid (optional field)
+    let digits = phone.replace(/[^0-9]/g, '') // keep digits only
+
+    // Strip country code
+    if (digits.startsWith('0092')) {
+        digits = digits.slice(4)
+    } else if (digits.startsWith('92')) {
+        digits = digits.slice(2)
+    }
+
+    // Strip leading zero
+    if (digits.startsWith('0')) {
+        digits = digits.slice(1)
+    }
+
+    return digits.length >= 9 && digits.length <= 10
+}
+
+/**
  * Extract error message from API error response
  * @param {Error} error - Axios error object
  * @param {string} fallback - Fallback message
@@ -139,6 +164,7 @@ export const normalizeToArray = (response) => {
 export default {
     getTimeAgo,
     validateCNIC,
+    validatePhone,
     extractErrorMessage,
     debounce,
     normalizeToArray,

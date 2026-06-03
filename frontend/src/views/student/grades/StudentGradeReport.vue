@@ -92,14 +92,10 @@
     </div>
 
     <!-- Export Button -->
-    <div class="mt-4 d-flex gap-2">
-      <button class="btn btn-success" @click="exportPDF">
+    <div class="mt-4">
+      <button class="btn btn-student-primary" @click="exportPDF">
         <i class="bi bi-file-pdf me-2"></i>
-        Export as PDF
-      </button>
-      <button class="btn btn-outline-success" @click="printReport">
-        <i class="bi bi-printer me-2"></i>
-        Print Report
+        Download Report
       </button>
     </div>
   </StudentPageTemplate>
@@ -107,6 +103,8 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { jsPDF } from 'jspdf'
+import autoTable from 'jspdf-autotable'
 import { useAlert } from '@/composables/shared'
 import { studentService, normalizeToArray } from '@/services/shared'
 import { StudentPageTemplate } from '@/components/shared/panels'
@@ -126,7 +124,7 @@ const report = ref({
   subject_performance: []
 })
 
-const { alert, showInfo } = useAlert()
+const { alert, showInfo, showError } = useAlert()
 const breadcrumbs = [
   { name: 'Dashboard', href: STUDENT_ROUTES.DASHBOARD.path },
   { name: 'Grades', href: STUDENT_ROUTES.MY_GRADES.path },
@@ -204,7 +202,78 @@ const loadData = async () => {
   } catch (err) { console.error(err) } finally { loading.value = false }
 }
 
-const exportPDF = () => showInfo('PDF export coming soon!')
+const exportPDF = () => {
+  try {
+    console.log('Generating PDF for student:', studentName.value)
+    const doc = new jsPDF()
+    const primaryColor = [16, 185, 129] // Emerald-500
+
+    // Header
+    doc.setFillColor(...primaryColor)
+    doc.rect(0, 0, 210, 40, 'F')
+    doc.setTextColor(255, 255, 255)
+    doc.setFontSize(22)
+    doc.text('STUDENT GRADE REPORT', 105, 20, { align: 'center' })
+    doc.setFontSize(12)
+    doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 105, 30, { align: 'center' })
+
+    // Student Info
+    doc.setTextColor(0, 0, 0)
+    doc.setFontSize(14)
+    doc.setFont('helvetica', 'bold')
+    doc.text('Student Information', 14, 55)
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(11)
+    doc.text(`Name: ${studentName.value || 'N/A'}`, 14, 65)
+    doc.text(`Enrollment: ${studentEnrollment.value || 'N/A'}`, 14, 72)
+
+    // Summary Stats
+    doc.setFont('helvetica', 'bold')
+    doc.text('Academic Summary', 120, 55)
+    doc.setFont('helvetica', 'normal')
+    doc.text(`Average Score: ${Math.round(report.value.summary.average_score || 0)}%`, 120, 65)
+    doc.text(`Total Subjects: ${report.value.summary.total_subjects || 0}`, 120, 72)
+    doc.text(`GPA: ${report.value.summary.overall_gpa || report.value.summary.gpa || '0.00'}`, 120, 79)
+
+    // Performance Table
+    const tableData = (subjectPerformance.value || []).map(item => [
+      item.subject_name || item.name || 'N/A',
+      item.subject_code || item.code || 'N/A',
+      `${item.score || item.average || 0}%`,
+      item.grade || 'N/A'
+    ])
+
+    if (tableData.length > 0) {
+      autoTable(doc, {
+        startY: 90,
+        head: [['Subject Name', 'Code', 'Score', 'Grade']],
+        body: tableData,
+        headStyles: { fillColor: primaryColor },
+        alternateRowStyles: { fillColor: [240, 253, 244] },
+        margin: { top: 90 }
+      })
+    } else {
+      doc.text('No subject data available', 14, 100)
+    }
+
+    // Footer
+    const pageCount = doc.internal.getNumberOfPages()
+    for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i)
+        doc.setFontSize(10)
+        doc.setTextColor(150)
+        doc.text('This is a computer generated report and does not require a signature.', 105, 285, { align: 'center' })
+    }
+
+    const filename = `Grade_Report_${studentEnrollment.value || 'Student'}.pdf`
+    doc.save(filename)
+    showInfo('Report downloaded successfully')
+  } catch (err) {
+    console.error('PDF Generation Error:', err)
+    showError('Failed to generate PDF report')
+  }
+}
+
 const printReport = () => window.print()
 onMounted(loadData)
 </script>

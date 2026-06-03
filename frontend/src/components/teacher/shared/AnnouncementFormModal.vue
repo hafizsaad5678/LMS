@@ -43,7 +43,6 @@
         <RichTextEditor 
           v-model="localForm.message" 
           placeholder="Write your announcement message here..."
-          required
         />
       </div>
 

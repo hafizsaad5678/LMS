@@ -352,7 +352,7 @@
                         </div>
 
                         <div class="d-grid gap-3">
-                            <button @click="handleSave" :disabled="saving"
+                            <button @click="handleSave" :disabled="saving || !quiz?.questions?.length"
                                 class="btn btn-teacher-primary w-100 py-3 rounded-4 fw-extrabold shadow-lg transition-all hover-scale-105">
                                 <span v-if="saving" class="spinner-border spinner-border-sm me-2"></span>
                                 {{ saving ? 'Deploying...' : 'Save & Assign Quiz' }}
@@ -631,22 +631,39 @@ const handleGenerate = async (s) => {
 }
 
 const handleSave = async () => {
-    saving.value = true
-    const payload = {
-        subject_id: form.subject_id,
-        title: quiz.value.title,
-        quiz_data: quiz.value,
-        assign_mode: form.assign_mode === 'subject' ? 'all' : form.assign_mode,
-        deadline: form.deadline ? new Date(form.deadline).toISOString() : null,
-        target_ids: form.assign_mode === 'students' ? form.selectedStudents : []
+    if (saving.value) return
+    if (!quiz.value?.questions?.length) {
+        showAlert('warning', 'Cannot save an empty quiz. Please add or generate some questions.')
+        return
     }
-    const res = await aiService.saveQuiz(payload)
-    if (res.success) {
-        clearState()
-        showAlert('success', 'Synchronization Complete!', 'Quiz Published')
-        setTimeout(() => router.push(TEACHER_ROUTES.QUIZ_LIST.path), 1500)
-    } else showAlert('error', res.message)
-    saving.value = false
+    
+    saving.value = true
+    try {
+        const payload = {
+            subject_id: form.subject_id,
+            title: quiz.value.title || 'Untitled AI Quiz',
+            quiz_data: quiz.value,
+            assign_mode: form.assign_mode === 'subject' ? 'all' : form.assign_mode,
+            deadline: form.deadline ? new Date(form.deadline).toISOString() : null,
+            target_ids: form.assign_mode === 'students' ? form.selectedStudents : []
+        }
+        const res = await aiService.saveQuiz(payload)
+        if (res.success) {
+            clearState()
+            showAlert('success', 'Synchronization Complete!', 'Quiz Published')
+            setTimeout(() => router.push(TEACHER_ROUTES.QUIZ_LIST.path), 1500)
+        } else {
+            // Handle structured error messages from DRF
+            const errorMsg = typeof res.message === 'object' 
+                ? Object.entries(res.message).map(([k, v]) => `${k}: ${v}`).join(', ')
+                : res.message
+            showAlert('error', errorMsg || 'Failed to save quiz')
+        }
+    } catch (e) {
+        showAlert('error', 'Network error while saving quiz.')
+    } finally {
+        saving.value = false
+    }
 }
 
 const showAlert = (type, message, title = '') => { Object.assign(alert, { show: true, type, message, title }) }
@@ -757,6 +774,11 @@ const normalizeQuestionShape = (question, questionNumber = 1) => {
 const normalizeQuizPayload = (payload, requestedType, mixedCounts) => {
     const quizPayload = payload && typeof payload === 'object' ? payload : { questions: [] }
     if (!Array.isArray(quizPayload.questions)) quizPayload.questions = []
+    
+    // Ensure title exists for the sidebar binding and save payload
+    if (!quizPayload.title) {
+        quizPayload.title = `AI Generated Quiz - ${new Date().toLocaleDateString()}`
+    }
 
     const requested = normalizeTypeLabel(requestedType)
     const isMixed = (requestedType || '').toString().toLowerCase().includes('mixed')

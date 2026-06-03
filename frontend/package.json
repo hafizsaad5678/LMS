@@ -19,6 +19,7 @@
     "bootstrap-icons": "^1.13.1",
     "chart.js": "^4.5.1",
     "jspdf": "^4.2.1",
+    "jspdf-autotable": "^5.0.8",
     "pinia": "^3.0.4",
     "sweetalert2": "^11.26.3",
     "vue": "^3.5.22",
