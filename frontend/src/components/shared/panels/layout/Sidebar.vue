@@ -78,12 +78,12 @@
   </aside>
 
   <!-- Support Floating Button -->
-  <button 
+  <!-- <button 
     :class="['support-float-btn', 'btn', 'rounded-circle', 'shadow-lg', `${sidebarTheme}-float`]"
     @click="toggleSupportCard"
     title="Need Help?">
     <i class="bi bi-question-circle-fill fs-3"></i>
-  </button>
+  </button> -->
 
   <!-- Support Card -->
   <Transition name="support-card">
