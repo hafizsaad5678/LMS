@@ -5,7 +5,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework_simplejwt.tokens import RefreshToken
-from rest_framework.throttling import AnonRateThrottle
+from rest_framework.throttling import AnonRateThrottle, SimpleRateThrottle
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from django.utils.encoding import force_bytes, force_str
 from django.contrib.auth.tokens import default_token_generator
@@ -21,8 +21,14 @@ from .serializers import (
 
 
 
-class LoginThrottle(AnonRateThrottle):
+class LoginThrottle(SimpleRateThrottle):
     scope = 'login'
+
+    def get_cache_key(self, request, view):
+        return self.cache_format % {
+            'scope': self.scope,
+            'ident': self.get_ident(request)
+        }
 
 
 @api_view(['POST'])
