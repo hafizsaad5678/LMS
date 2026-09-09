@@ -292,13 +292,14 @@ class DocumentUploadView(APIView):
 
                 UploadedFile.objects.filter(id=uploaded_file_id).update(index_status=UploadedFile.IndexStatus.PROCESSING)
                 f = BytesIO(data)
-                result = process_and_index_document(user_id, f, filename)
+                result = process_and_index_document(user_id, f, filename, session_id=session_id_value)
                 uf = UploadedFile.objects.filter(id=uploaded_file_id).first()
                 if not uf:
                     return
                 if result.get('status') == 'success':
                     uf.index_status = UploadedFile.IndexStatus.INDEXED
                     cache.set(get_doc_mode_cache_key(user_id, session_id_value), True, DOC_MODE_CACHE_TTL_SECONDS)
+                    cache.set(f"doc_mode_active_{user_id}", True, DOC_MODE_CACHE_TTL_SECONDS)
                 else:
                     uf.index_status = UploadedFile.IndexStatus.FAILED
                 uf.save()
