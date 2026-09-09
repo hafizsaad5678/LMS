@@ -274,7 +274,7 @@ def normalize_similarity_score(score):
         return 0.0
 
 
-def process_and_index_document(user_id, file_obj, filename):
+def process_and_index_document(user_id, file_obj, filename, session_id=None):
     """Extract text from PDF/DOCX/TXT, chunk it, and update the user's FAISS index."""
     lower_name = (filename or "").lower()
     page_texts: list[str] = []
@@ -301,21 +301,25 @@ def process_and_index_document(user_id, file_obj, filename):
                     {
                         "source": filename,
                         "original_filename": filename,
+                        "session_id": str(session_id) if session_id else "",
                         "page_number": meta.get("page") if meta.get("page") is not None else idx + 1,
                     }
                 )
 
         # Fallback extraction keeps previous behavior if a loader failed silently.
         if not page_texts and lower_name.endswith(".pdf"):
-            
-
             reader = pypdf.PdfReader(file_obj)
             for idx, page in enumerate(reader.pages):
                 text = (page.extract_text() or "").strip()
                 if not text:
                     continue
                 page_texts.append(text)
-                metadatas.append({"source": filename, "original_filename": filename, "page_number": idx + 1})
+                metadatas.append({
+                    "source": filename,
+                    "original_filename": filename,
+                    "session_id": str(session_id) if session_id else "",
+                    "page_number": idx + 1
+                })
 
         if not page_texts:
             return {"status": "error", "message": "Could not extract text from file."}
@@ -327,10 +331,14 @@ def process_and_index_document(user_id, file_obj, filename):
         index_dir = os.path.join(_get_faiss_dir(), f"user_docs_lc_{user_id}")
         vector_store = load_vector_store(index_dir)
 
-        if vector_store:
-            vector_store.add_documents(chunks)
-            vector_store.save_local(index_dir)
-            _write_integrity_manifest(index_dir)
+        if vector_store and hasattr(vector_store, "docstore") and hasattr(vector_store.docstore, "_dict"):
+            # Replace previous chunks of the same filename to avoid duplicates
+            existing_docs = [
+                d for d in vector_store.docstore._dict.values()
+                if (d.metadata.get("original_filename") or d.metadata.get("source")) != filename
+            ]
+            all_docs = existing_docs + chunks
+            build_vector_store(all_docs, index_dir)
         else:
             build_vector_store(chunks, index_dir)
 
