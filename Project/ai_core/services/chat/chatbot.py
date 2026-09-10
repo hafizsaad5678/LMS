@@ -14,6 +14,7 @@ from ..config import (
     CHAT_GREETING_KEYWORDS,
     CHAT_GREETING_RESPONSE,
     CHAT_SERVICE_VERSION,
+    CHAT_TOP_K,
     RAG_CONFIDENCE_SWITCH_THRESHOLD,
     RAG_MAX_CONTEXT_CHARS,
     SOURCE_LABEL_DOC_PREFIX,
@@ -24,6 +25,7 @@ from ..config import (
 from ...models.chatbot import UploadedFile
 from ..llm.provider import call_llm, get_chat_model, stream_llm
 from ..llm.prompts import CHATBOT_SYSTEM_PROMPT, RAG_DOC_ANSWER_PROMPT
+from ..rag.utils import get_or_load_vector_store
 from ..tools.docs import query_documents
 from ..utils import compact_text, get_doc_mode_cache_key
 
@@ -122,42 +124,57 @@ def _stream_rag_answer(context: str, question: str):
 
 
 def _has_user_document_index(user_id: int, session_id: str | None = None) -> bool:
-    
-    
-
-    # Require explicit doc-mode activation in this runtime to avoid unexpectedly
-    # loading embedding models from old historical uploads.
-    if not cache.get(get_doc_mode_cache_key(user_id, session_id)):
-        return False
-
-    # Do not attempt doc-RAG until this user has at least one successfully indexed upload.
+    """Check if the user has indexed documents available for RAG."""
+    # Check if user has indexed files in DB
     try:
-        has_indexed_upload = UploadedFile.objects.filter(user_id=user_id, index_status=UploadedFile.IndexStatus.INDEXED).exists()
+        has_indexed_upload = UploadedFile.objects.filter(
+            user_id=user_id, 
+            index_status=UploadedFile.IndexStatus.INDEXED
+        ).exists()
+        if has_indexed_upload:
+            return True
     except Exception:
-        return False
-    if not has_indexed_upload:
-        return False
+        pass
 
+    # Check if index file exists on disk
     index_file = os.path.join(str(FAISS_INDEX_DIR), f"user_docs_lc_{user_id}", "index.faiss")
-    return os.path.exists(index_file)
+    if os.path.exists(index_file):
+        return True
+
+    # Check cache flag
+    if cache.get(get_doc_mode_cache_key(user_id, session_id)) or cache.get(f"doc_mode_active_{user_id}"):
+        return True
+
+    return False
 
 
-def doc_rag_tool(user, query, history=None):
-    docs_res = query_documents(user.id, query)
+def doc_rag_tool(user, query, history=None, session_id=None):
+    docs_res = query_documents(user.id, query, session_id=session_id)
     results = docs_res.get("results") or []
     confidence = float(docs_res.get("confidence", 0.0) or 0.0)
 
-    # If retrieval confidence is weak, skip doc-grounded prompting and answer
-    # through the general assistant path directly.
-    if confidence < RAG_CONFIDENCE_SWITCH_THRESHOLD:
-        return _general_fallback_response(query, history=history, confidence=confidence)
+    # If standard thresholding yielded no results, retrieve top-k chunks directly from vector store
+    if not results:
+        index_dir = os.path.join(FAISS_INDEX_DIR, f'user_docs_lc_{user.id}')
+        try:
+            vector_store = get_or_load_vector_store(index_dir)
+            if vector_store:
+                raw_docs = vector_store.similarity_search(query, k=CHAT_TOP_K)
+                for doc in raw_docs:
+                    doc_text = doc.page_content or ""
+                    if doc_text.strip():
+                        results.append({
+                            "text": doc_text,
+                            "score": 0.5,
+                            "file_name": doc.metadata.get("original_filename") or doc.metadata.get("source") or "Uploaded File",
+                            "page": doc.metadata.get("page_number") if doc.metadata.get("page_number") is not None else "N/A"
+                        })
+                if results:
+                    confidence = 0.6
+        except Exception as err:
+            logger.warning("Fallback vector search failed: %s", err)
 
     if not results:
-        return _general_fallback_response(query, history=history, confidence=confidence)
-
-    # Even with non-trivial vector scores, if lexical overlap is too weak,
-    # prefer the general model instead of producing potentially off-topic doc answers.
-    if not _has_contextual_overlap(query, results):
         return _general_fallback_response(query, history=history, confidence=confidence)
 
     # First, test for exact symbolic or short line match
@@ -171,13 +188,12 @@ def doc_rag_tool(user, query, history=None):
             "confidence": confidence,
         }
 
-    # Our RAG prompt will automatically handle fallback to general knowledge
-    # if the context lacks the answer.
+    # Build RAG context from retrieved chunks
     context = _build_rag_context(results)
 
     unique_files = sorted({r.get("file_name") or "Uploaded File" for r in results})
     return {
-        "text": None, # Signal to use stream
+        "text": None,  # Signal to use stream
         "stream_generator": lambda: _stream_rag_answer(context=context, question=query),
         "prefix_text": "",
         "source": f"{SOURCE_LABEL_DOC_PREFIX}: {', '.join(unique_files)}",
@@ -213,7 +229,8 @@ def orchestrate_response(user, query, history=None, **kwargs):
         }
 
     t_start = time.time()
-    has_user_docs = _has_user_document_index(user.id, kwargs.get("session_id"))
+    session_id = kwargs.get("session_id")
+    has_user_docs = _has_user_document_index(user.id, session_id)
     conf = 1.0 if has_user_docs else 0.5
     intent = "rag" if has_user_docs else "general"
     use_doc_retrieval = has_user_docs
@@ -226,8 +243,8 @@ def orchestrate_response(user, query, history=None, **kwargs):
     if use_doc_retrieval:
         try:
             rag_start = time.time()
-            res.update(doc_rag_tool(user, query, history=history))
-            print(f"⏱️ RAG Retrieval took: {time.time() - rag_start:.2f}s")
+            res.update(doc_rag_tool(user, query, history=history, session_id=session_id))
+            logger.debug("RAG Retrieval took: %.2fs", time.time() - rag_start)
             
             if kwargs.get("streaming") and res.get("stream_generator") and res.get("prefix_text"):
                 base_gen = res["stream_generator"]
@@ -242,7 +259,7 @@ def orchestrate_response(user, query, history=None, **kwargs):
                 generated = "".join(list(res["stream_generator"]()))
                 res["text"] = f"{res.get('prefix_text', '')}{generated}"
                 res.pop("stream_generator", None)
-                print(f"⏱️ LLM Generation took: {time.time() - gen_start:.2f}s")
+                logger.debug("LLM Generation took: %.2fs", time.time() - gen_start)
         except Exception as e:
             logger.error(f"RAG fail: {e}")
             if kwargs.get("streaming"):
@@ -257,7 +274,7 @@ def orchestrate_response(user, query, history=None, **kwargs):
             res["stream_generator"] = lambda: stream_llm(query, system_prompt=CHATBOT_SYSTEM_PROMPT, history=history)
         else:
             res["text"] = call_llm(query, history=history, system_prompt=CHATBOT_SYSTEM_PROMPT)
-            print(f"⏱️ LLM Call took: {time.time() - llm_start:.2f}s")
+            logger.debug("LLM Call took: %.2fs", time.time() - llm_start)
 
     res["latency"] = round(time.time() - start, 2)
     if not kwargs.get("streaming") and res.get("text"):
